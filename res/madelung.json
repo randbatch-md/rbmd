@@ -1,0 +1,23 @@
+﻿{
+  "parallel": {
+    "type": "serial",
+    "num_threads": 8
+  },
+
+  "init_condition": {
+    "type": "MadelungInitCondition",
+    "dims": [ 101, 101, 101 ],
+    "x_range": [ 0.0, 101 ],
+    "y_range": [ 0.0, 101 ],
+    "z_range": [ 0.0, 101 ]
+  },
+
+  "System": {
+    "type": "MadelungSystem"
+  },
+
+  "Executioner": {
+    "dt": 1e-05,
+    "num_steps": 1
+  }
+}

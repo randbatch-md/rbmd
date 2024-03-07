@@ -1,0 +1,103 @@
+﻿{
+  "parallel": {
+    "type": "serial",
+    "num_threads": 8
+  },
+
+  "locator": {
+    "cut_off": 5,
+    "rs": 2.5,
+    "random_num": 50
+  },
+
+  "init_condition": {
+    "model_init_Condition": {
+      "type": "LJInitCondition",
+      "max_steps": 0,
+      "dt": 1e-05,
+      "dims": [ 10, 10, 10 ],
+      "x_range": [ 0.0, 10 ],
+      "y_range": [ 0.0, 10 ],
+      "z_range": [ 0.0, 10 ],
+      "velocity_type": "GAUSS"
+    }
+  },
+
+  "system": {
+    "type": "SalineSolutionSystem",
+    "alpha": 0.1,
+    "rbeP": 100,
+    "kmax": 2,
+    "kbT": 1.0,
+    "farforce_type": "RBE",
+    "nearforce_type": "RBL",
+    "temp_con_type": "BERENDSEN",
+    "unit": "LJ",
+    "use_erf": true
+  },
+
+  "executioner": {
+    "dt": 1e-02,
+    "num_steps": 10000
+  },
+
+  "outputs": {
+    "table_output": {
+      "type": "AtomsTableOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": false,
+      "output_screen": true,
+      "output_file": true,
+      "compute": true
+    },
+
+    "file_output": {
+      "type": "AtomsFileOutput",
+      "interval": 10,
+      "binary": false,
+      "out_initial": false,
+      "output_file": false,
+      "compute": false,
+      "radius": 5,
+      "dr": 0.1,
+      "min_radius": 0.0,
+      "statistics_rdf_steps": 1000,
+      "center_type": 1,
+      "target_type": 1
+    },
+
+    "msd_output": {
+      "type": "MSDOutput",
+      "interval": 10,
+      "binary": false,
+      "out_initial": true,
+      "output_file": true,
+      "compute": true,
+      "start_step": 0,
+      "end_step": 10000
+    },
+
+    "vacf_output": {
+      "type": "VACFOutput",
+      "interval": 10,
+      "binary": false,
+      "out_initial": true,
+      "output_file": true,
+      "compute": true,
+      "start_step": 0,
+      "end_step": 10000
+    },
+
+    "trajectory_output": {
+      "type": "TrajectoryOutput",
+      "interval": 100,
+      "binary": false,
+      "output_file": false
+    },
+
+    "progress": {
+      "type": "Progress"
+    }
+  }
+}

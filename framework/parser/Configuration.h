@@ -1,0 +1,124 @@
+﻿#pragma once
+
+#include "Any.h"
+#include "JsonParser.h"
+#include <map>
+#include <type_traits>
+#include "JsonParser.h"
+
+using linb::any_cast;
+struct PointType
+{
+};
+
+struct ValueType
+{
+};
+
+template<typename T>
+struct Trait
+{
+  using type = T;
+};
+
+class Configuration
+{
+  friend class Object;
+
+public:
+  Configuration(){};
+  ~Configuration(){};
+
+
+  template<typename T>
+  void Add(const std::string& name, const T& value)
+  {
+    if (Have(name))
+    {
+      console::Error(name, "已经存在");
+    }
+    _parameters[name] = value;
+  }
+
+private:
+  template<typename T>
+  std::enable_if_t<std::is_pointer<T>::value, T> Get_(const std::string& name) const
+  {
+    if (HaveInSelf(name))
+    {
+      T pointer = linb::any_cast<T>(_parameters.at(name));
+      if (pointer == nullptr)
+      {
+        console::Error("空指针");
+      }
+      return pointer;
+    }
+    console::Error(name, "不存在");
+  }
+
+  template<typename T>
+  std::enable_if_t<!std::is_pointer<T>::value, T> Get_(const std::string& name) const
+  {
+    if (HaveInJsonNode(name))
+    {
+      Json::Value* json_node = linb::any_cast<Json::Value*>(_parameters.at("_json_node"));
+      return (*json_node)[name].as<T>();
+    }
+
+    console::Error(name, "不存在");
+  }
+
+  template<typename T>
+  T Get(const std::string& name) const
+  {
+    return Get_<T>(name);
+  }
+
+  template<typename T>
+  T Get(const std::string& name, const T& value) const
+  {
+    if (HaveInJsonNode(name))
+    {
+      Json::Value* json_node = linb::any_cast<Json::Value*>(_parameters.at("_json_node"));
+      return (*json_node)[name].as<T>();
+    }
+    else
+    {
+      return value;
+    }
+
+    console::Error(name, "不存在");
+  }
+
+  template<typename T>
+  std::vector<T> GetVectorValue(const std::string& name) const
+  {
+    if (HaveInJsonNode(name))
+    {
+      Json::Value* json_node = linb::any_cast<Json::Value*>(_parameters.at("_json_node"));
+      auto& node = (*json_node)[name];
+      if (node.isArray())
+      {
+        std::vector<T> value;
+        for (auto i = 0; i < node.size(); ++i)
+        {
+          value.push_back(node[i].as<T>());
+        }
+        return value;
+      }
+      else
+      {
+        console::Error(name, "不是数组");
+      }
+    }
+
+    console::Error(name, "不存在");
+  }
+
+  bool Have(const std::string& name) const;
+  bool HaveInSelf(const std::string& name) const;
+  bool HaveInJsonNode(const std::string& name) const;
+
+private:
+  std::map<std::string, linb::any> _parameters;
+};
