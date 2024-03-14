@@ -9,6 +9,108 @@
 
 namespace OutPut
 {
+    struct ComputeEAMrhoWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Real& Vlength)
+        : _eam_cut_off(eam_cut_off)
+        , _Vlength(Vlength)
+      {
+      }
+    
+      using ControlSignature = void(FieldIn atoms_id,
+                                    WholeArrayIn rhor_spline,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldOut EAM_rho);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+    
+      template<typename SpileType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const SpileType& rhor_spline,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                Real& EAM_rho) const
+      {
+        Real rho = 0;
+    
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          rho += force_function.ComputeEAMrhoOUT(_eam_cut_off, r_ij, rhor_spline);
+        };
+        locator.ExecuteOnNeighbor(atoms_id, function);
+        EAM_rho = rho;
+      }
+      Real _eam_cut_off;
+      Real _Vlength;
+    };
+
+    struct ComputeEmbeddingEnergyWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeEmbeddingEnergyWorklet() {}
+    
+      using ControlSignature = void(FieldIn atoms_id,
+                                    WholeArrayIn EAM_rho,
+                                    WholeArrayIn frho_spline,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldOut embedding_energy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7);
+    
+      template<typename EAM_rhoype, typename SpileType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const EAM_rhoype& EAM_rho,
+                                const SpileType& frho_spline,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                Real& embedding_energy) const
+      {
+        embedding_energy = force_function.ComputeEmbeddingEnergy(atoms_id, EAM_rho, frho_spline);
+      }
+    };
+
+    struct ComputePairEnergyWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputePairEnergyWorklet(const Real& eam_cut_off, const Real& Vlength)
+        : _eam_cut_off(eam_cut_off)
+        , _Vlength(Vlength)
+      {
+      }
+    
+      using ControlSignature = void(FieldIn atoms_id,
+                                    WholeArrayIn z2r_spline,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldOut pair_energy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+    
+      template<typename z2rSpileType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const z2rSpileType& z2r_spline,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                Real& pair_energy) const
+      {
+        pair_energy = 0;
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          pair_energy += force_function.ComputePairEnergy(_eam_cut_off, r_ij, z2r_spline);
+        };
+        locator.ExecuteOnNeighbor(atoms_id, function);
+      }
+      Real _eam_cut_off;
+      Real _Vlength;
+    };
+
     struct ComputePotentialEnWorklet : vtkm::worklet::WorkletMapField
     {
       ComputePotentialEnWorklet(const Real& cut_off)
@@ -378,6 +480,62 @@ namespace OutPut
         VACFoutput[3] += vx_sq + vy_sq + vz_sq;
       }
     };
+
+    void EAM_rho(const Real& eam_cut_off,
+                 const Real& Vlength,
+                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                 const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                 const ContPointLocator& locator,
+                 const ContTopology& topology,
+                 const ContForceFunction& force_function,
+                 vtkm::cont::ArrayHandle<Real>& EAM_rho)
+    {
+      vtkm::cont::Invoker{}(ComputeEAMrhoWorklet{ eam_cut_off, Vlength },
+                            atoms_id,
+                            rhor_spline,
+                            locator,
+                            topology,
+                            force_function,
+                            EAM_rho);
+    }
+
+    void EAM_EmbeddingEnergy(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                             const vtkm::cont::ArrayHandle<Real>& EAM_rho,
+                             const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
+                             const ContPointLocator& locator,
+                             const ContTopology& topology,
+                             const ContForceFunction& force_function,
+                             vtkm::cont::ArrayHandle<Real>& embedding_energy)
+    {
+
+      vtkm::cont::Invoker{}(ComputeEmbeddingEnergyWorklet{},
+                            atoms_id,
+                            EAM_rho,
+                            frho_spline,
+                            locator,
+                            topology,
+                            force_function,
+                            embedding_energy);
+    }
+
+    void EAM_PairEnergy(const Real& eam_cut_off,
+                        const Real& Vlength,
+                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                        const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                        const ContPointLocator& locator,
+                        const ContTopology& topology,
+                        const ContForceFunction& force_function,
+                        vtkm::cont::ArrayHandle<Real>& pair_energy)
+    {
+
+      vtkm::cont::Invoker{}(ComputePairEnergyWorklet{ eam_cut_off, Vlength },
+                            atoms_id,
+                            z2r_spline,
+                            locator,
+                            topology,
+                            force_function,
+                            pair_energy);
+    }
 
     //Statistical PotentialEnergy
     void ComputePotentialEnergy(const Real& cutoff,

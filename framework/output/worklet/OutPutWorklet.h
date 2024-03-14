@@ -5,6 +5,32 @@
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 namespace OutPut
 {
+void EAM_rho(const Real& eam_cut_off,
+             const Real& Vlength,
+             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+             const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+             const ContPointLocator& locator,
+             const ContTopology& topology,
+             const ContForceFunction& force_function,
+             vtkm::cont::ArrayHandle<Real>& EAM_rho);
+
+void EAM_EmbeddingEnergy(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const vtkm::cont::ArrayHandle<Real>& EAM_rho,
+                         const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         vtkm::cont::ArrayHandle<Real>& embedding_energy);
+
+void EAM_PairEnergy(const Real& eam_cut_off,
+                    const Real& Vlength,
+                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                    const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                    const ContPointLocator& locator,
+                    const ContTopology& topology,
+                    const ContForceFunction& force_function,
+                    vtkm::cont::ArrayHandle<Real>& pair_energy);
+
 void ComputePotentialEnergy(const Real& cutoff,
                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                              const ContPointLocator& locator,

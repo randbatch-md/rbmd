@@ -55,7 +55,7 @@ private:
   void SetAtomsField();
   void SetBondField();
   void SetAngleField();
-
+  void SetAtomsFieldEAM();
 
 private:
   ModelHeader _header;

@@ -52,6 +52,59 @@ namespace SystemWorklet
                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                         const CoordOffsetType& coord_offset_j,
                         vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+
+   void EAMfpVerlet(const Real& cut_off,
+                    const Real& Vlength,
+                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                    const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                    const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
+                    const ContPointLocator& locator,
+                    const ContForceFunction& force_function,
+                    const GroupVecType& Group_j,
+                    const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                    const CoordOffsetType& coord_offset_j,
+                    vtkm::cont::ArrayHandle<Real>& EAM_fp);
+
+   void EAMForceVerlet(const Real& cut_off,
+                       const Real& vlength,
+                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                       const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                       const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                       const vtkm::cont::ArrayHandle<Real>& EAM_fp,
+                       const ContPointLocator& locator,
+                       const ContForceFunction& force_function,
+                       const GroupVecType& Group_j,
+                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                       const CoordOffsetType& coord_offset_j,
+                       vtkm::cont::ArrayHandle<Vec3f>& force);
+
+   void EAM_rho(const Real& eam_cut_off,
+                const Real& Vlength,
+                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                const ContPointLocator& locator,
+                const ContTopology& topology,
+                const ContForceFunction& force_function,
+                vtkm::cont::ArrayHandle<Real>& EAM_rho);
+
+   void EAM_fp(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+               const vtkm::cont::ArrayHandle<Real>& EAM_rho,
+               const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
+               const ContPointLocator& locator,
+               const ContTopology& topology,
+               const ContForceFunction& force_function,
+               vtkm::cont::ArrayHandle<Real>& fp);
+
+   void EAM_force(const Real& eam_cut_off,
+                  const Real& Vlength,
+                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                  const vtkm::cont::ArrayHandle<Real>& fp,
+                  const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                  const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                  const ContPointLocator& locator,
+                  const ContTopology& topology,
+                  const ContForceFunction& force_function,
+                  vtkm::cont::ArrayHandle<Vec3f>& eam_force);
     
     void NearForceRBLERF(const Id& rs_num,
                          const Id& pice_num,
@@ -88,6 +141,37 @@ namespace SystemWorklet
                     const GroupNumType& num_verletlist,
                     const CoordOffsetType& offset_verletlist_group,
                     vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce);
+
+    void EAMfp(const Real& rc,
+               const Real& Vlength,
+               const Real& rs,
+               const Id& rs_num,
+               const Id& pice_num,
+               const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+               const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+               const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
+               const ContPointLocator& locator,
+               const ContForceFunction& force_function,
+               const GroupVecType& id_verletlist_group,
+               const GroupNumType& num_verletlist_group,
+               const CoordOffsetType& offset_verletlist_group,
+               vtkm::cont::ArrayHandle<Real>& EAM_fp);
+
+    void EAMRBLForce(const Real& rc,
+                   const Real& Vlength,
+                   const Real& rs,
+                   const Id& rs_num,
+                   const Id& pice_num,
+                   const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                   const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                   const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                   const vtkm::cont::ArrayHandle<Real>& EAM_fp,
+                   const ContPointLocator& locator,
+                   const ContForceFunction& force_function,
+                   const GroupVecType& id_verletlist_group,
+                   const GroupNumType& num_verletlist_group,
+                   const CoordOffsetType& offset_verletlist_group,
+                   vtkm::cont::ArrayHandle<Vec3f>& corr_force);
     
     void SumRBLCorrForce(const vtkm::Vec3f corr_value,
                          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& corr_force,

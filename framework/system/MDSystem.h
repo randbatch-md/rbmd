@@ -21,6 +21,9 @@ protected:
   void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce);
   void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
+  void ComputeRBLEAMForce(ArrayHandle<Vec3f>& force);
+  void ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force);
+  void ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force);
 
   void InitField() override;
   void UpdateVerletList();
