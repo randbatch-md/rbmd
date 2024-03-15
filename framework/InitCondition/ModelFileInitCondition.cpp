@@ -776,4 +776,8 @@ void ModelFileInitCondition::SetAtomsFieldEAM()
 
   auto pts_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
+
+    // init position_flag
+  auto position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+  position_flag.AllocateAndFill(_header._num_atoms, { 0, 0, 0 });
 }
