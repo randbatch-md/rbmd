@@ -5,6 +5,14 @@
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 namespace OutPut
 {
+void ComputeRBLNeighboursOnce(const Id& rs_num,
+                              const Id& pice_num,
+                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                              const ContPointLocator& locator,
+                              GroupVecType& id_verletlist_group,
+                              GroupNumType& num_verletlist,
+                              CoordOffsetType& offset_verletlist_group);
+
 void EAM_rho(const Real& eam_cut_off,
              const Real& Vlength,
              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -30,6 +38,35 @@ void EAM_PairEnergy(const Real& eam_cut_off,
                     const ContTopology& topology,
                     const ContForceFunction& force_function,
                     vtkm::cont::ArrayHandle<Real>& pair_energy);
+
+void EAMPairEnergy(const Real& rc,
+                   const Real& Vlength,
+                   const Real& rs,
+                   const Id& rs_num,
+                   const Id& pice_num,
+                   const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                   const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                   const ContPointLocator& locator,
+                   const ContForceFunction& force_function,
+                   const GroupVecType& id_verletlist_group,
+                   const GroupNumType& num_verletlist_group,
+                   const CoordOffsetType& offset_verletlist_group,
+                   vtkm::cont::ArrayHandle<Real>& pair_energy);
+
+void EAMEmbeddingEnergy(const Real& rc,
+                        const Real& Vlength,
+                        const Real& rs,
+                        const Id& rs_num,
+                        const Id& pice_num,
+                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                        const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                        const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
+                        const ContPointLocator& locator,
+                        const ContForceFunction& force_function,
+                        const GroupVecType& id_verletlist_group,
+                        const GroupNumType& num_verletlist_group,
+                        const CoordOffsetType& offset_verletlist_group,
+                        vtkm::cont::ArrayHandle<Real>& embedding_energy);
 
 void ComputePotentialEnergy(const Real& cutoff,
                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

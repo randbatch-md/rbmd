@@ -511,7 +511,33 @@ public:
     Real phi = 0;
 
     auto rdrho = 1 / _drho;
+    //auto p = EAM_rho.Get(atoms_id) * rdrho + 1.0;
+    auto p = EAM_rho * rdrho + 1.0;
+    auto m = static_cast<int>(p);
+    //Id m = p;
+    m = MAX(1, MIN(m, _nrho - 1));
+    p -= m;
+    p = MIN(p, 1.0);
+    auto coeff = frho_spline.Get(m);
+    auto fp = (coeff[0] * p + coeff[1]) * p + coeff[2];
+    phi = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+    if (EAM_rho > _rhomax)
+    {
+      phi += fp * (EAM_rho - _rhomax);
+    }
+    return phi;
+  }
+
+  template<typename rhoType, typename frho_splineType>
+  VTKM_EXEC Real ComputeEmbeddingEnergyOriginal(const Id& atoms_id,
+                                        const rhoType& EAM_rho,
+                                        const frho_splineType& frho_spline) const
+  {
+    Real phi = 0;
+
+    auto rdrho = 1 / _drho;
     auto p = EAM_rho.Get(atoms_id) * rdrho + 1.0;
+    //auto p = EAM_rho * rdrho + 1.0;
     auto m = static_cast<int>(p);
     //Id m = p;
     m = MAX(1, MIN(m, _nrho - 1));
@@ -556,6 +582,39 @@ public:
     }
     return 0.5 * phi;
   }
+
+  template<typename z2r_splineType>
+  VTKM_EXEC Real ComputePairEnergyRBL(const Real& eam_cut_off,
+                                     const Real& rs,
+                                     const Vec3f& r_ij,
+                                     const z2r_splineType& z2r_spline) const
+  {
+    Real phi = 0;
+    auto rdr = 1 / _dr;
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = eam_cut_off * eam_cut_off;
+    auto rs_2 = rs * rs;
+
+    if (rsq < cutsq && rsq > rs_2)
+    {
+      auto r = vtkm::Sqrt(rsq);
+      auto p = r * rdr + 1.0;
+      auto m = static_cast<int>(p);
+      //Id m = p;
+      m = MIN(m, _nr - 1);
+      p -= m;
+      p = MIN(p, 1.0);
+
+      auto coeff = z2r_spline.Get(m);
+      auto z2p = (coeff[0] * p + coeff[1]) * p + coeff[2];
+      auto z2 = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+
+      auto recip = 1.0 / r;
+      phi = z2 * recip; //pair potential energy
+    }
+    return 0.5 * phi;
+  }
+
 
   private:
   Real _cut_Off;
