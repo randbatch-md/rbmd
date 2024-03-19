@@ -572,6 +572,7 @@ namespace OutPut
                   auto pts_id = locator.PtsInCell(ijk, p);
                   auto p_j = locator.GetPtsPosition(pts_id) - coord_offset;
                   Real dis = vtkm::Magnitude(p_j - p_i);
+
                   const auto& target_molecule_id = molecule_id.Get(pts_id);
 
                   if (center_molecule_id != target_molecule_id && dis > current_radius &&

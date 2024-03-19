@@ -206,11 +206,14 @@ void MDSystem::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                   IdComponent& RBE_P,
                                   ArrayHandle<Vec3f>& RBE_ele_force)
 {
+  Timer time;
+  time.Start();
   auto Vlength = GetParameter<Real>(PARA_VLENGTH);
   auto rhok = ComputeChargeStructureFactorRBE(Vlength, psample);
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   SystemWorklet::ComputeNewRBEForce(
     RBE_P, _atoms_id, psample, whole_rhok, _force_function, _topology, _locator, RBE_ele_force);
+  std::cout << "远程时间为：" << time.GetElapsedTime() << std::endl;
 }
 
 void MDSystem::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force)
@@ -224,6 +227,8 @@ void MDSystem::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald
 
 void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
 {
+  Timer time_list;
+  time_list.Start();
   auto N = _position.GetNumberOfValues();
   vtkm::cont::ArrayHandle<Vec3f> corr_force;
   corr_force.Allocate(N);
@@ -269,7 +274,10 @@ void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
                                           id_verletlist_group,
                                           num_verletlist_group,
                                           offset_verletlist_group);
-  
+  std::cout << "邻居列表时间：" << time_list.GetElapsedTime() << std::endl;
+
+  Timer time;
+  time.Start();
   if (_use_erf == true)
   {
     SystemWorklet::NearForceRBLERF(rs_num,
@@ -303,6 +311,7 @@ void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   
   Vec3f corr_value = vtkm::cont::Algorithm::Reduce(corr_force, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   SystemWorklet::SumRBLCorrForce(corr_value, corr_force, nearforce);
+  std::cout << "近程时间为："<< time.GetElapsedTime() << "   " << std::endl;
 
 
   //auto N = _position.GetNumberOfValues();
@@ -316,6 +325,8 @@ void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
 
 void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
 {
+  Timer time_list;
+  time_list.Start();
   auto N = _position.GetNumberOfValues();
   vtkm::cont::ArrayHandle<Vec3f> corr_ljforce;
   corr_ljforce.Allocate(N);
@@ -334,8 +345,8 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
-  //Id cutoff_num = rs_num + random_num;
-  Id cutoff_num = rc_num + random_num;
+  Id cutoff_num = rs_num + random_num;
+  //Id cutoff_num = rc_num + random_num;
   Id verletlist_num = N * cutoff_num;
 
   num_verletlist.Allocate(N * 2);
@@ -361,6 +372,10 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
                                           id_verletlist_group,
                                           num_verletlist_group,
                                           offset_verletlist_group);
+  std::cout << "列表时间：" << time_list.GetElapsedTime() << std::endl;
+
+  Timer time;
+  time.Start();
 
   SystemWorklet::LJForceRBL(rs_num,
                             pice_num,
@@ -376,6 +391,7 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   SystemWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
+  std::cout << "近程计算时间：" << time.GetElapsedTime() << std::endl;
 }
 
 void MDSystem::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
@@ -472,6 +488,8 @@ void MDSystem::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 
 void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
 {
+  Timer time_list;
+  time_list.Start();
   ArrayHandle<Real> fp;
   auto Vlength = GetParameter<Real>(PARA_VLENGTH);
   auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
@@ -495,8 +513,8 @@ void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
   Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
-  //Id cutoff_num = rs_num + random_num;
-  Id cutoff_num = rc_num + random_num;
+  Id cutoff_num = rs_num + random_num;
+  //Id cutoff_num = rc_num + random_num;
   Id verletlist_num = N * cutoff_num;
 
   num_verletlist.Allocate(N * 2);
@@ -522,7 +540,9 @@ void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
                                           id_verletlist_group,
                                           num_verletlist_group,
                                           offset_verletlist_group);
-
+  std::cout << "列表时间：" << time_list.GetElapsedTime() << std::endl;
+  Timer time;
+  time.Start();
   SystemWorklet::EAMfp(rc,
                        Vlength,
                        rs,
@@ -557,6 +577,7 @@ void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_force, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
  SystemWorklet::SumRBLCorrForce(corr_value, corr_force, force);
+  std::cout << "近程计算时间：" << time.GetElapsedTime() << std::endl;
 }
 
 void MDSystem::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
