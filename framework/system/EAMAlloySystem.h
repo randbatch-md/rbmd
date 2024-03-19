@@ -98,8 +98,10 @@ private:
   std::vector<std::vector<Real>> alloy_z2r;
 
   std::vector<Id> type2frho;
-  std::vector<Id2> type2rhor;
-  std::vector<Id2> type2z2r;
+  std::vector<std::vector<Id>> type2rhor;
+  std::vector<std::vector<Id>> type2z2r;
+  //std::vector<Id2> type2rhor;
+  //std::vector<Id2> type2z2r;
   std::vector<Vec2f> scale;
   std::vector<Id> map; // mapping from atom types to elements
 

@@ -60,6 +60,23 @@ public:
     return _parameters.find(name) != _parameters.end();
   }
 
+    // 定义一个函数用于读取一行数据
+  template<typename T>
+  void read_line(std::ifstream& file, T& data)
+  {
+    file >> data;
+  }
+
+  // 定义一个函数用于读取一维数组
+  template<typename T>
+  void read_array(std::ifstream& file, std::vector<T>& array, int size)
+  {
+    for (int i = 0; i < size; ++i)
+    {
+      read_line(file, array[i]);
+    }
+  }
+
   auto& App() { return this->_app; }
   auto& GetTimer() { return this->_timer; }
 

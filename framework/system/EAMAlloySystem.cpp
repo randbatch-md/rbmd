@@ -84,56 +84,26 @@ void EAMAlloySystem::ReadPotentialFile(std::ifstream& input_file)
   input_file >> alloy_file.nelements >> elementsA >> elementsB;
 
   // 开始读取第五行的值
-  input_file >> alloy_file.nrho >> alloy_file.drho >> alloy_file.nr >> alloy_file.dr >>
-    alloy_file.cut_off;
+  input_file >> alloy_file.nrho >> alloy_file.drho >> alloy_file.nr >> alloy_file.dr >>alloy_file.cut_off;
 
   //分配内存
   auto nelements = alloy_file.nelements;
   alloy_file.frho.resize(nelements, std::vector<Real>(alloy_file.nrho + 1));
   alloy_file.rhor.resize(nelements, std::vector<Real>(alloy_file.nr + 1));
-  alloy_file.z2r.resize(nelements);
-  for (int i = 0; i < nelements; ++i)
-  {
-    alloy_file.z2r[i].resize(nelements, std::vector<Real>(alloy_file.nr + 1));
-  }
+  alloy_file.z2r.resize( nelements, std::vector<std::vector<Real>>(nelements, std::vector<Real>(alloy_file.nr + 1)));
 
   // 第6行
   int number;
   float mass, lattice_parameter;
   std::string lattice_style;
-
-  input_file >> number >> mass >> lattice_parameter >> lattice_style;
-  // 读取并保存 Ni_frho 数组
-
-  for (int i = 0; i < alloy_file.nrho; ++i)
+  for (int i = 0; i < nelements; ++i)
   {
-    input_file >> alloy_file.frho[0][i];
-    //std::cout << "i= " << i << ", alloy_file.frho: " << alloy_file.frho[0][i] << std::endl;
-  }
-
-  // 读取并保存  Ni_rhor 数组
-
-  for (int i = 0; i < alloy_file.nrho; ++i)
-  {
-    input_file >> alloy_file.rhor[0][i];
-    //std::cout << "i= " << i << ", alloy_file.rhor: " << alloy_file.rhor[0][i] << std::endl;
-  }
-
-  input_file >> number >> mass >> lattice_parameter >> lattice_style;
-  // 读取并保存 Cu_frho 数组
-
-  for (int i = 0; i < alloy_file.nrho; ++i)
-  {
-    input_file >> alloy_file.frho[1][i];
-    //std::cout << "i= " << i << ", alloy_file.frho: " << alloy_file.frho[1][i] << std::endl;
-  }
-
-  // 读取并保存  Cu_rhor 数组
-
-  for (int i = 0; i < alloy_file.nrho; ++i)
-  {
-    input_file >> alloy_file.rhor[1][i];
-    //std::cout << "i= " << i << ", alloy_file.rhor: " << alloy_file.rhor[1][i] << std::endl;
+    // 读取第6行
+    input_file >> number >> mass >> lattice_parameter >> lattice_style;
+    // 读取并保存 frho 数组
+    read_array(input_file, alloy_file.frho[i], alloy_file.nrho);
+    // 读取并保存 rhor 数组
+    read_array(input_file, alloy_file.rhor[i], alloy_file.nr);
   }
 
   // 读取并保存 z2r 数组
@@ -145,7 +115,7 @@ void EAMAlloySystem::ReadPotentialFile(std::ifstream& input_file)
       for (int k = 0; k <= alloy_file.nr; ++k)
       {
         input_file >> alloy_file.z2r[i][j][k];
-        // std::cout << "alloy_file.z2r[" << i << "][" << j << "][" << k  << "] = " << alloy_file.z2r[i][j][k] << std::endl;
+         //std::cout << "alloy_file.z2r[" << i << "][" << j << "][" << k  << "] = " << alloy_file.z2r[i][j][k] << std::endl;
       }
     }
   }
@@ -161,140 +131,23 @@ void EAMAlloySystem::ReadPotentialFile(std::ifstream& input_file)
 
 void EAMAlloySystem::AllocateEAM() 
 {
-  Id i, j, m, n;
-
-  //auto ntypes = GetParameter<Id>(NTYPES);
-  auto ntypes = 2;
-
-  nrho = alloy_file.nrho;
-  nr = alloy_file.nr;
-  drho = alloy_file.drho;
-  dr = alloy_file.dr;
-  rhomax = (nrho - 1) * drho;
-
-  // ------------------------------------------------------------------
-  // setup frho arrays
-  // ------------------------------------------------------------------
-  auto nelements = alloy_file.nelements;
-  nfrho = nelements + 1;
-  alloy_frho.resize(nfrho, std::vector<Real>(nrho + 1));
-
-  // copy each element's frho to global frho
-  for (i = 0; i < nelements; i++)
+  auto n = 2;
+  map.resize(n+1);
+  for (int i = 1; i <= n; i++)
   {
-    for (m = 1; m <= nrho; m++)
-    {
-      alloy_frho[i][m] = alloy_file.frho[i][m];
-      //std::cout << i << "," << m <<", "  << alloy_frho[i][m] << std::endl;
-    }
+    map[i] = -1;
+    
   }
+  //for (int i = 0; i < map.size(); i++)
+  //{
+  //  std::cout << "," << map[i] << std::endl;
+  //}
+  
 
-  // add extra frho of zeroes for non-EAM types to point to (pair hybrid)
-  // this is necessary b/c fp is still computed for non-EAM atoms
-
-  for (m = 1; m <= nrho; m++)
-  {
-    alloy_frho[nfrho - 1][m] = 0.0;
-  }
-
-
-  for (i = 1; i <= ntypes; i++)
-  {
-    if (map[i] >= 0)
-      type2frho[i] = map[i];
-    else
-      type2frho[i] = nfrho - 1;
-  }
-
-
-
-  // ------------------------------------------------------------------
-  // setup rhor arrays
-  // ------------------------------------------------------------------
-  nrhor = nelements;
-  alloy_rhor.resize(nrhor, std::vector<Real>(nr + 1));
-
-  // copy each element's rhor to global rhor
-  for (i = 0; i < nelements; i++)
-  {
-    for (j = 1; j <= nr; j++)
-    {
-      alloy_rhor[i][j] = alloy_file.rhor[i][j];
-      //std::cout << i << "," << j << ", " << alloy_rhor[i][j] << std::endl;
-    }
-  }
-
-  // type2rhor[i][j] = which rhor array (0 to nrhor-1) each type pair maps to
-  // for setfl files, I,J mapping only depends on I
-  // OK if map = -1 (non-EAM atom in pair hybrid) b/c type2rhor not used
-
-  for (i = 1; i <= ntypes; i++)
-  {
-    for (j = 1; j <= ntypes; j++)
-    {
-      type2rhor[i][j] = map[i];
-    }
-  }
-
-
-  // ------------------------------------------------------------------
-  // setup z2r arrays
-  // ------------------------------------------------------------------
-
-  // nz2r = N*(N+1)/2 where N = # of setfl elements
-
-  nz2r = nelements * (nelements + 1) / 2;
-  alloy_z2r.resize(nz2r, std::vector<Real>(nr + 1));
-
-  // copy each element pair z2r to global z2r, only for I >= J
-  n = 0;
-  for (i = 0; i < nelements; i++)
-  {
-    for (j = 0; j <= i; j++)
-    {
-      for (m = 1; m <= nr; m++)
-      {
-        alloy_z2r[n][m] = alloy_file.z2r[i][j][m];
-        //std::cout << n << "," << m << ", " << alloy_z2r[n][m] << std::endl;
-      }
-      n++;
-    }
-  }
-
-  // type2z2r[i][j] = which z2r array (0 to nz2r-1) each type pair maps to
-  // set of z2r arrays only fill lower triangular Nelement matrix
-  // value = n = sum over rows of lower-triangular matrix until reach irow,icol
-  // swap indices when irow < icol to stay lower triangular
-  // if map = -1 (non-EAM atom in pair hybrid):
-  //   type2z2r is not used by non-opt
-  //   but set type2z2r to 0 since accessed by opt
-
-  int irow, icol;
-  for (i = 1; i <= ntypes; i++)
-  {
-    for (j = 1; j <= ntypes; j++)
-    {
-      irow = map[i];
-      icol = map[j];
-      if (irow == -1 || icol == -1)
-      {
-        type2z2r[i][j] = 0;
-        continue;
-      }
-      if (irow < icol)
-      {
-        irow = map[j];
-        icol = map[i];
-      }
-      n = 0;
-      for (m = 0; m < irow; m++)
-      {
-        n += m + 1;
-      }
-      n += icol;
-      type2z2r[i][j] = n;
-    }
-  }
+  type2frho.resize(n+1);
+  //type2frho.resize(n + 1, n + 1);
+  type2rhor.resize(n + 1, std::vector<Id>(n + 1));
+  type2z2r.resize(n + 1, std::vector<Id>(n + 1));
 }
 
 void EAMAlloySystem::file2array()
@@ -327,6 +180,7 @@ void EAMAlloySystem::file2array()
     }
   }
 
+
   // add extra frho of zeroes for non-EAM types to point to (pair hybrid)
   // this is necessary b/c fp is still computed for non-EAM atoms
 
@@ -335,13 +189,24 @@ void EAMAlloySystem::file2array()
     alloy_frho[nfrho - 1][m] = 0.0;
   }
 
+  //for (i = 0; i < nfrho; i++)
+  //{
+  //  for (m = 0; m < alloy_frho[i].size(); m++)
+  //  {
+  //    std::cout << i << "," << m << ", " << alloy_frho[i][m] << std::endl;
+  //  }
+  //}
+
+  // type2frho[i] = which frho array (0 to nfrho-1) each atom type maps to
+  // if atom type doesn't point to element (non-EAM atom in pair hybrid)
+  // then map it to last frho array of zeroes
 
   for (i = 1; i <= ntypes; i++)
   {
     if (map[i] >= 0)
       type2frho[i] = map[i];
     else
-      type2frho[i] = nfrho - 1;
+      type2frho[i] = nfrho - 1;   //non-EAM atom  ,map it to last frho array of zeroes
   }
 
 
@@ -371,6 +236,8 @@ void EAMAlloySystem::file2array()
     for (j = 1; j <= ntypes; j++)
     {
       type2rhor[i][j] = map[i];
+
+      //std::cout << i << "," << j << ", " << type2rhor[i][j] << std::endl;
     }
   }
 
@@ -431,6 +298,14 @@ void EAMAlloySystem::file2array()
       }
       n += icol;
       type2z2r[i][j] = n;
+      //std::cout << "," << type2z2r[i][j] << std::endl;
+    }
+  }
+  for (int i = 0; i <= ntypes; ++i)
+  {
+    for (int j = 0; j <= ntypes; ++j)
+    {
+      std::cout << "type2z2r[" << i << "][" << j << "] = " << type2z2r[i][j] << std::endl;
     }
   }
 }
@@ -583,7 +458,7 @@ void EAMAlloySystem::SetEAM()
   //}
 
   //sourceArray
-  vtkm::cont::ArrayHandle<Vec7f> source_alloy_frho_spline =
+  vtkm::cont::ArrayHandle<Vec7f> sourceArray_frho_spline =
     vtkm::cont::make_ArrayHandle<Vec7f>(flattened_alloy_frho_spline);
   //for (int i = 0; i < sourceArray.GetNumberOfValues(); ++i)
   //{
@@ -604,8 +479,11 @@ void EAMAlloySystem::SetEAM()
     vtkm::cont::make_ArrayHandle<vtkm::Id>(frho_countVector);
 
   vtkm::Id sourceArraySize;
-  vtkm::cont::ArrayHandle<vtkm::Id> frho_offsetsArray =
+  vtkm::cont::ArrayHandle<vtkm::Id> offsetsArray_frho =
     vtkm::cont::ConvertNumComponentsToOffsets(frho_countArray, sourceArraySize);
+
+
+
 
   //for (int i = 0; i < frho_ffsetsArray.GetNumberOfValues(); ++i)
   //{

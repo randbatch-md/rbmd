@@ -379,7 +379,7 @@ void EAMSystem::UpdateVelocityByTempConType()
     //Maybe dt_divide_taut = 0.05 is a good choice for dt = 2e-3. 0.005, 0.01, 0.1 is optional.
     //The selection of dt_divide_taut determines the temperature equilibrium time.
     //
-    Real dt_divide_taut = 0.01;
+    Real dt_divide_taut = 0.5;   // 0.5 is ok for Ni  element
     Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
     SystemWorklet::UpdateVelocityRescale(coeff_Berendsen, _velocity);
   }
