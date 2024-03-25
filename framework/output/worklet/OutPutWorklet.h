@@ -65,10 +65,11 @@ void ComputeSpecialFarCoul(const Real& Vlength,
                            const ContForceFunction& force_function,
                            vtkm::cont::ArrayHandle<Real>& SpecFarEnergy); 
 
-void ComputeRDF(const Id& num_center_pos,
+ void ComputeRDF(const Id& num_center_pos,
                 const Real& _rho,
                 const vtkm::cont::ArrayHandle<Real>& radius,
                 const vtkm::cont::ArrayHandle<vtkm::Vec3f>& center_position,
+                const vtkm::cont::ArrayHandle<vtkm::Vec3f>& target_position,
                 const vtkm::cont::ArrayHandle<vtkm::Id>& center_ids,
                 const vtkm::cont::ArrayHandle<vtkm::Id>& molecule_id,
                 const ContPointLocator& locator,

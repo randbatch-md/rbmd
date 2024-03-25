@@ -299,15 +299,17 @@ namespace OutPut
       }
       using ControlSignature = void(FieldIn current_radius,
                                     WholeArrayIn center_pts,
+                                    WholeArrayIn target_pts,
                                     WholeArrayIn center_ids,
                                     WholeArrayIn molecule_id,
                                     ExecObject locator,
                                     FieldInOut rdf);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5,_6);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7);
 
       template<typename RadiusType, typename WholePtsType, typename RdfType, typename IdsType>
       VTKM_EXEC void operator()(const RadiusType& current_radius,
                                 const WholePtsType& center_pts,
+                                const WholePtsType& target_pts,
                                 const IdsType& center_ids,
                                 const IdsType& molecule_id,
                                 const ExecPointLocator& locator,
@@ -337,7 +339,7 @@ namespace OutPut
                 for (Id p = 0; p < num_pts; p++)
                 {
                   auto pts_id = locator.PtsInCell(ijk, p);
-                  auto p_j = locator.GetPtsPosition(pts_id) - coord_offset;
+                  auto p_j = target_pts.Get(pts_id) - coord_offset;
                   Real dis = vtkm::Magnitude(p_j - p_i);
                   const auto& target_molecule_id = molecule_id.Get(pts_id);
 
@@ -357,9 +359,9 @@ namespace OutPut
         auto total_num = 0;
         for (auto i = 0; i < _num_center_pos; ++i)
         {
-          const auto& p_i = center_pts.Get(i);
-          const auto& center_molecule_id = molecule_id.Get(center_ids.Get(i));
-          total_num += GetNumber(p_i, center_molecule_id);
+              const auto& p_i = center_pts.Get(i);
+              const auto& center_molecule_id = molecule_id.Get(center_ids.Get(i));
+              total_num += GetNumber(p_i, center_molecule_id);
         }
         auto dr3 = vtkm::Pow((current_radius + current_radius * 0.01), 3);
         auto r3 = vtkm::Pow(current_radius, 3);
@@ -602,6 +604,7 @@ namespace OutPut
                     const Real& _rho,
                     const vtkm::cont::ArrayHandle<Real>& radius,
                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& center_position,
+                    const vtkm::cont::ArrayHandle<vtkm::Vec3f>& target_position,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& center_ids,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& molecule_id,
                     const ContPointLocator& locator,
@@ -610,6 +613,7 @@ namespace OutPut
       vtkm::cont::Invoker{}(ComputeRDFWorklet{ num_center_pos, _rho },
                             radius,
                             center_position,
+                            target_position,
                             center_ids,
                             molecule_id,
                             locator,
