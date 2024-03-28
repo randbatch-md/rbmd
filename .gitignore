@@ -4,3 +4,4 @@
 out
 CMakeSettings.json
 build
+framework/tools/Windows

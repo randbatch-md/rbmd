@@ -1,0 +1,100 @@
+﻿{
+  "parallel": {
+    "type": "serial",
+    "num_threads": 8
+  },
+
+  "locator": {
+    "cut_off": 4.94999,
+    "rs": 2.5,
+    "random_num": 100
+  },
+
+  "init_condition": {
+    "model_init_Condition": {
+      "type": "ModelFileInitCondition",
+      "file": "Cu10_v.data",
+      "atom_style": "atomic",
+      "velocity_type": "GAUSS"
+    }
+  },
+
+  "system": {
+    "type": "EAMSystem",
+    "potential_file": "E:/VS Librarys/1_library/semd/out/build/x64-Release-CUDA/framework/potentials/Cu_u3.eam",
+    "alpha": 0.1,
+    "rbeP": 100,
+    "kmax": 4,
+    "kbT": 298,
+    "farforce_type": "RBE",
+    "nearforce_type": "RBL",
+    "temp_con_type": "NOSE_HOOVER",
+    "unit": "METAL",
+    "use_erf": true
+  },
+
+  "executioner": {
+    "dt": 1e-03,
+    "num_steps": 10000
+  },
+
+  "outputs": {
+    "table_output": {
+      "type": "AtomsTableOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": false,
+      "output_screen": true,
+      "output_file": true,
+      "compute": true
+    },
+
+    "file_output": {
+      "type": "AtomsFileOutput",
+      "interval": 10,
+      "binary": false,
+      "out_initial": false,
+      "output_file": false,
+      "compute": false,
+      "radius": 4.94999,
+      "dr": 0.1,
+      "min_radius": 0.0,
+      "statistics_rdf_steps": 1000,
+      "center_type": 1,
+      "target_type": 1
+    },
+
+    "msd_output": {
+      "type": "MSDOutput",
+      "interval": 10,
+      "binary": false,
+      "out_initial": true,
+      "output_file": true,
+      "compute": true,
+      "start_step": 0,
+      "end_step": 10000
+    },
+
+    "vacf_output": {
+      "type": "VACFOutput",
+      "interval": 10,
+      "binary": false,
+      "out_initial": true,
+      "output_file": true,
+      "compute": true,
+      "start_step": 0,
+      "end_step": 10000
+    },
+
+    "trajectory_output": {
+      "type": "TrajectoryOutput",
+      "interval": 100,
+      "binary": false,
+      "output_file": false
+    },
+
+    "progress": {
+      "type": "Progress"
+    }
+  }
+}
