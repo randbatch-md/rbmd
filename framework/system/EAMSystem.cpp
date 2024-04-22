@@ -52,9 +52,7 @@ void EAMSystem::Init()
   InitialCondition();
 
   ComputeForce(); // Presolve force
-  ComputeVirial();
-  //ev_tall();
-
+  setup();
 }
 
 void EAMSystem::InitialCondition()
@@ -554,41 +552,74 @@ void EAMSystem::ComputeVirial()
   }
 
   //
-  for (int i = 0; i < 6; ++i)
-  {
-    std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
-  }
-  auto volume = GetParameter<Real>(PARA_VOLUME);
-  auto temperature = GetParameter<Real>(PARA_TEMPT);
-  Real boltz, nktv2p, inv_volume, dof;
-
- inv_volume = 1.0 / volume;
- //
- scalar = (dof * boltz * temperature + virial[0] + virial[1] + virial[2]) /
-                     3.0 * inv_volume * nktv2p;
-
-}
-
-void EAMSystem::ev_tall() 
-{
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
-  SystemWorklet::ComputeFpair(_force, fpair);
-  for (int i = 0; i < fpair.GetNumberOfValues(); ++i)
-  {
-    std::cout << "i=" << i << ",fpair=" << fpair.ReadPortal().Get(i) << std::endl;
-  }
-  SystemWorklet::ComputeVirial0(Vlength, _atoms_id, fpair, _locator, _force_function, virial);
-  //for (int i = 0; i < virial.GetNumberOfValues();++i)
+  //for (int i = 0; i < 6; ++i)
   //{
-  //  std::cout << "i=" << i << ",virial="  << virial.ReadPortal().Get(0) << 
-  //               virial.ReadPortal().Get(1) <<
-  //               virial.ReadPortal().Get(2) <<
-  //               virial.ReadPortal().Get(3) << 
-  //               virial.ReadPortal().Get(4) << 
-  //                  virial.ReadPortal().Get(5)
-  //      << std::endl;
-
+  //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
   //}
 
+  //compute scalar
+  auto volume = GetParameter<Real>(PARA_VOLUME);
+  auto temperature = GetParameter<Real>(PARA_TEMPT);
+  auto inv_volume = 1.0 / volume;
+  auto n = _position.GetNumberOfValues();
+  auto dof = 3 * n;
+
+  scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) / 3.0 *
+            inv_volume * _unit_factor.nktv2p;
+
+  std::cout << " scalar=" << scalar << std::endl;
 }
+
+void EAMSystem::Couple() 
+{
+  p_current[0] = p_current[1] = p_current[2] = scalar;
+
+
+}
+
+void EAMSystem::setup()
+{
+  ComputeVirial();
+  Couple();
+  // masses and initial forces on thermostat variables
+  auto n = _position.GetNumberOfValues();
+  auto tdof = 3 * n;
+  Real t_targ, t_freq;
+
+  //eta_mass[0] = tdof * _unit_factor.boltz * t_target / (t_freq * t_freq);
+  //for (int ich = 1; ich < mtchain; ich++)
+  //{
+  //  eta_mass[ich] = _unit_factor.boltz * t_target / (t_freq * t_freq);
+  //}
+
+  //for (int ich = 1; ich < mtchain; ich++)
+  //{
+  //  eta_dotdot[ich] =
+  //    (eta_mass[ich - 1] * eta_dot[ich - 1] * eta_dot[ich - 1] - boltz * t_target) / eta_mass[ich];
+  //}
+}
+
+
+//void EAMSystem::ev_tall() 
+//{
+//  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+//  SystemWorklet::ComputeFpair(_force, fpair);
+//  for (int i = 0; i < fpair.GetNumberOfValues(); ++i)
+//  {
+//    std::cout << "i=" << i << ",fpair=" << fpair.ReadPortal().Get(i) << std::endl;
+//  }
+//  SystemWorklet::ComputeVirial0(Vlength, _atoms_id, fpair, _locator, _force_function, virial);
+//  //for (int i = 0; i < virial.GetNumberOfValues();++i)
+//  //{
+//  //  std::cout << "i=" << i << ",virial="  << virial.ReadPortal().Get(0) << 
+//  //               virial.ReadPortal().Get(1) <<
+//  //               virial.ReadPortal().Get(2) <<
+//  //               virial.ReadPortal().Get(3) << 
+//  //               virial.ReadPortal().Get(4) << 
+//  //                  virial.ReadPortal().Get(5)
+//  //      << std::endl;
+//
+//  //}
+//
+//}
 

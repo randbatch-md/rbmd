@@ -41,6 +41,8 @@ private:
   //
   void ev_tall();
   void ComputeVirial();
+  void Couple();
+  void setup();
 
 
 
@@ -68,6 +70,13 @@ private:
   ArrayHandle<Vec6f> virial_atom; 
   Vec6f virial;               // accumulated virial: xx,yy,zz,xy,xz,yz    
   Real scalar;                // computed global scalar
+
+  Vec6f p_current;
+  double *eta, *eta_dot; // chain thermostat for particles
+  double* eta_dotdot;
+  double* eta_mass;
+  int mtchain; // length of chain
+
   
   ArrayHandle<Real> _EAM_rho;
   ArrayHandle<Real> _fp;
