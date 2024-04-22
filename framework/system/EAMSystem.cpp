@@ -52,6 +52,9 @@ void EAMSystem::Init()
   InitialCondition();
 
   ComputeForce(); // Presolve force
+  ComputeVirial();
+  //ev_tall();
+
 }
 
 void EAMSystem::InitialCondition()
@@ -364,7 +367,7 @@ void EAMSystem::UpdateVelocityByTempConType()
     //In fact, 5.0 and 10.0 are also optional.
     //As long as the coefficent is not too large, such as larger than 100 * dt.
     SystemWorklet::UpdateVelocityNoseHoover(_dt, _unit_factor._fmt2v, _nosehooverxi, _force, _mass, _velocity);
-    Real tauT = 2000 * _dt;
+    Real tauT = 5000 * _dt;           //2000 is is ok for Cu, Ni ; 5000 is ok for Ag , Au, Pd ; 10000  is ok for Pt
     _nosehooverxi += 0.5 * _dt * (_tempT / _kbT - 1.0) / tauT;
   }
   else if (_temp_con_type == "TEMP_RESCALE")
@@ -379,7 +382,7 @@ void EAMSystem::UpdateVelocityByTempConType()
     //Maybe dt_divide_taut = 0.05 is a good choice for dt = 2e-3. 0.005, 0.01, 0.1 is optional.
     //The selection of dt_divide_taut determines the temperature equilibrium time.
     //
-    Real dt_divide_taut = 0.5;   // 0.5 is ok for Ni  element
+    Real dt_divide_taut = 0.5;   // 0.01 is ok for Cu ; 0.5 is ok for Ni ,Ag 
     Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
     SystemWorklet::UpdateVelocityRescale(coeff_Berendsen, _velocity);
   }
@@ -495,3 +498,97 @@ void EAMSystem::SetTopology()
   _topology.SetMolecularId(molecule_id);
   _topology.SetEpsAndSigma(epsilon, sigma);
 }
+
+void EAMSystem::ComputeVirial()
+{
+  auto cut_off = GetParameter<Real>(EAM_PARA_CUTOFF);
+  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+
+  auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+
+  ArrayHandle<Real> EAM_rho;
+  ArrayHandle<Real> fp;
+
+  //1:compute _EAM_rho   = density at each atom
+  SystemWorklet::EAM_rho(
+    cut_off, Vlength, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
+
+  // 2:compute fp    = derivative of embedding energy at each atom
+  SystemWorklet::EAM_fp(_atoms_id, EAM_rho, frho_spline, _locator, _topology, _force_function, fp);
+
+  // 3:compute  virial  = EAM_virial
+  SystemWorklet::EAM_virial(cut_off,
+                           Vlength,
+                           _atoms_id,
+                           fp,
+                           rhor_spline,
+                           z2r_spline,
+                           _locator,
+                           _topology,
+                           _force_function,
+                            virial_atom);
+
+
+  //for (int i = 0; i <virial_atom.GetNumberOfValues();++i)
+  //{
+  //  std::cout << "i=" << i << ",virial_atom=" << virial_atom.ReadPortal().Get(i)[0] << "," 
+  //            << virial_atom.ReadPortal().Get(i)[1] << "," << virial_atom.ReadPortal().Get(i)[2] << "," 
+  //            << virial_atom.ReadPortal().Get(i)[3] << "," << virial_atom.ReadPortal().Get(i)[4] << "," 
+  //            << virial_atom.ReadPortal().Get(i)[5]
+  //      << std::endl;
+  //}
+
+
+
+  virial = { 0, 0, 0, 0, 0, 0 };
+  for (int i = 0; i < virial_atom.GetNumberOfValues(); ++i)
+  {
+    // 获取当前原子的virial
+    Vec6f vatom = virial_atom.ReadPortal().Get(i); 
+    for (int j = 0; j < 6; ++j)
+    {
+      virial[j] += vatom[j];
+    }
+  }
+
+  //
+  for (int i = 0; i < 6; ++i)
+  {
+    std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
+  }
+  auto volume = GetParameter<Real>(PARA_VOLUME);
+  auto temperature = GetParameter<Real>(PARA_TEMPT);
+  Real boltz, nktv2p, inv_volume, dof;
+
+ inv_volume = 1.0 / volume;
+ //
+ scalar = (dof * boltz * temperature + virial[0] + virial[1] + virial[2]) /
+                     3.0 * inv_volume * nktv2p;
+
+}
+
+void EAMSystem::ev_tall() 
+{
+  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+  SystemWorklet::ComputeFpair(_force, fpair);
+  for (int i = 0; i < fpair.GetNumberOfValues(); ++i)
+  {
+    std::cout << "i=" << i << ",fpair=" << fpair.ReadPortal().Get(i) << std::endl;
+  }
+  SystemWorklet::ComputeVirial0(Vlength, _atoms_id, fpair, _locator, _force_function, virial);
+  //for (int i = 0; i < virial.GetNumberOfValues();++i)
+  //{
+  //  std::cout << "i=" << i << ",virial="  << virial.ReadPortal().Get(0) << 
+  //               virial.ReadPortal().Get(1) <<
+  //               virial.ReadPortal().Get(2) <<
+  //               virial.ReadPortal().Get(3) << 
+  //               virial.ReadPortal().Get(4) << 
+  //                  virial.ReadPortal().Get(5)
+  //      << std::endl;
+
+  //}
+
+}
+

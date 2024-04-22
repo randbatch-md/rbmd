@@ -38,6 +38,11 @@ private:
   void SetEAM();
   void InitStyle();
 
+  //
+  void ev_tall();
+  void ComputeVirial();
+
+
 
 private:
   std::shared_ptr<Executioner>& _executioner;
@@ -58,7 +63,11 @@ private:
   Real _tempT_sum;
   Real _tempT;
   std::ifstream _potential_file;
-
+  //
+  ArrayHandle<Real> fpair; 
+  ArrayHandle<Vec6f> virial_atom; 
+  Vec6f virial;               // accumulated virial: xx,yy,zz,xy,xz,yz    
+  Real scalar;                // computed global scalar
   
   ArrayHandle<Real> _EAM_rho;
   ArrayHandle<Real> _fp;

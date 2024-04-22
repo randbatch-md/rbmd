@@ -29,6 +29,6 @@
     vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Vec3f>,
                                             vtkm::cont::ArrayHandle<vtkm::Id>>;
   using Vec7f = vtkm::Vec<vtkm::FloatDefault, 7>;
-
+  using Vec6f = vtkm::Vec<vtkm::FloatDefault, 6>;
   //using RealGradient = vtkm::Vec3f;
 //}

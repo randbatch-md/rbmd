@@ -374,6 +374,7 @@ public:
                                   const z2r_splineType& z2r_spline) const
   {
     Vec3f eam_force = { 0, 0, 0 };
+    Vec6f virial = { 0, 0, 0,0, 0, 0 };
 
     auto rdr = 1 / _dr;
     auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
@@ -421,8 +422,81 @@ public:
       eam_force[0] = r_ij[0] * fpair;
       eam_force[1] = r_ij[1] * fpair;
       eam_force[2] = r_ij[2] * fpair;
+
+      //
+       virial[0] = r_ij[0] * r_ij[0] * fpair;
+       virial[1] = r_ij[1] * r_ij[1] * fpair;
+       virial[2] = r_ij[2] * r_ij[2] * fpair;
+       virial[3] = r_ij[0] * r_ij[1] * fpair;
+       virial[4] = r_ij[0] * r_ij[2] * fpair;
+       virial[5] = r_ij[1] * r_ij[2] * fpair;
     }
     return eam_force;
+  }
+
+  template<typename fpType, typename rhor_splineType, typename z2r_splineType>
+  VTKM_EXEC Vec6f ComputeEAMViral(const Real& eam_cut_off,
+                                  const Id& atoms_id,
+                                  const Id& pts_id_j,
+                                  const Vec3f& r_ij,
+                                  const fpType fp,
+                                  const rhor_splineType& rhor_spline,
+                                  const z2r_splineType& z2r_spline) const
+  {
+    Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+
+    auto rdr = 1 / _dr;
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = eam_cut_off * eam_cut_off;
+
+    if (rsq < cutsq && rsq > 0.01)
+    {
+       auto r = vtkm::Sqrt(rsq);
+       auto p = r * rdr + 1.0;
+       auto m = static_cast<int>(p);
+       //Id m = p;
+       m = MIN(m, _nr - 1);
+       p -= m;
+       p = MIN(p, 1.0);
+
+       // rhoip = derivative of (density at atom j due to atom i)
+       // rhojp = derivative of (density at atom i due to atom j)
+       // phi = pair potential energy
+       // phip = phi'
+       // z2 = phi * r
+       // z2p = (phi * r)' = (phi' r) + phi
+       // psip needs both fp[i] and fp[j] terms since r_ij appears in two
+       //   terms of embed eng: Fi(sum rho_ij) and Fj(sum rho_ji)
+       //   hence embed' = Fi(sum rho_ij) rhojp + Fj(sum rho_ji) rhoip
+       // scale factor can be applied by thermodynamic integration
+
+       auto coeffi = rhor_spline.Get(m);
+       auto rhoip = (coeffi[0] * p + coeffi[1]) * p + coeffi[2];
+
+       auto coeffj = rhor_spline.Get(m);
+       auto rhojp = (coeffj[0] * p + coeffj[1]) * p + coeffj[2];
+
+       auto coeff = z2r_spline.Get(m);
+       auto z2p = (coeff[0] * p + coeff[1]) * p + coeff[2];
+       auto z2 = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+
+       auto recip = 1.0 / r;
+       auto phi = z2 * recip;                 //pair potential energy
+       auto phip = z2p * recip - phi * recip; //pair force
+       auto psip = fp.Get(atoms_id) * rhojp + fp.Get(pts_id_j) * rhoip + phip;
+       auto fpair = -psip * recip;
+       //std::cout << fpair << "," << r_ij[0] << "," << r_ij[1] << ","  << r_ij[2] << std::endl;
+
+       //compute virial
+       virial[0] = r_ij[0] * r_ij[0] * fpair;
+       //std::cout << virial[0] << std::endl;
+       virial[1] = r_ij[1] * r_ij[1] * fpair;
+       virial[2] = r_ij[2] * r_ij[2] * fpair;
+       virial[3] = r_ij[0] * r_ij[1] * fpair;
+       virial[4] = r_ij[0] * r_ij[2] * fpair;
+       virial[5] = r_ij[1] * r_ij[2] * fpair;
+    }
+    return virial;
   }
 
   template<typename fpType, typename rhor_splineType, typename z2r_splineType>
@@ -556,6 +630,19 @@ public:
     }
     return 0.5 * phi;
   }
+
+   VTKM_EXEC Vec6f ComputeVirial0(const Vec3f& r_ij, const Real& fpair) const
+   {
+        Vec6f virial = {0,0,0,0,0,0};
+        virial[0] += r_ij[0] * r_ij[0] * fpair;
+        virial[1] += r_ij[1] * r_ij[1] * fpair;
+        virial[2] += r_ij[2] * r_ij[2] * fpair;
+        virial[3] += r_ij[0] * r_ij[1] * fpair;
+        virial[4] += r_ij[0] * r_ij[2] * fpair;
+        virial[5] += r_ij[1] * r_ij[2] * fpair;
+        return virial;
+
+   }
 
   private:
   Real _cut_Off;

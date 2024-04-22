@@ -52,6 +52,8 @@ void MeshFreeSystem::InitPara()
     _unit_factor._fmt2v = 4.186 * vtkm::Pow(10.0, -4);
     _unit_factor._mvv2e = 1.0 / (4.186 * vtkm::Pow(10.0, -4));
     _unit_factor._qqr2e = 332.06371;
+    _unit_factor.nktv2p = 1.6021765e6;
+    _unit_factor.boltz = 8.617343e-5;
   }
   else if (_unit == "LJ")
   {
