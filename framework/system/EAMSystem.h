@@ -41,8 +41,14 @@ private:
   //
   void ev_tall();
   void ComputeVirial();
+  void Compute_Pressure_Scalar();
+  void Compute_Temp_Scalar();
   void Couple();
-  void setup();
+  void end_of_step();
+  void x2lamda(Id n);
+  void lamda2x(Id n);
+  void set_global_box();
+  void remap();
 
 
 
@@ -65,17 +71,31 @@ private:
   Real _tempT_sum;
   Real _tempT;
   std::ifstream _potential_file;
+
+
   //
   ArrayHandle<Real> fpair; 
-  ArrayHandle<Vec6f> virial_atom; 
-  Vec6f virial;               // accumulated virial: xx,yy,zz,xy,xz,yz    
-  Real scalar;                // computed global scalar
+  ArrayHandle<Vec6f> _virial_atom; 
+  Vec6f virial;                      // accumulated virial: xx,yy,zz,xy,xz,yz    
+  Real pressure_scalar;              // computed global pressure scalar
 
-  Vec6f p_current;
-  double *eta, *eta_dot; // chain thermostat for particles
-  double* eta_dotdot;
-  double* eta_mass;
-  int mtchain; // length of chain
+  //
+  Vec3f p_start, p_stop;
+  Vec3f p_period ,p_target;
+
+  Vec3f p_current, dilation;
+  Real bulkmodulus;
+
+
+  //
+  Vec6f h, h_inv; // shape matrix in Voigt ordering
+
+   // orthogonal box
+
+  Real  xprd, yprd, zprd;                  // global box dimensions
+  Real  xprd_half, yprd_half, zprd_half; // half dimensions
+  Vec3f prd;                           // array form of dimensions
+  Vec3f prd_half;                      // array form of half dimensions
 
   
   ArrayHandle<Real> _EAM_rho;

@@ -52,7 +52,7 @@ void EAMSystem::Init()
   InitialCondition();
 
   ComputeForce(); // Presolve force
-  setup();
+
 }
 
 void EAMSystem::InitialCondition()
@@ -396,6 +396,7 @@ void EAMSystem::Solve()
 {
   // stage1:
   UpdateVelocity();
+  end_of_step();
 
   // stage2:
   UpdatePosition();
@@ -526,25 +527,29 @@ void EAMSystem::ComputeVirial()
                            _locator,
                            _topology,
                            _force_function,
-                            virial_atom);
+                            _virial_atom);
 
 
-  //for (int i = 0; i <virial_atom.GetNumberOfValues();++i)
+  //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
   //{
-  //  std::cout << "i=" << i << ",virial_atom=" << virial_atom.ReadPortal().Get(i)[0] << "," 
-  //            << virial_atom.ReadPortal().Get(i)[1] << "," << virial_atom.ReadPortal().Get(i)[2] << "," 
-  //            << virial_atom.ReadPortal().Get(i)[3] << "," << virial_atom.ReadPortal().Get(i)[4] << "," 
-  //            << virial_atom.ReadPortal().Get(i)[5]
+  //  std::cout << "i=" << i << ",_virial_atom=" << _virial_atom.ReadPortal().Get(i)[0] << "," 
+  //            << _virial_atom.ReadPortal().Get(i)[1] << "," << _virial_atom.ReadPortal().Get(i)[2] << "," 
+  //            << _virial_atom.ReadPortal().Get(i)[3] << "," << _virial_atom.ReadPortal().Get(i)[4] << "," 
+  //            << _virial_atom.ReadPortal().Get(i)[5]
   //      << std::endl;
   //}
+}
 
+void EAMSystem::Compute_Pressure_Scalar()
+{
 
+  ComputeVirial();
 
   virial = { 0, 0, 0, 0, 0, 0 };
-  for (int i = 0; i < virial_atom.GetNumberOfValues(); ++i)
+  for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
   {
     // 获取当前原子的virial
-    Vec6f vatom = virial_atom.ReadPortal().Get(i); 
+    Vec6f vatom = _virial_atom.ReadPortal().Get(i);
     for (int j = 0; j < 6; ++j)
     {
       virial[j] += vatom[j];
@@ -557,48 +562,179 @@ void EAMSystem::ComputeVirial()
   //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
   //}
 
-  //compute scalar
+  //compute pressure scalar
   auto volume = GetParameter<Real>(PARA_VOLUME);
   auto temperature = GetParameter<Real>(PARA_TEMPT);
   auto inv_volume = 1.0 / volume;
+  //
   auto n = _position.GetNumberOfValues();
-  auto dof = 3 * n;
+  auto extra_dof = 3; //dimension =3
 
-  scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) / 3.0 *
-            inv_volume * _unit_factor.nktv2p;
+  auto dof = 3 * n - extra_dof;
 
-  std::cout << " scalar=" << scalar << std::endl;
+  pressure_scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) / 3.0 
+                      * inv_volume * _unit_factor.nktv2p;
+
+  std::cout << " scalar=" << pressure_scalar << std::endl;
 }
+
+void EAMSystem::Compute_Temp_Scalar() {}
 
 void EAMSystem::Couple() 
 {
-  p_current[0] = p_current[1] = p_current[2] = scalar;
-
+  p_current[0] = p_current[1] = p_current[2] = pressure_scalar;
 
 }
 
-void EAMSystem::setup()
+void EAMSystem::end_of_step()
 {
-  ComputeVirial();
+  bulkmodulus = 10.0;
+  p_start[0] = p_start[1] = p_start[2] = 1.0;
+  p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
+  p_period[0] = p_period[1] = p_period[2] = 1.0;
+
+  // compute new T,P
+
+  Compute_Pressure_Scalar();
   Couple();
-  // masses and initial forces on thermostat variables
-  auto n = _position.GetNumberOfValues();
-  auto tdof = 3 * n;
-  Real t_targ, t_freq;
 
-  //eta_mass[0] = tdof * _unit_factor.boltz * t_target / (t_freq * t_freq);
-  //for (int ich = 1; ich < mtchain; ich++)
-  //{
-  //  eta_mass[ich] = _unit_factor.boltz * t_target / (t_freq * t_freq);
-  //}
+  auto currentstep = _app.GetExecutioner()->CurrentStep();
+  auto beginstep = 0;
+  auto endstep = _app.GetExecutioner()->NumStep();
 
-  //for (int ich = 1; ich < mtchain; ich++)
+  auto delta = currentstep - beginstep;
+  std::cout << delta << std::endl;
+  if (delta != 0.0)
+  {
+    delta = delta / (endstep - beginstep);
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
+    dilation[i] = pow(1.0 - _dt / p_period[i] * (p_target[i] - p_current[i]) / bulkmodulus, 1.0 / 3.0);
+  }
+
+  for (int i = 0; i < 3; i++)
+  {
+    std::cout << "i=" << i  << ",dilation=" << dilation[i] << std::endl;
+  }
+  // remap simulation box and atoms
+  // redo KSpace coeffs since volume has changed
+
+  remap();
+
+
+}
+
+void EAMSystem::x2lamda(Id n)
+{
+  //
+  set_global_box();
+  //
+  Vec3f delta;
+  auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  //
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+
+  for (int i = 0; i < n; i++)
+  {
+    delta[0] = position.ReadPortal().Get(i)[0] - range[0].Min;
+    delta[1] = position.ReadPortal().Get(i)[1] - range[1].Min;
+    delta[2] = position.ReadPortal().Get(i)[2] - range[2].Min;
+
+    position.WritePortal().Get(i)[0] = h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2];
+    position.WritePortal().Get(i)[1] = h_inv[1] * delta[1] + h_inv[3] * delta[2];
+    position.WritePortal().Get(i)[2] = h_inv[2] * delta[2];
+  }
+  //for (int i = 0; i < n; i++)
   //{
-  //  eta_dotdot[ich] =
-  //    (eta_mass[ich - 1] * eta_dot[ich - 1] * eta_dot[ich - 1] - boltz * t_target) / eta_mass[ich];
+  //  for (int j = 0; j < 3; j++)
+  //  {
+  //    std::cout << "i=" << i << ", lamda_position=" << position.ReadPortal().Get(i)[j] << std::endl;
+  //  }
   //}
 }
 
+void EAMSystem::lamda2x(Id n)
+{
+  auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+
+  for (int i = 0; i < n; i++)
+  {
+    position.WritePortal().Get(i)[0] = h[0] * position.ReadPortal().Get(i)[0] + 
+                                       h[5] * position.ReadPortal().Get(i)[1] +
+                                       h[4] * position.ReadPortal().Get(i)[2] + range[0].Min;
+
+    position.WritePortal().Get(i)[1] = h[1] * position.ReadPortal().Get(i)[1] +
+                                       h[3] * position.ReadPortal().Get(i)[2] +  
+                                       range[1].Min;
+
+    position.WritePortal().Get(i)[2] = h[2] * position.ReadPortal().Get(i)[2] + range[2].Min;
+  }
+  //for (int i = 0; i < n; i++)
+  //{
+  //  for (int j = 0; j < 3; j++)
+  //  {
+  //    std::cout << "i=" << i << ", position=" << position.ReadPortal().Get(i)[j] << std::endl;
+  //  }
+  //}
+}
+
+void EAMSystem::set_global_box()
+{
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  prd[0] = xprd = range[0].Max - range[0].Min;
+  prd[1] = yprd = range[1].Max - range[1].Min;
+  prd[2] = zprd = range[2].Max - range[2].Min;
+
+  h[0] = xprd;
+  h[1] = yprd;
+  h[2] = zprd;
+  //
+  auto orthogonal  = 1;
+  if (orthogonal)
+  {
+    h_inv[0] = 1.0 / h[0];
+    h_inv[1] = 1.0 / h[1];
+    h_inv[2] = 1.0 / h[2];
+    h_inv[3] = 0;
+    h_inv[4] = 0;
+    h_inv[5] = 0;
+  }
+
+
+}
+
+void EAMSystem::remap() 
+{
+  Real oldlo, oldhi, ctr;
+  auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  auto n = position.GetNumberOfValues();
+
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+
+  // convert pertinent atoms and rigid bodies to lamda coords
+  x2lamda(n);
+
+  // reset global and local box to new size/shape
+
+  for (int i = 0; i < 3; i++)
+  {
+    oldlo = range[i].Min;
+    oldhi = range[i].Max;
+    ctr = 0.5 * (oldlo + oldhi);
+    range[i].Min = (oldlo - ctr) * dilation[i] + ctr;
+    range[i].Max = (oldhi - ctr) * dilation[i] + ctr;
+  }
+
+  set_global_box();
+
+  // convert pertinent atoms and rigid bodies back to box coords
+
+  lamda2x(n);
+
+}
 
 //void EAMSystem::ev_tall() 
 //{
