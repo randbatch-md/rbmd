@@ -13,6 +13,7 @@ const std::string HEADER_RESIDUAL_NAME = "RESIDUAL";
 const std::string HEADER_KINETIC_ENERGY_NAME = "KINETIC_ENERGY";
 const std::string HEADER_TOTAL_ENERGY_NAME = "TOTAL_ENERGY";
 const std::string HEADER_KBT_NAME = "KBT";
+const std::string HEADER_PRESSURE_NAME = "pressure";
 const std::string HEADER_CUMULATIVE_TIME_NAME = "CUMULATIVE_TIME";
 
 //RegisterObject(AtomsTableOutput);
@@ -33,6 +34,7 @@ AtomsTableOutput::AtomsTableOutput(const Configuration& cfg)
   , _rho(0.0)
   , _tempT_sum(0.0)
   , _tempT(0.0)
+  , _pressure(0.0)
 {
 
 }
@@ -50,6 +52,7 @@ void AtomsTableOutput::Init()
     AddHeader(HEADER_POTENTIAL_ENERGY_NAME);
     AddHeader(HEADER_RESIDUAL_NAME);
     AddHeader(HEADER_KBT_NAME);
+    AddHeader(HEADER_PRESSURE_NAME);
     AddHeader(HEADER_KINETIC_ENERGY_NAME);
     AddHeader(HEADER_TOTAL_ENERGY_NAME);
     AddHeader(HEADER_CUMULATIVE_TIME_NAME);
@@ -69,6 +72,7 @@ void AtomsTableOutput::Execute()
   {
     _tempT_sum = _system.GetParameter<Real>(PARA_TEMPT_SUM);
     _tempT = _system.GetParameter<Real>(PARA_TEMPT);
+    //_pressure = _system.GetParameter<Real>(PARA_PRESSURE);
 
     //ComputePotentialEnergy();          ////////////////////         这里需要有判断
     ComputeEAMPotentialEnergy();
@@ -207,6 +211,7 @@ void AtomsTableOutput::AddDataToTable()
     AddData(HEADER_TOTAL_ENERGY_NAME, _total_energy);
     AddData(HEADER_KINETIC_ENERGY_NAME, _kinteic_energy);
     AddData(HEADER_KBT_NAME, _tempT);
+   // AddData(HEADER_PRESSURE_NAME, _pressure);
     AddData(HEADER_CUMULATIVE_TIME_NAME, _cumulative_time + _timer.GetElapsedTime());
   }
 }
@@ -231,6 +236,8 @@ void AtomsTableOutput::WriteToFile()
             << ", "
             << "kBT"                         // add kBT
             << ", "
+            //<< "pressure"
+            //<< ", "
             << "KinteicEnergy"
             << ", "
             << "PotentialEnergy"
@@ -251,6 +258,7 @@ void AtomsTableOutput::WriteToFile()
             << _far_ele_potential_energy_avr << " , " 
             << _residual << ", "
             << _tempT  << ", "
+            //<< _pressure << ", "
             << _kinteic_energy << ", "
             << _potential_energy << ", "
             << _total_energy << ", "

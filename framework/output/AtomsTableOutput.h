@@ -48,4 +48,5 @@ private:
   Real _far_ele_potential_energy_avr;
   Real _self_potential_energy_avr;
   Real _temperature;
+  Real _pressure;
 };

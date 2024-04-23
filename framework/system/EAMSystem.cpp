@@ -563,7 +563,10 @@ void EAMSystem::Compute_Pressure_Scalar()
   //}
 
   //compute pressure scalar
-  auto volume = GetParameter<Real>(PARA_VOLUME);
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto volume = (range[0].Max - range[0].Min) * 
+                (range[1].Max - range[1].Min) *
+                (range[2].Max - range[2].Min);
   auto temperature = GetParameter<Real>(PARA_TEMPT);
   auto inv_volume = 1.0 / volume;
   //
@@ -572,17 +575,18 @@ void EAMSystem::Compute_Pressure_Scalar()
 
   auto dof = 3 * n - extra_dof;
 
-  pressure_scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) / 3.0 
+  _pressure_scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) / 3.0 
                       * inv_volume * _unit_factor.nktv2p;
 
-  std::cout << " scalar=" << pressure_scalar << std::endl;
+  SetParameter(PARA_PRESSURE, _pressure_scalar);
+  std::cout << " pressure=" << _pressure_scalar << std::endl;
 }
 
 void EAMSystem::Compute_Temp_Scalar() {}
 
 void EAMSystem::Couple() 
 {
-  p_current[0] = p_current[1] = p_current[2] = pressure_scalar;
+  p_current[0] = p_current[1] = p_current[2] = _pressure_scalar;
 
 }
 
@@ -614,10 +618,10 @@ void EAMSystem::end_of_step()
     dilation[i] = pow(1.0 - _dt / p_period[i] * (p_target[i] - p_current[i]) / bulkmodulus, 1.0 / 3.0);
   }
 
-  for (int i = 0; i < 3; i++)
-  {
-    std::cout << "i=" << i  << ",dilation=" << dilation[i] << std::endl;
-  }
+  //for (int i = 0; i < 3; i++)
+  //{
+  //  std::cout << "i=" << i  << ",dilation=" << dilation[i] << std::endl;
+  //}
   // remap simulation box and atoms
   // redo KSpace coeffs since volume has changed
 
@@ -727,6 +731,8 @@ void EAMSystem::remap()
     range[i].Min = (oldlo - ctr) * dilation[i] + ctr;
     range[i].Max = (oldhi - ctr) * dilation[i] + ctr;
   }
+  //
+  SetParameter(PARA_RANGE, range);
 
   set_global_box();
 
