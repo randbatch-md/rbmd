@@ -326,6 +326,9 @@ void EAMSystem::UpdatePosition()
 {
   auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
+  //
+  fix_press_berendsen();
+  //
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
 }
@@ -400,7 +403,7 @@ void EAMSystem::Solve()
   // stage1:
   UpdateVelocity();
   //
-  fix_press_berendsen();
+  //fix_press_berendsen();
 
   // stage2:
   UpdatePosition();
@@ -650,7 +653,7 @@ void EAMSystem::x2lamda(Id n)
     _position.WritePortal().Get(i)[1] = h_inv[1] * delta[1] + h_inv[3] * delta[2];
     _position.WritePortal().Get(i)[2] = h_inv[2] * delta[2];
   }
-  _locator.SetPosition(_position);
+  //_locator.SetPosition(_position);
   //for (int i = 0; i < n; i++)
   //{
   //  for (int j = 0; j < 3; j++)
@@ -676,7 +679,7 @@ void EAMSystem::lamda2x(Id n)
 
     _position.WritePortal().Get(i)[2] = h[2] * _position.ReadPortal().Get(i)[2] + range[2].Min;
   }
-  _locator.SetPosition(_position);
+  //_locator.SetPosition(_position);
 
   //for (int i = 0; i < n; i++)
   //{

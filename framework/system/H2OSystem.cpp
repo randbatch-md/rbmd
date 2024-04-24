@@ -75,6 +75,8 @@ void H2OSystem::Solve()
   //ComputeForce();   // Only compute once during evaluation
   UpdateVelocity();
 
+  //
+  fix_press_berendsen();
   // stage2:
   UpdatePosition();
 
@@ -111,6 +113,8 @@ void H2OSystem::InitialCondition()
 
   PreForce();
   _nosehooverxi = 0.0;
+
+  set_global_box();
 }
 
 void H2OSystem::ComputeForce()
@@ -622,7 +626,7 @@ void H2OSystem::fix_press_berendsen()
   bulkmodulus = 10.0;
   p_start[0] = p_start[1] = p_start[2] = 1.0;
   p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
-  p_period[0] = p_period[1] = p_period[2] = 1.0;
+  p_period[0] = p_period[1] = p_period[2] = 500;
 
   // compute new T,P
 
@@ -658,34 +662,9 @@ void H2OSystem::fix_press_berendsen()
 
 void H2OSystem::ComputeVirial()
 {
-  auto cut_off = GetParameter<Real>(EAM_PARA_CUTOFF);
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
-
-  auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
-  auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
-  auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
-
-  ArrayHandle<Real> EAM_rho;
-  ArrayHandle<Real> fp;
-
-  //1:compute _EAM_rho   = density at each atom
-  SystemWorklet::EAM_rho(
-    cut_off, Vlength, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
-
-  // 2:compute fp    = derivative of embedding energy at each atom
-  SystemWorklet::EAM_fp(_atoms_id, EAM_rho, frho_spline, _locator, _topology, _force_function, fp);
-
-  // 3:compute  virial  = EAM_virial
-  SystemWorklet::EAM_virial(cut_off,
-                            Vlength,
-                            _atoms_id,
-                            fp,
-                            rhor_spline,
-                            z2r_spline,
-                            _locator,
-                            _topology,
-                            _force_function,
-                            _virial_atom);
+  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  SystemWorklet::LJVirial(
+    cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
 
   //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
@@ -700,6 +679,7 @@ void H2OSystem::ComputeVirial()
 
 void H2OSystem::Compute_Pressure_Scalar()
 {
+  //ComputeTempe();
 
   ComputeVirial();
 
