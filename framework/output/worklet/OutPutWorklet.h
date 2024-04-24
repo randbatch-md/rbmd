@@ -38,6 +38,13 @@ void ComputePotentialEnergy(const Real& cutoff,
                              const ContForceFunction& force_function,
                              vtkm::cont::ArrayHandle<Real>& potential_energy);
 
+void ComputeClass2PotentialEnergy(const Real& cutoff,
+                                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                  const ContPointLocator& locator,
+                                  const ContTopology& topology,
+                                  const ContForceFunction& force_function,
+                                  vtkm::cont::ArrayHandle<Real>& potential_energy);
+
 void ComputeNearElePotential(const Real& cutoff,
                              const Real& alpha,
                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

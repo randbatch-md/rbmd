@@ -159,6 +159,60 @@ namespace OutPut
       Real _cut_off;
     };
     
+    struct ComputeClass2PotentialEnWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeClass2PotentialEnWorklet(const Real& cut_off)
+        : _cut_off(cut_off)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldOut PotentialEnergy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5);
+
+      VTKM_EXEC void operator()(vtkm::Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                Real& PotentialEnergy) const
+      {
+        Real PE_ij = 0;
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+          auto r_ij = p_j - p_i;
+
+          auto sigma_i3 = sigma_i * sigma_i * sigma_i;
+          auto sigma_i6 = sigma_i3 * sigma_i3;
+          auto sigma_j3 = sigma_j * sigma_j * sigma_j;
+          auto sigma_j6 = sigma_j3 * sigma_j3;
+          Real eps_ij = (2 * vtkm::Sqrt(eps_i * eps_j) * sigma_i3 * sigma_j3) / sigma_i6 + sigma_j6;
+          Real sigma_ij = vtkm::Pow((sigma_i6 + sigma_j6)/2, 1/6);
+
+          // special lj part
+          auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+          IdComponent force_factor_ij = (molecular_id_i == molecular_id_j) ? 0 : 1.0;
+
+          PE_ij += force_factor_ij *
+            force_function.ComputeClass2PotentialEn(r_ij, eps_ij, sigma_ij, _cut_off);
+        };
+        locator.ExecuteOnNeighbor(atoms_id, function);
+
+        PotentialEnergy = PE_ij;
+      }
+      Real _cut_off;
+    };
+
     struct ComputeNearElePotentialWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeNearElePotentialWorklet(const Real& cut_off, const Real& nearalpha)
@@ -548,6 +602,21 @@ namespace OutPut
                                 vtkm::cont::ArrayHandle<Real>& potential_energy)
     {
       vtkm::cont::Invoker{}(ComputePotentialEnWorklet{ cutoff },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            potential_energy);
+    }
+
+    void ComputeClass2PotentialEnergy(const Real& cutoff,
+                                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                      const ContPointLocator& locator,
+                                      const ContTopology& topology,
+                                      const ContForceFunction& force_function,
+                                      vtkm::cont::ArrayHandle<Real>& potential_energy)
+    {
+      vtkm::cont::Invoker{}(ComputeClass2PotentialEnWorklet{ cutoff },
                             atoms_id,
                             locator,
                             topology,

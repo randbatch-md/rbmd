@@ -134,7 +134,8 @@ void MoleculesTableOutput::ComputePotentialEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
-  OutPut::ComputePotentialEnergy( _cut_off, atoms_id, locator, topology, force_function, lj_potential_energy);
+  //OutPut::ComputePotentialEnergy( _cut_off, atoms_id, locator, topology, force_function, lj_potential_energy);
+  OutPut::ComputeClass2PotentialEnergy( _cut_off, atoms_id, locator, topology, force_function, lj_potential_energy);
 
   auto lj_potential_energy_total =
     vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());

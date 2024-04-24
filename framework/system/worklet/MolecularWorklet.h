@@ -114,6 +114,104 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
   Real _Vlength;
 };
 
+struct ComputeBondClass2Worklet : vtkm::worklet::WorkletMapField
+{
+  ComputeBondClass2Worklet(const Real& Vlength)
+    : _Vlength(Vlength)
+  {
+  }
+  using ControlSignature = void(FieldIn bond_type,
+                                FieldIn bondlist,
+                                FieldIn bond_coeffs_k2,
+                                FieldIn bond_coeffs_k3,
+                                FieldIn bond_coeffs_k4,
+                                FieldIn bond_coeffs_equilibrium,
+                                WholeArrayIn _position,
+                                FieldOut forcebond,
+                                FieldOut bondEnergy,
+                                ExecObject locator);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10);
+
+  template<typename BondType,
+           typename BondListType,
+           typename PositionType,
+           typename ForceBondType,
+           typename BondEnergyType>
+  VTKM_EXEC void operator()(const BondType& bond_type,
+                            const BondListType& bondlist,
+                            const Real& bond_coeffs_k2,
+                            const Real& bond_coeffs_k3,
+                            const Real& bond_coeffs_k4,
+                            const Real& bond_coeffs_equilibrium,
+                            const PositionType& _position,
+                            ForceBondType& forcebond,
+                            BondEnergyType& bondEnergy,
+                            const ExecPointLocator& locator) const
+  {
+
+    vtkm::IdComponent bondi = bondlist[0];
+    vtkm::IdComponent bondj = bondlist[1];
+    vtkm::IdComponent bondtype = bond_type;
+    Vec3f forcebondij;
+
+    ComputeijBondClass2EnergyForce(bondi,
+                                   bondj,
+                                   bondtype,
+                                   bond_coeffs_k2,
+                                   bond_coeffs_k3,
+                                   bond_coeffs_k4,
+                                   bond_coeffs_equilibrium,
+                                   _position,
+                                   forcebondij,
+                                   bondEnergy,
+                                   locator);
+
+    //_forcebond.Get(bondi) = _forcebond.Get(bondi) + forcebondij;
+    //_forcebond.Get(bondj) = _forcebond.Get(bondj) - forcebondij;
+
+    forcebond[0] = forcebondij;
+    forcebond[1] = -forcebondij;
+  }
+  template<typename PositionType>
+  VTKM_EXEC void ComputeijBondClass2EnergyForce(const vtkm::IdComponent& bondi,
+                                                const vtkm::IdComponent& bondj,
+                                                const vtkm::IdComponent& bondtype,
+                                                const Real& k2,
+                                                const Real& k3,
+                                                const Real& k4,
+                                                const Real& equilibrium,
+                                                const PositionType& _position,
+                                                Vec3f& forcebondij,
+                                                Real& bondEnergy,
+                                                const ExecPointLocator& locator) const
+  {
+    Vec3f p_i = _position.Get(bondi);
+    Vec3f p_j = _position.Get(bondj);
+
+    // minimum image distance
+    Vec3f r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+
+    Real dis_2 = vtkm::MagnitudeSquared(r_ij);
+    Real disij = vtkm::Sqrt(dis_2);
+
+    Real dr, dr2, dr3, dr4, fbond;
+    dr = disij - equilibrium;
+    dr2 = dr * dr;
+    dr3 = dr2 * dr;
+    dr4 = dr3 * dr;
+    Real de_bond = 2.0 * k2 * dr + 3.0 * k3 * dr2 + 4.0 * k4 * dr3;
+
+    if (disij > 0.01)
+      fbond = -de_bond / disij;
+    else
+      fbond = 0.0;
+    forcebondij = r_ij * fbond;
+
+    bondEnergy = k2 * dr2 + k3 * dr3 + k4 * dr4;
+  }
+  Real _Vlength;
+};
+
 struct ReduceForceWorklet : vtkm::worklet::WorkletReduceByKey
 {
   using ControlSignature = void(KeysIn atoms, ValuesIn force, ReducedValuesOut reduce_force);
@@ -254,6 +352,200 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
   Real _Vlength;
 };
 
+struct ComputeAngleClass2Worklet : vtkm::worklet::WorkletMapField
+{
+
+  ComputeAngleClass2Worklet(const Real& Vlength)
+    : _Vlength(Vlength)
+  {
+  }
+  using ControlSignature = void(FieldIn angle_type,
+                                const FieldIn anglelist,
+                                FieldIn angle_coeffs_k2,
+                                FieldIn angle_coeffs_k3,
+                                FieldIn angle_coeffs_k4,
+                                FieldIn angle_coeffs_equilibrium,
+                                FieldIn bb_m,
+                                FieldIn bb_r1,
+                                FieldIn bb_r2,
+                                FieldIn ba_n1,
+                                FieldIn ba_n2,
+                                FieldIn ba_r1,
+                                FieldIn ba_r2,
+                                const WholeArrayIn whole_pts,
+                                FieldOut forceangle,
+                                FieldOut angleEnergy,
+                                ExecObject locator);
+  using ExecutionSignature =
+    void(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17);
+
+  template<typename AngleType,
+           typename AngleListType,
+           typename WholePtsType,
+           typename ForceAngleType,
+           typename AngleEnergyType>
+  VTKM_EXEC void operator()(const AngleType& angle_type,
+                            const AngleListType& anglelist,
+                            const Real& angle_coeffs_k2,
+                            const Real& angle_coeffs_k3,
+                            const Real& angle_coeffs_k4,
+                            const Real& angle_coeffs_equilibrium,
+                            const Real& bb_m,
+                            const Real& bb_r1,
+                            const Real& bb_r2,
+                            const Real& ba_n1,
+                            const Real& ba_n2,
+                            const Real& ba_r1,
+                            const Real& ba_r2,
+                            const WholePtsType& whole_pts,
+                            ForceAngleType& forceangle,
+                            AngleEnergyType& angleEnergy,
+                            const ExecPointLocator& locator) const
+  {
+
+    vtkm::IdComponent anglei = anglelist[0];
+    vtkm::IdComponent anglej = anglelist[1];
+    vtkm::IdComponent anglek = anglelist[2];
+    vtkm::IdComponent angletype = angle_type;
+    Vec3f force_anglei;
+    Vec3f force_anglek;
+
+    ComputeijAngleClass2EnergyForce(anglei,
+                                    anglej,
+                                    anglek,
+                                    angletype,
+                                    angle_coeffs_k2,
+                                    angle_coeffs_k3,
+                                    angle_coeffs_k4,
+                                    angle_coeffs_equilibrium,
+                                    bb_m,
+                                    bb_r1,
+                                    bb_r2,
+                                    ba_n1,
+                                    ba_n2,
+                                    ba_r1,
+                                    ba_r2,
+                                    whole_pts,
+                                    force_anglei,
+                                    force_anglek,
+                                    angleEnergy,
+                                    locator);
+    forceangle[0] = force_anglei;
+    forceangle[1] = -force_anglei - force_anglek;
+    forceangle[2] = force_anglek;
+  }
+  template<typename WholePtsType>
+  VTKM_EXEC void ComputeijAngleClass2EnergyForce(const vtkm::IdComponent& anglei,
+                                                 const vtkm::IdComponent& anglej,
+                                                 const vtkm::IdComponent& anglek,
+                                                 const vtkm::IdComponent& angletype,
+                                                 const Real& angle_coeffs_k2,
+                                                 const Real& angle_coeffs_k3,
+                                                 const Real& angle_coeffs_k4,
+                                                 const Real& angle_coeffs_equilibrium,
+                                                 const Real& bb_m,
+                                                 const Real& bb_r1,
+                                                 const Real& bb_r2,
+                                                 const Real& ba_n1,
+                                                 const Real& ba_n2,
+                                                 const Real& ba_r1,
+                                                 const Real& ba_r2,
+                                                 const WholePtsType& whole_pts,
+                                                 Vec3f& force_anglei,
+                                                 Vec3f& force_anglek,
+                                                 Real& angleEnergy,
+                                                 const ExecPointLocator& locator) const
+  {
+
+    Vec3f p_i = whole_pts.Get(anglei);
+    Vec3f p_j = whole_pts.Get(anglej);
+    Vec3f p_k = whole_pts.Get(anglek);
+
+    // minimum image distance
+    Vec3f r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+    Vec3f r_kj = locator.MinDistance(p_k, p_j, _Vlength);
+
+    Real disij_2 = vtkm::MagnitudeSquared(r_ij);
+    Real disij = vtkm::Sqrt(disij_2);
+
+    Real diskj_2 = vtkm::MagnitudeSquared(r_kj);
+    Real diskj = vtkm::Sqrt(diskj_2);
+
+    Real cosangle = vtkm::Dot(r_ij, r_kj);
+    cosangle /= disij * diskj;
+
+    if (cosangle > 1.0)
+      cosangle = 1.0;
+    if (cosangle < -1.0)
+      cosangle = -1.0;
+    Real s = sqrt(1.0 - cosangle * cosangle);
+    if (s < SMALL)
+      s = SMALL;
+    s = 1.0 / s;
+
+    Real dtheta = acos(cosangle) - (angle_coeffs_equilibrium * vtkm::Pif()) / 180;
+    Real dtheta2 = dtheta * dtheta;
+    Real dtheta3 = dtheta2 * dtheta;
+    Real dtheta4 = dtheta3 * dtheta;
+    Real de_angle = 2.0 * angle_coeffs_k2 * dtheta + 3.0 * angle_coeffs_k3 * dtheta2 +
+      4.0 * angle_coeffs_k4 * dtheta3; // * (r_ij - ba_r1) + ba_n2 * (r_kj - ba_r2);
+    //Real tk = k * dtheta;
+
+    Real a = -de_angle * s;
+    // Real a = -2.0 * tk * s;
+    Real a11 = a * cosangle / disij_2;
+    Real a12 = -a / (disij * diskj);
+    Real a22 = a * cosangle / diskj_2;
+
+    Vec3f f1 = a11 * r_ij + a12 * r_kj;
+    Vec3f f3 = a22 * r_kj + a12 * r_ij;
+
+    angleEnergy = angle_coeffs_k2 * dtheta2 + angle_coeffs_k3 * dtheta3 +
+      angle_coeffs_k4 * dtheta4; //* (r_ij - bb_r1) * (r_kj - bb_r2);
+
+    Real dr1 = disij - bb_r1;
+    Real dr2 = diskj - bb_r2;
+    Real tk1 = bb_m * dr1;
+    Real tk2 = bb_m * dr2;
+
+    f1 -= r_ij * tk2 / disij;
+    f3 -= r_kj * tk1 / diskj;
+
+    angleEnergy += bb_m * dr1 * dr2;
+
+    dr1 = disij - ba_r1;
+    dr2 = diskj - ba_r2;
+    Real aa1 = s * dr1 * ba_n1;
+    Real aa2 = s * dr2 * ba_n2;
+
+    Real aa11 = aa1 * cosangle / disij_2;
+    Real aa12 = -aa1 / (disij * diskj);
+    Real aa21 = aa2 * cosangle / disij_2;
+    Real aa22 = -aa2 / (disij * diskj);
+
+    Vec3f v11 = aa11 * r_ij + aa12 * r_kj;
+    Vec3f v12 = aa21 * r_ij + aa22 * r_kj;
+
+    aa11 = aa1 * cosangle / diskj_2;
+    aa21 = aa2 * cosangle / diskj_2;
+
+    Vec3f v21 = aa11 * r_kj + aa12 * r_ij;
+    Vec3f v22 = aa21 * r_kj + aa22 * r_ij;
+
+    Real b1 = ba_n1 * dtheta / disij;
+    Real b2 = ba_n2 * dtheta / diskj;
+
+    f1 -= v11 + b1 * r_ij + v12;
+    f3 -= v21 + b2 * r_kj + v22;
+
+    angleEnergy += ba_n1 * dr1 * dtheta + ba_n2 * dr2 * dtheta;
+
+    force_anglei = f1;
+    force_anglek = f3;
+  }
+
+  Real _Vlength;
+};
 
 struct ComputeDihedralOPLSWorklet : vtkm::worklet::WorkletMapField
 {

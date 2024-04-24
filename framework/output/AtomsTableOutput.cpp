@@ -70,8 +70,8 @@ void AtomsTableOutput::Execute()
     _tempT_sum = _system.GetParameter<Real>(PARA_TEMPT_SUM);
     _tempT = _system.GetParameter<Real>(PARA_TEMPT);
 
-    //ComputePotentialEnergy();          ////////////////////         这里需要有判断
-    ComputeEAMPotentialEnergy();
+    ComputePotentialEnergy();          ////////////////////         这里需要有判断
+    //ComputeEAMPotentialEnergy();
 
     Residual();
 

@@ -18,6 +18,7 @@
 #include "TrajectoryOutput.h"
 #include "VACFOutput.h"
 #include "EAMSystem.h"
+#include "PCFFSystem.h"
 void RegisterObjectGlobal() 
 {
   RegisterObject(LJInitCondition);
@@ -39,4 +40,6 @@ void RegisterObjectGlobal()
   //RegisterObject(ERFInitCondition);
   RegisterObject(VACFOutput);
   RegisterObject(EAMSystem);  
+  RegisterObject(PCFFSystem);
+
 }

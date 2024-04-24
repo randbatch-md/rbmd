@@ -54,6 +54,7 @@ system/SalineSolutionSystem.cpp # Remove the "<vtkm/cont/Algorithm.h>" to move o
 system/H2OSystem.cpp
 system/NaClSystem.cpp
 system/EAMSystem.cpp
+system/PCFFSystem.cpp
 output/MoleculesTableOutput.cpp
 output/MoleculesFileOutput.cpp
 output/AtomsTableOutput.cpp
