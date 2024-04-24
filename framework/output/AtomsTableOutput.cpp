@@ -52,7 +52,7 @@ void AtomsTableOutput::Init()
     AddHeader(HEADER_POTENTIAL_ENERGY_NAME);
     AddHeader(HEADER_RESIDUAL_NAME);
     AddHeader(HEADER_KBT_NAME);
-    AddHeader(HEADER_PRESSURE_NAME);
+    //AddHeader(HEADER_PRESSURE_NAME);
     AddHeader(HEADER_KINETIC_ENERGY_NAME);
     AddHeader(HEADER_TOTAL_ENERGY_NAME);
     AddHeader(HEADER_CUMULATIVE_TIME_NAME);
@@ -211,7 +211,7 @@ void AtomsTableOutput::AddDataToTable()
     AddData(HEADER_TOTAL_ENERGY_NAME, _total_energy);
     AddData(HEADER_KINETIC_ENERGY_NAME, _kinteic_energy);
     AddData(HEADER_KBT_NAME, _tempT);
-   // AddData(HEADER_PRESSURE_NAME, _pressure);
+    //AddData(HEADER_PRESSURE_NAME, _pressure);
     AddData(HEADER_CUMULATIVE_TIME_NAME, _cumulative_time + _timer.GetElapsedTime());
   }
 }

@@ -44,7 +44,7 @@ private:
   void Compute_Pressure_Scalar();
   void Compute_Temp_Scalar();
   void Couple();
-  void end_of_step();
+  void fix_press_berendsen();
   void x2lamda(Id n);
   void lamda2x(Id n);
   void set_global_box();

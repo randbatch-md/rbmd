@@ -616,3 +616,239 @@ void H2OSystem::ConstraintB()
     _velocity.WritePortal().Set(i , _old_velocity.ReadPortal().Get(i));
   }
 }
+
+void H2OSystem::fix_press_berendsen()
+{
+  bulkmodulus = 10.0;
+  p_start[0] = p_start[1] = p_start[2] = 1.0;
+  p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
+  p_period[0] = p_period[1] = p_period[2] = 1.0;
+
+  // compute new T,P
+
+  Compute_Pressure_Scalar();
+  Couple();
+
+  auto currentstep = _app.GetExecutioner()->CurrentStep();
+  auto beginstep = 0;
+  auto endstep = _app.GetExecutioner()->NumStep();
+
+  auto delta = currentstep - beginstep;
+  std::cout << delta << std::endl;
+  if (delta != 0.0)
+  {
+    delta = delta / (endstep - beginstep);
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
+    dilation[i] =
+      pow(1.0 - _dt / p_period[i] * (p_target[i] - p_current[i]) / bulkmodulus, 1.0 / 3.0);
+  }
+
+  //for (int i = 0; i < 3; i++)
+  //{
+  //  std::cout << "i=" << i  << ",dilation=" << dilation[i] << std::endl;
+  //}
+  // remap simulation box and atoms
+  // redo KSpace coeffs since volume has changed
+
+  remap();
+}
+
+void H2OSystem::ComputeVirial()
+{
+  auto cut_off = GetParameter<Real>(EAM_PARA_CUTOFF);
+  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+
+  auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+
+  ArrayHandle<Real> EAM_rho;
+  ArrayHandle<Real> fp;
+
+  //1:compute _EAM_rho   = density at each atom
+  SystemWorklet::EAM_rho(
+    cut_off, Vlength, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
+
+  // 2:compute fp    = derivative of embedding energy at each atom
+  SystemWorklet::EAM_fp(_atoms_id, EAM_rho, frho_spline, _locator, _topology, _force_function, fp);
+
+  // 3:compute  virial  = EAM_virial
+  SystemWorklet::EAM_virial(cut_off,
+                            Vlength,
+                            _atoms_id,
+                            fp,
+                            rhor_spline,
+                            z2r_spline,
+                            _locator,
+                            _topology,
+                            _force_function,
+                            _virial_atom);
+
+
+  //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
+  //{
+  //  std::cout << "i=" << i << ",_virial_atom=" << _virial_atom.ReadPortal().Get(i)[0] << ","
+  //            << _virial_atom.ReadPortal().Get(i)[1] << "," << _virial_atom.ReadPortal().Get(i)[2] << ","
+  //            << _virial_atom.ReadPortal().Get(i)[3] << "," << _virial_atom.ReadPortal().Get(i)[4] << ","
+  //            << _virial_atom.ReadPortal().Get(i)[5]
+  //      << std::endl;
+  //}
+}
+
+void H2OSystem::Compute_Pressure_Scalar()
+{
+
+  ComputeVirial();
+
+  virial = { 0, 0, 0, 0, 0, 0 };
+  for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
+  {
+    // 获取当前原子的virial
+    Vec6f vatom = _virial_atom.ReadPortal().Get(i);
+    for (int j = 0; j < 6; ++j)
+    {
+      virial[j] += vatom[j];
+    }
+  }
+
+  //
+  //for (int i = 0; i < 6; ++i)
+  //{
+  //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
+  //}
+
+  //compute pressure scalar
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto volume =
+    (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+  auto temperature = GetParameter<Real>(PARA_TEMPT);
+  auto inv_volume = 1.0 / volume;
+  //
+  auto n = _position.GetNumberOfValues();
+  auto extra_dof = 3; //dimension =3
+
+  auto dof = 3 * n - extra_dof;
+
+  _pressure_scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) /
+    3.0 * inv_volume * _unit_factor.nktv2p;
+
+  SetParameter(PARA_PRESSURE, _pressure_scalar);
+  std::cout << " pressure=" << _pressure_scalar << std::endl;
+}
+
+void H2OSystem::Compute_Temp_Scalar() {}
+
+void H2OSystem::Couple()
+{
+  p_current[0] = p_current[1] = p_current[2] = _pressure_scalar;
+}
+
+void H2OSystem::x2lamda(Id n)
+{
+  //
+  Vec3f delta;
+  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  //
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  for (int i = 0; i < n; i++)
+  {
+    delta[0] = _position.ReadPortal().Get(i)[0] - range[0].Min;
+    delta[1] = _position.ReadPortal().Get(i)[1] - range[1].Min;
+    delta[2] = _position.ReadPortal().Get(i)[2] - range[2].Min;
+
+    _position.WritePortal().Get(i)[0] =
+      h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2];
+    _position.WritePortal().Get(i)[1] = h_inv[1] * delta[1] + h_inv[3] * delta[2];
+    _position.WritePortal().Get(i)[2] = h_inv[2] * delta[2];
+  }
+  _locator.SetPosition(_position);
+  //for (int i = 0; i < n; i++)
+  //{
+  //  for (int j = 0; j < 3; j++)
+  //  {
+  //    std::cout << "i=" << i << ", lamda_position=" << position.ReadPortal().Get(i)[j] << std::endl;
+  //  }
+  //}
+}
+
+void H2OSystem::lamda2x(Id n)
+{
+  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+
+  for (int i = 0; i < n; i++)
+  {
+    _position.WritePortal().Get(i)[0] = h[0] * _position.ReadPortal().Get(i)[0] +
+      h[5] * _position.ReadPortal().Get(i)[1] + h[4] * _position.ReadPortal().Get(i)[2] +
+      range[0].Min;
+
+    _position.WritePortal().Get(i)[1] = h[1] * _position.ReadPortal().Get(i)[1] +
+      h[3] * _position.ReadPortal().Get(i)[2] + range[1].Min;
+
+    _position.WritePortal().Get(i)[2] = h[2] * _position.ReadPortal().Get(i)[2] + range[2].Min;
+  }
+  _locator.SetPosition(_position);
+
+  //for (int i = 0; i < n; i++)
+  //{
+  //  for (int j = 0; j < 3; j++)
+  //  {
+  //    std::cout << "i=" << i << ", position=" << position.ReadPortal().Get(i)[j] << std::endl;
+  //  }
+  //}
+}
+
+void H2OSystem::set_global_box()
+{
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  prd[0] = xprd = range[0].Max - range[0].Min;
+  prd[1] = yprd = range[1].Max - range[1].Min;
+  prd[2] = zprd = range[2].Max - range[2].Min;
+
+  h[0] = xprd;
+  h[1] = yprd;
+  h[2] = zprd;
+
+  //
+  auto orthogonal = 1;
+  if (orthogonal)
+  {
+    h_inv[0] = 1.0 / h[0];
+    h_inv[1] = 1.0 / h[1];
+    h_inv[2] = 1.0 / h[2];
+    h_inv[3] = 0;
+    h_inv[4] = 0;
+    h_inv[5] = 0;
+  }
+}
+
+void H2OSystem::remap()
+{
+  Real oldlo, oldhi, ctr;
+  auto n = _position.GetNumberOfValues();
+
+  // convert pertinent atoms and rigid bodies to lamda coords
+  x2lamda(n);
+
+  // reset global and local box to new size/shape
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  for (int i = 0; i < 3; i++)
+  {
+    oldlo = range[i].Min;
+    oldhi = range[i].Max;
+    ctr = 0.5 * (oldlo + oldhi);
+    range[i].Min = (oldlo - ctr) * dilation[i] + ctr;
+    range[i].Max = (oldhi - ctr) * dilation[i] + ctr;
+  }
+  //
+  SetParameter(PARA_RANGE, range);
+
+  set_global_box();
+
+  // convert pertinent atoms and rigid bodies back to box coords
+
+  lamda2x(n);
+}

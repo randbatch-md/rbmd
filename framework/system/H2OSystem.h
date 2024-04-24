@@ -40,6 +40,18 @@ private:
   void ConstraintA();
   void ConstraintB();
 
+    //
+  void ev_tall();
+  void ComputeVirial();
+  void Compute_Pressure_Scalar();
+  void Compute_Temp_Scalar();
+  void Couple();
+  void fix_press_berendsen();
+  void x2lamda(Id n);
+  void lamda2x(Id n);
+  void set_global_box();
+  void remap();
+
 private:
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
@@ -73,4 +85,28 @@ private:
   Real _tempT;
 
   Real _Elefartimer_counting;
+
+    //
+  ArrayHandle<Real> fpair;
+  ArrayHandle<Vec6f> _virial_atom;
+  Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
+  Real _pressure_scalar; // computed global pressure scalar
+
+  //
+  Vec3f p_start, p_stop;
+  Vec3f p_period, p_target;
+
+  Vec3f p_current, dilation;
+  Real bulkmodulus;
+
+
+  //
+  Vec6f h, h_inv; // shape matrix in Voigt ordering
+
+  // orthogonal box
+
+  Real xprd, yprd, zprd;                // global box dimensions
+  Real xprd_half, yprd_half, zprd_half; // half dimensions
+  Vec3f prd;                            // array form of dimensions
+  Vec3f prd_half;                       // array form of half dimensions
 };

@@ -64,6 +64,8 @@ void EAMSystem::InitialCondition()
   SetParameter(PARA_RDF_RHO, _rho);
   SetCharge();
   PreForce();
+  //
+  set_global_box();
 }
 
 void EAMSystem::ReadPotentialFile(std::ifstream& input_file)
@@ -349,7 +351,8 @@ void EAMSystem::ComputeTempe()
     vtkm::cont::Algorithm::Reduce(sq_velocity, vtkm::TypeTraits<Real>::ZeroInitialization());
   
   Real temperature_kB = _unit_factor._kB;
-  _tempT = 0.5 * _tempT_sum / (3 * n * temperature_kB / 2.0);
+  _tempT = 0.5 * _tempT_sum / ((3 * n - 3 ) * temperature_kB / 2.0);
+  //_tempT = 0.5 * _tempT_sum / (3 * n  * temperature_kB / 2.0);
 
   SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   SetParameter(PARA_TEMPT, _tempT);
@@ -396,7 +399,8 @@ void EAMSystem::Solve()
 {
   // stage1:
   UpdateVelocity();
-  end_of_step();
+  //
+  fix_press_berendsen();
 
   // stage2:
   UpdatePosition();
@@ -498,6 +502,45 @@ void EAMSystem::SetTopology()
   _topology.SetEpsAndSigma(epsilon, sigma);
 }
 
+void EAMSystem::fix_press_berendsen()
+{
+  bulkmodulus = 10.0;
+  p_start[0] = p_start[1] = p_start[2] = 1.0;
+  p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
+  p_period[0] = p_period[1] = p_period[2] = 1.0;
+
+  // compute new T,P
+
+  Compute_Pressure_Scalar();
+  Couple();
+
+  auto currentstep = _app.GetExecutioner()->CurrentStep();
+  auto beginstep = 0;
+  auto endstep = _app.GetExecutioner()->NumStep();
+
+  auto delta = currentstep - beginstep;
+  std::cout << delta << std::endl;
+  if (delta != 0.0)
+  {
+    delta = delta / (endstep - beginstep);
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
+    dilation[i] =
+      pow(1.0 - _dt / p_period[i] * (p_target[i] - p_current[i]) / bulkmodulus, 1.0 / 3.0);
+  }
+
+  //for (int i = 0; i < 3; i++)
+  //{
+  //  std::cout << "i=" << i  << ",dilation=" << dilation[i] << std::endl;
+  //}
+  // remap simulation box and atoms
+  // redo KSpace coeffs since volume has changed
+
+  remap();
+}
+
 void EAMSystem::ComputeVirial()
 {
   auto cut_off = GetParameter<Real>(EAM_PARA_CUTOFF);
@@ -590,66 +633,24 @@ void EAMSystem::Couple()
 
 }
 
-void EAMSystem::end_of_step()
-{
-  bulkmodulus = 10.0;
-  p_start[0] = p_start[1] = p_start[2] = 1.0;
-  p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
-  p_period[0] = p_period[1] = p_period[2] = 1.0;
-
-  // compute new T,P
-
-  Compute_Pressure_Scalar();
-  Couple();
-
-  auto currentstep = _app.GetExecutioner()->CurrentStep();
-  auto beginstep = 0;
-  auto endstep = _app.GetExecutioner()->NumStep();
-
-  auto delta = currentstep - beginstep;
-  std::cout << delta << std::endl;
-  if (delta != 0.0)
-  {
-    delta = delta / (endstep - beginstep);
-  }
-  for (int i = 0; i < 3; i++)
-  {
-    p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
-    dilation[i] = pow(1.0 - _dt / p_period[i] * (p_target[i] - p_current[i]) / bulkmodulus, 1.0 / 3.0);
-  }
-
-  //for (int i = 0; i < 3; i++)
-  //{
-  //  std::cout << "i=" << i  << ",dilation=" << dilation[i] << std::endl;
-  //}
-  // remap simulation box and atoms
-  // redo KSpace coeffs since volume has changed
-
-  remap();
-
-
-}
-
 void EAMSystem::x2lamda(Id n)
 {
   //
-  set_global_box();
-  //
   Vec3f delta;
-  auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
   //
   vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-
   for (int i = 0; i < n; i++)
   {
-    delta[0] = position.ReadPortal().Get(i)[0] - range[0].Min;
-    delta[1] = position.ReadPortal().Get(i)[1] - range[1].Min;
-    delta[2] = position.ReadPortal().Get(i)[2] - range[2].Min;
+    delta[0] = _position.ReadPortal().Get(i)[0] - range[0].Min;
+    delta[1] = _position.ReadPortal().Get(i)[1] - range[1].Min;
+    delta[2] = _position.ReadPortal().Get(i)[2] - range[2].Min;
 
-    position.WritePortal().Get(i)[0] = h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2];
-    position.WritePortal().Get(i)[1] = h_inv[1] * delta[1] + h_inv[3] * delta[2];
-    position.WritePortal().Get(i)[2] = h_inv[2] * delta[2];
+    _position.WritePortal().Get(i)[0] = h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2];
+    _position.WritePortal().Get(i)[1] = h_inv[1] * delta[1] + h_inv[3] * delta[2];
+    _position.WritePortal().Get(i)[2] = h_inv[2] * delta[2];
   }
+  _locator.SetPosition(_position);
   //for (int i = 0; i < n; i++)
   //{
   //  for (int j = 0; j < 3; j++)
@@ -661,21 +662,22 @@ void EAMSystem::x2lamda(Id n)
 
 void EAMSystem::lamda2x(Id n)
 {
-  auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
   vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
 
   for (int i = 0; i < n; i++)
   {
-    position.WritePortal().Get(i)[0] = h[0] * position.ReadPortal().Get(i)[0] + 
-                                       h[5] * position.ReadPortal().Get(i)[1] +
-                                       h[4] * position.ReadPortal().Get(i)[2] + range[0].Min;
+    _position.WritePortal().Get(i)[0] = h[0] * _position.ReadPortal().Get(i)[0] + 
+                                        h[5] * _position.ReadPortal().Get(i)[1] +
+                                        h[4] * _position.ReadPortal().Get(i)[2] + range[0].Min;
 
-    position.WritePortal().Get(i)[1] = h[1] * position.ReadPortal().Get(i)[1] +
-                                       h[3] * position.ReadPortal().Get(i)[2] +  
-                                       range[1].Min;
+    _position.WritePortal().Get(i)[1] = h[1] * _position.ReadPortal().Get(i)[1] +
+                                        h[3] * _position.ReadPortal().Get(i)[2] + range[1].Min;
 
-    position.WritePortal().Get(i)[2] = h[2] * position.ReadPortal().Get(i)[2] + range[2].Min;
+    _position.WritePortal().Get(i)[2] = h[2] * _position.ReadPortal().Get(i)[2] + range[2].Min;
   }
+  _locator.SetPosition(_position);
+
   //for (int i = 0; i < n; i++)
   //{
   //  for (int j = 0; j < 3; j++)
@@ -695,8 +697,9 @@ void EAMSystem::set_global_box()
   h[0] = xprd;
   h[1] = yprd;
   h[2] = zprd;
+
   //
-  auto orthogonal  = 1;
+  auto orthogonal = 1;
   if (orthogonal)
   {
     h_inv[0] = 1.0 / h[0];
@@ -713,16 +716,13 @@ void EAMSystem::set_global_box()
 void EAMSystem::remap() 
 {
   Real oldlo, oldhi, ctr;
-  auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
-  auto n = position.GetNumberOfValues();
-
-  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto n = _position.GetNumberOfValues();
 
   // convert pertinent atoms and rigid bodies to lamda coords
   x2lamda(n);
 
   // reset global and local box to new size/shape
-
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
   for (int i = 0; i < 3; i++)
   {
     oldlo = range[i].Min;
