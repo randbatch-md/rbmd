@@ -75,8 +75,6 @@ void H2OSystem::Solve()
   //ComputeForce();   // Only compute once during evaluation
   UpdateVelocity();
 
-  //
-  fix_press_berendsen();
   // stage2:
   UpdatePosition();
 
@@ -182,6 +180,10 @@ void H2OSystem::UpdatePosition()
     //          << position_flag.ReadPortal().Get(46)[2] << std::endl;
     //std::cout << "After UpdatePosition:_position[46][2] = " << _position.ReadPortal().Get(46)[2]
     //          << std::endl;
+    //
+   
+    //
+    fix_press_berendsen();
 
     _locator.SetPosition(_position);
 
@@ -675,14 +677,8 @@ void H2OSystem::ComputeVirial()
   //            << _virial_atom.ReadPortal().Get(i)[5]
   //      << std::endl;
   //}
-}
-
-void H2OSystem::Compute_Pressure_Scalar()
-{
-  //ComputeTempe();
-
-  ComputeVirial();
-
+  
+  //reduce virial_atom
   virial = { 0, 0, 0, 0, 0, 0 };
   for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
   {
@@ -693,27 +689,35 @@ void H2OSystem::Compute_Pressure_Scalar()
       virial[j] += vatom[j];
     }
   }
-
   //
   //for (int i = 0; i < 6; ++i)
   //{
   //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
   //}
+}
 
-  //compute pressure scalar
-  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  auto volume =
-    (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+void H2OSystem::Compute_Pressure_Scalar()
+{
+  //compute temperature
   auto temperature = GetParameter<Real>(PARA_TEMPT);
+
+  // compute  virial
+  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto volume =  (range[0].Max - range[0].Min) * 
+                 (range[1].Max - range[1].Min) * 
+                 (range[2].Max - range[2].Min);
+
   auto inv_volume = 1.0 / volume;
-  //
+  ComputeVirial();
+
+  //compute dof
   auto n = _position.GetNumberOfValues();
   auto extra_dof = 3; //dimension =3
-
   auto dof = 3 * n - extra_dof;
 
+  //compute pressure_scalar
   _pressure_scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) /
-    3.0 * inv_volume * _unit_factor.nktv2p;
+                      3.0 * inv_volume * _unit_factor.nktv2p;
 
   SetParameter(PARA_PRESSURE, _pressure_scalar);
   std::cout << " pressure=" << _pressure_scalar << std::endl;

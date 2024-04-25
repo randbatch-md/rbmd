@@ -39,7 +39,6 @@ private:
   void InitStyle();
 
   //
-  void ev_tall();
   void ComputeVirial();
   void Compute_Pressure_Scalar();
   void Compute_Temp_Scalar();
@@ -74,7 +73,6 @@ private:
 
 
   //
-  ArrayHandle<Real> fpair; 
   ArrayHandle<Vec6f> _virial_atom; 
   Vec6f virial;                      // accumulated virial: xx,yy,zz,xy,xz,yz    
   Real _pressure_scalar;              // computed global pressure scalar

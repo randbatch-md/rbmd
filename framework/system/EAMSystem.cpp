@@ -326,9 +326,9 @@ void EAMSystem::UpdatePosition()
 {
   auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
+  _locator.SetPosition(_position);
   //
   fix_press_berendsen();
-  //
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
 }
@@ -584,13 +584,8 @@ void EAMSystem::ComputeVirial()
   //            << _virial_atom.ReadPortal().Get(i)[5]
   //      << std::endl;
   //}
-}
 
-void EAMSystem::Compute_Pressure_Scalar()
-{
-
-  ComputeVirial();
-
+  //reduce virial_atom
   virial = { 0, 0, 0, 0, 0, 0 };
   for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
   {
@@ -601,26 +596,33 @@ void EAMSystem::Compute_Pressure_Scalar()
       virial[j] += vatom[j];
     }
   }
-
   //
   //for (int i = 0; i < 6; ++i)
   //{
   //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
   //}
+}
 
-  //compute pressure scalar
+void EAMSystem::Compute_Pressure_Scalar()
+{
+  //compute temperature
+  auto temperature = GetParameter<Real>(PARA_TEMPT);
+
+  // compute  virial
   vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
   auto volume = (range[0].Max - range[0].Min) * 
                 (range[1].Max - range[1].Min) *
                 (range[2].Max - range[2].Min);
-  auto temperature = GetParameter<Real>(PARA_TEMPT);
+
   auto inv_volume = 1.0 / volume;
-  //
+  ComputeVirial();
+
+  //compute dof 
   auto n = _position.GetNumberOfValues();
   auto extra_dof = 3; //dimension =3
-
   auto dof = 3 * n - extra_dof;
 
+  //compute pressure_scalar
   _pressure_scalar = (dof * _unit_factor.boltz * temperature + virial[0] + virial[1] + virial[2]) / 3.0 
                       * inv_volume * _unit_factor.nktv2p;
 
@@ -745,26 +747,4 @@ void EAMSystem::remap()
 
 }
 
-//void EAMSystem::ev_tall() 
-//{
-//  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
-//  SystemWorklet::ComputeFpair(_force, fpair);
-//  for (int i = 0; i < fpair.GetNumberOfValues(); ++i)
-//  {
-//    std::cout << "i=" << i << ",fpair=" << fpair.ReadPortal().Get(i) << std::endl;
-//  }
-//  SystemWorklet::ComputeVirial0(Vlength, _atoms_id, fpair, _locator, _force_function, virial);
-//  //for (int i = 0; i < virial.GetNumberOfValues();++i)
-//  //{
-//  //  std::cout << "i=" << i << ",virial="  << virial.ReadPortal().Get(0) << 
-//  //               virial.ReadPortal().Get(1) <<
-//  //               virial.ReadPortal().Get(2) <<
-//  //               virial.ReadPortal().Get(3) << 
-//  //               virial.ReadPortal().Get(4) << 
-//  //                  virial.ReadPortal().Get(5)
-//  //      << std::endl;
-//
-//  //}
-//
-//}
 
