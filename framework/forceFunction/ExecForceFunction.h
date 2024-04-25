@@ -460,14 +460,6 @@ public:
       eam_force[0] = r_ij[0] * fpair;
       eam_force[1] = r_ij[1] * fpair;
       eam_force[2] = r_ij[2] * fpair;
-
-      //
-       virial[0] = r_ij[0] * r_ij[0] * fpair;
-       virial[1] = r_ij[1] * r_ij[1] * fpair;
-       virial[2] = r_ij[2] * r_ij[2] * fpair;
-       virial[3] = r_ij[0] * r_ij[1] * fpair;
-       virial[4] = r_ij[0] * r_ij[2] * fpair;
-       virial[5] = r_ij[1] * r_ij[2] * fpair;
     }
     return eam_force;
   }
@@ -668,19 +660,6 @@ public:
     }
     return 0.5 * phi;
   }
-
-   VTKM_EXEC Vec6f ComputeVirial0(const Vec3f& r_ij, const Real& fpair) const
-   {
-        Vec6f virial = {0,0,0,0,0,0};
-        virial[0] += r_ij[0] * r_ij[0] * fpair;
-        virial[1] += r_ij[1] * r_ij[1] * fpair;
-        virial[2] += r_ij[2] * r_ij[2] * fpair;
-        virial[3] += r_ij[0] * r_ij[1] * fpair;
-        virial[4] += r_ij[0] * r_ij[2] * fpair;
-        virial[5] += r_ij[1] * r_ij[2] * fpair;
-        return virial;
-
-   }
 
   private:
   Real _cut_Off;

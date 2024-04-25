@@ -209,6 +209,14 @@ void LJVirial(const Real& cut_off,
               const ContForceFunction& force_function,
               vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
 
+    void LJVirialPBC(const Real& cut_off,
+                 const Real& Vlength,
+                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                 const ContPointLocator& locator,
+                 const ContTopology& topology,
+                 const ContForceFunction& force_function,
+                 vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
+
 void ComputeNearElectrostatics(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                const ContPointLocator& locator,
                                const ContTopology& topology,

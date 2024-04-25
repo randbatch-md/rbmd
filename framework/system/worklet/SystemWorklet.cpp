@@ -11,59 +11,6 @@
 
 namespace SystemWorklet
 {
-    struct ComputeFpairWorklet : vtkm::worklet::WorkletMapField
-    {
-      using ControlSignature = void(FieldIn force,  FieldOut fpair);
-      using ExecutionSignature = void(_1, _2);
-
-      VTKM_EXEC void operator()(const Vec3f& force, Real& fpair) const
-      {
-        auto f = force[0] * force[0] + force[1] * force[1] + force[2] * force[2];
-         fpair = vtkm::Sqrt(f);
-      }
-    };
-
-    struct ComputeVirial0Worklet : vtkm::worklet::WorkletMapField
-    {
-      ComputeVirial0Worklet(const Real& Vlength)
-        : _Vlength(Vlength)
-    {
-
-    }
-
-    using ControlSignature = void(FieldIn atoms_id,
-                                  FieldIn fpair,
-                                  ExecObject locator,
-                                  ExecObject force_function,
-                                  FieldOut virial);
-    using ExecutionSignature = void(_1, _2, _3, _4, _5);
-
-
-    VTKM_EXEC void operator()(const Id atoms_id,
-                              const Real fpair,
-                              const ExecPointLocator& locator,
-                              const ExecForceFunction& force_function,
-                              Vec6f& virial) const
-    {
-      Vec6f Virial = { 0, 0, 0, 0, 0, 0 };
-      auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
-      {
-        //auto r_ij = p_j - p_i;
-        auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
-        Virial += force_function.ComputeVirial0(r_ij, fpair);
-        //virial[0] += r_ij[0] * r_ij[0] * fpair;
-        //virial[1] += r_ij[1] * r_ij[1] * fpair;
-        //virial[2] += r_ij[2] * r_ij[2] * fpair;
-        //virial[3] += r_ij[0] * r_ij[1] * fpair;
-        //virial[4] += r_ij[0] * r_ij[2] * fpair;
-        //virial[5] += r_ij[1] * r_ij[2] * fpair;
-      };
-      locator.ExecuteOnNeighbor(atoms_id, function);
-      virial = Virial;
-    }
-    Real _Vlength;
-    };
-
     struct ComputeNeighboursWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeNeighboursWorklet(const Real& cut_off)
@@ -668,7 +615,7 @@ namespace SystemWorklet
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, 10);
+          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
 
           LJforce += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
         };
@@ -721,6 +668,54 @@ namespace SystemWorklet
         lj_virial = virial;
       }
       Real _cut_off;
+    };
+
+    struct ComputeLJVirialPBCWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeLJVirialPBCWorklet(const Real& cut_off, const Real& Vlength)
+        : _cut_off(cut_off)
+        , _Vlength(Vlength)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldOut lj_virial);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5);
+
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                Vec6f& lj_virial) const
+      {
+        Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+          if (molecular_id_i == molecular_id_j)
+            return;
+
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+
+          virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+        };
+        locator.ExecuteOnNeighbor(atoms_id, function);
+        lj_virial = virial;
+      }
+      Real _cut_off;
+      Real _Vlength;
     };
 
     struct ComputeRBLNeighboursOnceWorklet : vtkm::worklet::WorkletMapField
@@ -2103,6 +2098,22 @@ namespace SystemWorklet
                             lj_virial);
     }
 
+    void LJVirialPBC(const Real& cut_off,
+                     const Real& Vlength,
+                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                  const ContPointLocator& locator,
+                  const ContTopology& topology,
+                  const ContForceFunction& force_function,
+                  vtkm::cont::ArrayHandle<Vec6f>& lj_virial)
+    {
+      vtkm::cont::Invoker{}(ComputeLJVirialPBCWorklet{ cut_off, Vlength },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            lj_virial);
+    }
+
     void ComputeNearElectrostatics(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                    const ContPointLocator& locator,
                                    const ContTopology& topology,
@@ -2290,26 +2301,5 @@ namespace SystemWorklet
                                topology,
                                locator,
                                eleFarNewforce);
-    }
-
-    void ComputeFpair(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& Allforce,
-                       vtkm::cont::ArrayHandle<Real>& fpair)
-    {
-         vtkm::cont::Invoker{}(ComputeFpairWorklet{}, Allforce, fpair);
-    }
-
-    void ComputeVirial0(const Real& Vlength,
-                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                       const vtkm::cont::ArrayHandle <Real> &fpair,
-                       const ContPointLocator& locator,
-                       const ContForceFunction& force_function,
-                        vtkm::cont::ArrayHandle<Vec6f>& virial)
-    {
-         vtkm::cont::Invoker{}(ComputeVirial0Worklet{Vlength },
-                               atoms_id,
-                               fpair,
-                               locator,
-                               force_function,
-                               virial);
-    }
+    } 
 }

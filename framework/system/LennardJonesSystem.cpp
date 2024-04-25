@@ -100,11 +100,10 @@ void LennardJonesSystem::UpdatePosition()
   //SystemWorklet::UpdatePosition(_dt,_velocity, _locator, _position);
   auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
+  //
   fix_press_berendsen();
   _locator.SetPosition(_position);
-  //
 
-  //_locator.SetPosition(_position);
   SetCenterTargetPositions();
 }
 
@@ -125,7 +124,7 @@ void LennardJonesSystem::ComputeTempe()
   SystemWorklet::ComputerKineticEnergy(_velocity, _mass, sq_velocity);
   _tempT_sum =
     vtkm::cont::Algorithm::Reduce(sq_velocity, vtkm::TypeTraits<Real>::ZeroInitialization());
-  _tempT = 0.5 * _tempT_sum / (3 * n / 2.0);
+  _tempT = 0.5 * _tempT_sum / ((3 * n -3) / 2.0);
   SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   SetParameter(PARA_TEMPT, _tempT);
 }
@@ -211,8 +210,8 @@ void LennardJonesSystem::SetTopology()
 void LennardJonesSystem::fix_press_berendsen()
 {
   bulkmodulus = 10.0;
-  p_start[0] = p_start[1] = p_start[2] = 1.0;
-  p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
+  p_start[0] = p_start[1] = p_start[2] = 10.0;
+  p_stop[0] = p_stop[1] = p_stop[2] = 10.0;
   p_period[0] = p_period[1] = p_period[2] = 1;
 
   // compute new T,P
@@ -225,7 +224,6 @@ void LennardJonesSystem::fix_press_berendsen()
   auto endstep = _app.GetExecutioner()->NumStep();
 
   auto delta = currentstep - beginstep;
-  std::cout << delta << std::endl;
   if (delta != 0.0)
   {
     delta = delta / (endstep - beginstep);
@@ -250,7 +248,14 @@ void LennardJonesSystem::fix_press_berendsen()
 void LennardJonesSystem::ComputeVirial()
 {
   auto cut_off = GetParameter<Real>(PARA_CUTOFF);
-  SystemWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+
+  SystemWorklet::LJVirial(
+   cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+
+  //auto range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //auto Vlength = range[0].Max - range[0].Min;
+  //SystemWorklet::LJVirialPBC(
+   // cut_off, Vlength,_atoms_id, _locator, _topology, _force_function, _virial_atom);
 
 
   //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)

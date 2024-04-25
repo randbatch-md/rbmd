@@ -468,6 +468,11 @@ void MDSystem::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 {
   auto cut_off = GetParameter<Real>(PARA_CUTOFF);
   SystemWorklet::LJForceWithPeriodicBC( cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+  //auto  range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //auto Vlength = range[0].Max - range[0].Min;
+
+  //SystemWorklet::LJForceWithPBC(
+   // cut_off, Vlength,_atoms_id, _locator, _topology, _force_function, ljforce);
 }
 
 void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)

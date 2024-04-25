@@ -113,6 +113,10 @@ void AtomsTableOutput::ComputePotentialEnergy()
   SetLocator(locator);
   OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy);  
 
+   //auto  range = _system.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+   //auto Vlength = range[0].Max - range[0].Min;
+   //OutPut::ComputePotentialEnergyPBC(
+    // _cut_off, Vlength, atoms_id, locator, topology, force_function, lj_potential_energy);  
   
   auto _lj_potential_energy_total = vtkm::cont::Algorithm::Reduce( lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization()); 
   _lj_potential_energy_avr = _lj_potential_energy_total / position.GetNumberOfValues();
