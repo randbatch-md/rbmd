@@ -194,6 +194,13 @@ void LJForceWithPeriodicBC(const Real& cut_off,
                            const ContTopology& topology,
                            const ContForceFunction& force_function,
                            vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+void LJForceWithPBC(const Real& cut_off,
+                            const Real& Vlength,
+                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                            const ContPointLocator& locator,
+                            const ContTopology& topology,
+                            const ContForceFunction& force_function,
+                            vtkm::cont::ArrayHandle<Vec3f>& LJforce);
 
 void LJVirial(const Real& cut_off,
               const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

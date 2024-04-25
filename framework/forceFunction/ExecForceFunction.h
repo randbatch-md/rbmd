@@ -86,12 +86,14 @@ public:
       Real sigmaij_6 = sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij;
       Real dis_6 = dis_2 * dis_2 * dis_2;
       Real sigmaij_dis_6 = sigmaij_6 / dis_6;
-      auto fpair =  -24 * vtkm::Sqrt(eps_i * eps_j) * 
-                    ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6) / dis_2;
+      Real eps_ij = vtkm::Sqrt(eps_i * eps_j);
+      auto fpair = 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6) / dis_2;
 
-       //compute virial
+      //auto forcelj = 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6;
+      //auto fpair = forcelj / dis_2;
+        
+      //compute virial
       virial[0] = r_ij[0] * r_ij[0] * fpair;
-      //std::cout << virial[0] << std::endl;
       virial[1] = r_ij[1] * r_ij[1] * fpair;
       virial[2] = r_ij[2] * r_ij[2] * fpair;
       virial[3] = r_ij[0] * r_ij[1] * fpair;

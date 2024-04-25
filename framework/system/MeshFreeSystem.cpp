@@ -61,6 +61,8 @@ void MeshFreeSystem::InitPara()
     _unit_factor._fmt2v = 1.0;
     _unit_factor._mvv2e = 1.0;
     _unit_factor._qqr2e = 1.0;
+    _unit_factor.boltz = 1.0;
+    _unit_factor.nktv2p = 1.0;
   }
   else if (_unit == "METAL")
   {

@@ -25,6 +25,7 @@ LennardJonesSystem::LennardJonesSystem(const Configuration& cfg)
   SetParameter(PARA_ALPHA, Get<Real>("alpha"));
   SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   SetParameter(PARA_TEMPT, Real{ 0.0 });
+  SetParameter(PARA_PRESSURE, Real{ 0.0 });
 }
 
 void LennardJonesSystem::Init()
@@ -57,7 +58,7 @@ void LennardJonesSystem::InitialCondition()
     { static_cast<vtkm::FloatDefault>(range[1].Max),},
     { static_cast<vtkm::FloatDefault>(range[2].Max),}
   };
-  //set_global_box();
+  set_global_box();
 }
 
 void LennardJonesSystem::ComputeForce()
@@ -99,9 +100,10 @@ void LennardJonesSystem::UpdatePosition()
   //SystemWorklet::UpdatePosition(_dt,_velocity, _locator, _position);
   auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
+  fix_press_berendsen();
   _locator.SetPosition(_position);
   //
-  //fix_press_berendsen();
+
   //_locator.SetPosition(_position);
   SetCenterTargetPositions();
 }
@@ -211,7 +213,7 @@ void LennardJonesSystem::fix_press_berendsen()
   bulkmodulus = 10.0;
   p_start[0] = p_start[1] = p_start[2] = 1.0;
   p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
-  p_period[0] = p_period[1] = p_period[2] = 10.0;
+  p_period[0] = p_period[1] = p_period[2] = 1;
 
   // compute new T,P
 
@@ -301,7 +303,7 @@ void LennardJonesSystem::Compute_Pressure_Scalar()
     3.0 * inv_volume * _unit_factor.nktv2p;
 
   SetParameter(PARA_PRESSURE, _pressure_scalar);
-  std::cout << " pressure=" << _pressure_scalar << std::endl;
+  //std::cout << " pressure=" << _pressure_scalar << std::endl;
 }
 
 void LennardJonesSystem::Compute_Temp_Scalar() {}

@@ -38,6 +38,7 @@ EAMSystem::EAMSystem(const Configuration& cfg)
   SetParameter(PARA_KMAX, _Kmax);
   SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   SetParameter(PARA_TEMPT, Real{ 0.0 });
+  SetParameter(PARA_PRESSURE, Real{ 0.0 });
 }
 
 void EAMSystem::Init()
@@ -326,10 +327,11 @@ void EAMSystem::UpdatePosition()
 {
   auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
-  _locator.SetPosition(_position);
-  //
+
   fix_press_berendsen();
   _locator.SetPosition(_position);
+  //
+
   SetCenterTargetPositions();
 }
 
@@ -510,7 +512,7 @@ void EAMSystem::fix_press_berendsen()
   bulkmodulus = 10.0;
   p_start[0] = p_start[1] = p_start[2] = 1.0;
   p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
-  p_period[0] = p_period[1] = p_period[2] = 1.0;
+  p_period[0] = p_period[1] = p_period[2] = 0.1;
 
   // compute new T,P
 
@@ -627,7 +629,7 @@ void EAMSystem::Compute_Pressure_Scalar()
                       * inv_volume * _unit_factor.nktv2p;
 
   SetParameter(PARA_PRESSURE, _pressure_scalar);
-  std::cout << " pressure=" << _pressure_scalar << std::endl;
+  //std::cout << " pressure=" << _pressure_scalar << std::endl;
 }
 
 void EAMSystem::Compute_Temp_Scalar() {}
