@@ -99,7 +99,7 @@ target_include_directories(_compiler_flags INTERFACE
   )
   # 看来要在res 文件下建立cmake文件
   # 定义lib
-add_library(libsemd STATIC ${host_src} ${device_src})
+add_library(libsemd STATIC ${host_src} ${device_src}  )
 target_link_libraries(libsemd PUBLIC _compiler_flags)
 
 #链接json库
@@ -115,7 +115,7 @@ target_link_libraries(libsemd PUBLIC fmt::fmt)
 vtkm_add_target_information(libsemd DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES ${device_src})
 
   # 定义target
-add_executable(${target} main.cpp)
+add_executable(${target} main.cpp  )
 #file(COPY ${CMAKE_SOURCE_DIR}/framework/res/Gnear_table_geq2_2.txt DESTINATION ${CMAKE_BINARY_DIR}/framework/res)
 #file(COPY ${CMAKE_SOURCE_DIR}/framework/res/Gnear_table_leq2_2.txt DESTINATION ${CMAKE_BINARY_DIR}/framework/res)
 #file(COPY "../res" DESTINATION ${CMAKE_BINARY_DIR}/framework)

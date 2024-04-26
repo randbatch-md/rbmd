@@ -1,20 +1,59 @@
 ﻿#include "Application.h"
 #include "CommandLine.h"
-#include "Register.h"
-#include <vtkm/cont/RuntimeDeviceTracker.h>
 #include "InitGlobal.h"
+#include "Register.h"
+#include "SetupDeviceAction.h"
+#include <vtkm/cont/RuntimeDeviceTracker.h>
 
 Application::Application(int argc, char** argv)
 {
-  _command_line = std::make_unique<CommandLine>(argc, argv);
-  _init_global = std::make_unique<InitGlobal>(argc, argv);
-  RegisterObjectGlobal();
+  int iargc = 1;
+  if (argc == 2)
+  {
+    if (std::string(argv[iargc]) == "--version")
+    {
+      OutputVersion();
+    }
+    else if (std::string(argv[iargc]) == "-help")
+    {
+      HelpMessages();
+    }
+    else
+    {
+      ErrerMessages();
+    }
+  }
+  else if (argc > 2)
+  {
+    if (std::string(argv[iargc]) == "-j" && argc == 3)
+    {
+      _command_line = std::make_unique<CommandLine>(argc, argv);
+      _init_global = std::make_unique<InitGlobal>(argc, argv);
+      RegisterObjectGlobal();
+    }
+    else if (std::string(argv[iargc]) == "-j" && argc > 3)
+    {
+      std::cout << "--- The formate is: '-j'+ '*.json'---" << std::endl;
+      exit(0);
+    }
+    else
+    {
+      ErrerMessages();
+    }
+  }
+  else
+  {
+    ErrerMessages();
+  }
 }
 
 Application::~Application() {}
 
 void Application::SetupDevice()
 {
+  //auto set_devices = std::make_shared<SetupDeviceAction>(*this);
+  //set_devices->Execute();
+
   auto& tracker = vtkm::cont::GetRuntimeDeviceTracker();
 
   try
@@ -35,7 +74,26 @@ void Application::SetupDevice()
 
   console::Info("Device Tag: ", _device->GetName());
 }
+void Application::OutputVersion()
+{
+  const std::string RBMD_VERSION = "1.0.0";
+  std::cout << RBMD_VERSION << std::endl;
+  exit(0);
+}
 
+void Application::HelpMessages()
+{
+  std::cout << "---Reference website: https://www.randbatch.com/guide/CASE_STUDIES.html---"
+            << std::endl;
+  exit(0);
+}
+
+void Application::ErrerMessages()
+{
+  std::cout << "---Please enter the configuration command---" << std::endl
+            << "---You can enter '-help' to query---" << std::endl;
+  exit(0);
+}
 void Application::Run()
 {
 
