@@ -512,7 +512,7 @@ void EAMSystem::fix_press_berendsen()
   bulkmodulus = 10.0;
   p_start[0] = p_start[1] = p_start[2] = 1.0;
   p_stop[0] = p_stop[1] = p_stop[2] = 1.0;
-  p_period[0] = p_period[1] = p_period[2] = 0.1;
+  p_period[0] = p_period[1] = p_period[2] = 0.001;
 
   // compute new T,P
 
@@ -653,17 +653,18 @@ void EAMSystem::x2lamda(Id n)
     delta[1] = _position.ReadPortal().Get(i)[1] - range[1].Min;
     delta[2] = _position.ReadPortal().Get(i)[2] - range[2].Min;
 
-    _position.WritePortal().Get(i)[0] = h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2];
-    _position.WritePortal().Get(i)[1] = h_inv[1] * delta[1] + h_inv[3] * delta[2];
-    _position.WritePortal().Get(i)[2] = h_inv[2] * delta[2];
+    Vec3f lamda_position = { h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2],
+                             h_inv[1] * delta[1] + h_inv[3] * delta[2],
+                             h_inv[2] * delta[2] };
+
+    _position.WritePortal().Set(i, lamda_position);
   }
   //_locator.SetPosition(_position);
   //for (int i = 0; i < n; i++)
   //{
-  //  for (int j = 0; j < 3; j++)
-  //  {
-  //    std::cout << "i=" << i << ", lamda_position=" << position.ReadPortal().Get(i)[j] << std::endl;
-  //  }
+  //  std::cout << "i=" << i << ", lamda_position=" << _position.ReadPortal().Get(i)[0] << ","
+  //            << _position.ReadPortal().Get(i)[1] << "," << _position.ReadPortal().Get(i)[2]
+  //            << std::endl;
   //}
 }
 
@@ -671,26 +672,29 @@ void EAMSystem::lamda2x(Id n)
 {
   //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
   vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  Vec3f position_base;
 
   for (int i = 0; i < n; i++)
   {
-    _position.WritePortal().Get(i)[0] = h[0] * _position.ReadPortal().Get(i)[0] + 
-                                        h[5] * _position.ReadPortal().Get(i)[1] +
-                                        h[4] * _position.ReadPortal().Get(i)[2] + range[0].Min;
+    position_base[0] = _position.ReadPortal().Get(i)[0];
+    position_base[1] = _position.ReadPortal().Get(i)[1];
+    position_base[2] = _position.ReadPortal().Get(i)[2];
 
-    _position.WritePortal().Get(i)[1] = h[1] * _position.ReadPortal().Get(i)[1] +
-                                        h[3] * _position.ReadPortal().Get(i)[2] + range[1].Min;
+    Vec3f x_position = { h[0] * position_base[0] + h[5] * position_base[1] +
+                           h[4] * position_base[2] + static_cast<vtkm::FloatDefault>(range[0].Min),
+                         h[1] * position_base[1] + h[3] * position_base[2] +
+                           static_cast<vtkm::FloatDefault>(range[1].Min),
+                         h[2] * position_base[2] + static_cast<vtkm::FloatDefault>(range[2].Min) };
 
-    _position.WritePortal().Get(i)[2] = h[2] * _position.ReadPortal().Get(i)[2] + range[2].Min;
+    _position.WritePortal().Set(i, x_position);
   }
-  //_locator.SetPosition(_position);
 
   //for (int i = 0; i < n; i++)
   //{
-  //  for (int j = 0; j < 3; j++)
-  //  {
-  //    std::cout << "i=" << i << ", position=" << position.ReadPortal().Get(i)[j] << std::endl;
-  //  }
+  //  std::cout << "i=" << i << ", new_position=" <<
+  //            _position.ReadPortal().Get(i)[0] << "," <<
+  //            _position.ReadPortal().Get(i)[1] << ","  << _position.ReadPortal().Get(i)[2]
+  //            << std::endl;
   //}
 }
 
@@ -704,7 +708,9 @@ void EAMSystem::set_global_box()
   h[0] = xprd;
   h[1] = yprd;
   h[2] = zprd;
-
+  h[3] = 0;
+  h[4] = 0;
+  h[5] = 0;
   //
   auto orthogonal = 1;
   if (orthogonal)
