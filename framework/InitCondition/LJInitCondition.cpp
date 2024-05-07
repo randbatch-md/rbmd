@@ -58,7 +58,7 @@ void LJInitCondition::ComputeForce()
     ContPointLocator locator;
     SetLocator(locator);
     auto cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
-    SystemWorklet::LJForceWithPeriodicBC(cut_off, atom_id, locator, topology, force_function, _LJforce);
+    SystemWorklet::Class2LJForceWithPeriodicBC(cut_off, atom_id, locator, topology, force_function, _LJforce);
   }
   catch (const std::exception& e)
   {

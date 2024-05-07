@@ -21,6 +21,7 @@
 #include <vtkm/worklet/Keys.h>
 #include "locator/ContPointLocator.h"
 #include "forceFunction/ContForceFunction.h"
+#include <iomanip>
 
 template<typename T>
 void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
@@ -29,7 +30,10 @@ void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
   auto read_protol = arrayHandle.ReadPortal();
   for (int i = 0; i < num; ++i)
   {
-    std::cout << read_protol.Get(i) << std::endl;
+    std::cout << std::right << std::setw(10) << read_protol.Get(i)[0] << " " << std::right 
+              << std::setw(10) << read_protol.Get(i)[1] << " " << std::right << std::setw(10)
+              << read_protol.Get(i)[2]
+              << std::endl;
   }
 }
 
@@ -116,6 +120,9 @@ void PCFFSystem::ComputeForce()
 {
   ComputeAllForce();
   TempConTypeForce();
+  //PrintArrayhandle(_all_force);
+  //std::cout << "------------------------------------------------------------" << std::endl;
+  //PrintArrayhandle(_position);
 }
 
 void PCFFSystem::ComputeAllForce()
@@ -432,7 +439,18 @@ vtkm::cont::ArrayHandle<Vec3f> PCFFSystem::EleNewForce()
   }
   //_EleFartimer.Stop();
 
-  Invoker{}(MolecularWorklet::UnitRescaleWorklet{ _unit_factor._qqr2e }, _ele_new_force);
+  //Invoker{}(MolecularWorklet::UnitRescaleWorklet{ _unit_factor._qqr2e }, _ele_new_force);
+  //vtkm::cont::ArrayHandle<Vec3f> arrayHandle;
+  //arrayHandle.Allocate(_ele_new_force.GetNumberOfValues());
+
+  //// 初始化数组中的每个元素为 (0, 0, 0)
+  //Vec3f initValue(0.0f, 0.0f, 0.0f);
+  //auto portal = arrayHandle.WritePortal();
+  //for (vtkm::Id i = 0; i < _ele_new_force.GetNumberOfValues(); ++i)
+  //{
+  //  portal.Set(i, initValue);
+  //}
+
   return _ele_new_force;
 }
 

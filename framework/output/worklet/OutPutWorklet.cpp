@@ -190,13 +190,14 @@ namespace OutPut
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistance(p_j, p_i, 16.378);
 
           auto sigma_i3 = sigma_i * sigma_i * sigma_i;
           auto sigma_i6 = sigma_i3 * sigma_i3;
           auto sigma_j3 = sigma_j * sigma_j * sigma_j;
           auto sigma_j6 = sigma_j3 * sigma_j3;
-          Real eps_ij = (2 * vtkm::Sqrt(eps_i * eps_j) * sigma_i3 * sigma_j3) / sigma_i6 + sigma_j6;
+          Real eps_ij = (2 * vtkm::Sqrt(eps_i * eps_j) * sigma_i3 * sigma_j3) / (sigma_i6 + sigma_j6);
           Real sigma_ij = vtkm::Pow((sigma_i6 + sigma_j6)/2, 1/6);
 
           // special lj part

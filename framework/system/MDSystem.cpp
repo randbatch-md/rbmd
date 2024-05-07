@@ -467,7 +467,7 @@ void MDSystem::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
 void MDSystem::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce) 
 {
   auto cut_off = GetParameter<Real>(PARA_CUTOFF);
-  SystemWorklet::LJForceWithPeriodicBC( cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+  SystemWorklet::Class2LJForceWithPeriodicBC( cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
 }
 
 void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
