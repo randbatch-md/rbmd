@@ -1,0 +1,100 @@
+﻿{
+  "parallel": {
+    "type": "serial",
+    "num_threads": 8
+  },
+
+  "locator": {
+    "cut_off": 5,
+    "rs": 2.5,
+    "random_num": 50
+  },
+
+  "init_condition": {
+    "model_init_Condition": {
+      "type": "ModelFileInitCondition",
+      "file": "water_300_pcff_v.data",
+      "velocity_type": "GAUSS",
+        "atom_style": "full"
+    }
+  },
+
+  "system": {
+    "type": "PCFFSystem",
+    "alpha": 0.1,
+    "rbeP": 100,
+    "kmax": 2,
+    "kbT": 298.0,
+    "farforce_type": "RBE",
+    "nearforce_type": "ORIGINAL",
+    "temp_con_type": "BERENDSEN",
+    "unit": "REAL",
+    "use_shake": false,
+    "use_erf": true
+  },
+
+  "executioner": {
+    "dt": 1,
+    "num_steps": 1000
+  },
+
+  "outputs": {
+    "table_output": {
+      "type": "MoleculesTableOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": false,
+      "output_screen": true,
+      "output_file": true,
+      "compute": true
+    },
+
+    "file_output": {
+      "type": "MoleculesFileOutput",
+      "interval": 10,
+      "binary": false,
+      "out_initial": false,
+      "output_file": false,
+      "compute": false,
+      "radius": 5,
+      "dr": 0.1,
+      "min_radius": 0.0,
+      "statistics_rdf_steps": 1000,
+      "center_type": 1,
+      "target_type": 1
+    },
+
+    "msd_output": {
+      "type": "MSDOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": true,
+      "output_file": true,
+      "compute": true,
+      "start_step": 500,
+      "end_step": 600
+    },
+
+    "vacf_output": {
+      "type": "VACFOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": true,
+      "output_file": true,
+      "compute": true,
+      "start_step": 500,
+      "end_step": 600
+    },
+
+    "trajectory_output": {
+      "type": "TrajectoryOutput",
+      "interval": 100,
+      "binary": false,
+      "output_file": true
+    },
+
+    "progress": {
+      "type": "Progress"
+    }
+  }
+}
