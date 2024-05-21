@@ -1,101 +1,203 @@
-## 关于semd
-可压缩Navier-Stokes方程GPU解算器
+<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
+<a name="readme-top"></a>
+<!--
+*** Thanks for checking out the Best-README-Template. If you have a suggestion
+*** that would make this better, please fork the repo and create a pull request
+*** or simply open an issue with the tag "enhancement".
+*** Don't forget to give the project a star!
+*** Thanks again! Now go create something AMAZING! :D
+-->
 
-## windows下的依赖安装
-### Visual Studio 2019 安装
-参照vistual studio官方[安装教程](https://visualstudio.microsoft.com/zh-hans/vs/)
-### cuda 安装
-对于windows平台，需要[cuda10.2](https://developer.nvidia.com/cuda-10.2-download-archive?target_os=Windows&target_arch=x86_64&target_version=10&target_type=exelocal)或以上版本
 
-cuda其他版本[下载](https://developer.nvidia.com/cuda-toolkit-archive)
-### VTKm安装
-zaran依赖[VTKm](https://m.vtk.org/)库，VTKm的代码[仓库地址](https://gitlab.kitware.com/vtk/vtk-m)，
 
-关于VTKm的介绍，可下载这个[PPT](https://m-old.vtk.org/images/f/f3/VTKm_Tutorial_VIS19.pptx)，
+<!-- PROJECT SHIELDS -->
+<!--
+*** I'm using markdown "reference style" links for readability.
+*** Reference links are enclosed in brackets [ ] instead of parentheses ( ).
+*** See the bottom of this document for the declaration of the reference variables
+*** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
+*** https://www.markdownguide.org/basic-syntax/#reference-style-links
+-->
+<!--
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![MIT License][license-shield]][license-url]
+[![LinkedIn][linkedin-shield]][linkedin-url]
+-->
 
-更多信息，参考官方[用户指南](https://gitlab.kitware.com/vtk/vtk-m-user-guide/-/wikis/home)，
-[zanran](https://gitee.com/feaSYtech/zaran)使用了VTKm的最新版本为v1.6
+<!-- TABLE OF CONTENTS -->
 
-##### 下载vtkm
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+    </li>
+    <li>
+      <a href="#getting-started">Installation</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+          <ul>
+              <li><a href="#onLinux">On Linux</a></li>
+          </ul>
+        <li><a href="#installation">Installation</a></li>
+          <ul>
+              <li><a href="#remark">Remark</a></li>
+          </ul>
+        <li><a href="#DockerImage">Docker Image</a></li>
+      </ul>
+    </li>
+    <li><a href="#gettingStarted">Getting Started</a></li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
+
+
+
+
+
+<!-- ABOUT THE PROJECT -->
+## About The Project 
+<!--
+[![Product Name Screen Shot][product-screenshot]](https://example.com)
+-->
+
+RBMD (Random Batch Molecular Dynamics) is a GPU-CPU heterogeneous accelerating molecular dynamics software baed on random batch series algorithms.
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- GETTING STARTED -->
+
+## Installation 
+
+### Prerequisites
+#### On Linux
+The third-party library vtk-m needs to be installed. First, clone the VTK-m from github on `your_folder`
 ```
-git clone https://gitlab.kitware.com/vtk/vtk-m/
-git checkout v1.9.0 
+git clone https://gitlab.kitware.com/vtk/vtk-m.git
 ```
-##### 编译安装
+Then switch to the branch: v1.9.0
+```
+git checkout v1.9.0
+```
+Finally, compile VTK-m with cmake (CUDA support required)  , CMake/3.22, GCC/9.3, and CUDA/11.8 have been confirmed to be necessary for compiling VTK-m.
+```
+cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DVTKm_ENABLE_CUDA=ON -DVTKm_USE_64BIT_IDS=OFF -DVTKm_ENABLE_TESTING=OFF -DVTKm_ENABLE_RENDERING=OFF -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=your_folder/vtkm_out ..
+```
+And install in the `vtkm-out`
+```
+make -j
+make install
+```
+For rbmd compilation,
 
-在vtkm文件夹上右键，用Vistual Studio打开
+1. Install the source code on `your_folder` and switch to the `dev` branch
+   ```
+   git clone https://github.com/randbatch-md/rbmd.git
+   git checkout dev
+   ```
+2. cmake RBMD based on the same packages :CMake/3.22, GCC/9.3, and CUDA/11.8 in the `build` folder
+   ```
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   ```
+3. compile the executable file `rbmd` and then `rbmd` is on the `framework` folder 
+   ```
+   make -j
+   ```
+   
 
-<img src="docs/images/open-vtkm.png" />
+#### Remark
 
-VS2017之后，内置了对cmake的支持，省去使用cmake-gui生成sln的步骤，更方便使用。
-打开vtkm源码之后，vistual studio搜索到vtkm文件夹下的存在CMakeLists.txt，调用内置的cmake构建器
-可使用管理配置进行编译配置，如配置Release或Debug编译，以及编译器选择。编译器可选择msvc或clang，
-甚至远程服务器上的编译环境。
-<img src="docs/images/vs-config.png" />
+1. If the step for `make` rbmd is wrong in the first time, the `Linux` folder needs to be deleted
+```
+rm -rf your_folder/rbmd/framework/tools/Linux
+```
+and complie again.
 
-编译前对VTKm进行配置
-<img src="docs/images/vtkm-options.png" />
-其中：
+2. If in the end of  `make`, the error `cannot find -ljsoncpp` is occured, the environment variables needs to be specified and the step for make is changed
+```
+export LD_LIBRARY_PATH=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64:$LD_LIBRARY_PATH
+export LIBRARY_PATH=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64:$LIBRARY_PATH
+cmake  ..  -DCMAKE_BUILD_TYPE=Release -DCMAKE_LINKER=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64
+```
 
-+ VTKm_ENABLE_CUDA：       是否打开GPU编译
-+ VTKm_ENABLE_RENDERING：  是否打开内置渲染模块，打开
-+ VTKm_USER_DOUBLE_PRECISION：是否使用双精度，关闭，桌面显卡的双精度性能很差 
+### Docker Image
 
-其他选项默认即可。
-配置好选项之后，保存，vistual studio自动使用内置cmake生成，之后进行编译，安装即可。
-
-<img src="docs/images/compile_build.png" />
-
-编译过程会使用并行编译，根据机器性能，cpu版本约10分钟，gpu版本约30分钟。安装的路径在`vtkm/out/install/*`下，
-根据不同配置名称生成相应的文件夹，方便第三方库切换使用。
-
-## semd的编译
-
+You can also pull the docker image and run docker dircetly
 
 ```
-git clone https://gitee.com/sciai_cq/semd.git
+docker pull ghcr.io/randbatch-md/rbmd:1.0.0
+docker run --rm --gpus all -it -v $PWD:/app rbmd  /bin/bash -c "rbmd -j rbmd.json"
 ```
-同样，右键semd文件夹，使用vistual studio打开，配置
 
-<img src="docs/images/zaran_config.png" />
 
-其中`VTKm_DIR`选择安装好的vtkm路径，semd会根据VTKm的配置是否启用cuda，编译gpu版本
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## semd的运行
-编译之后，在`semd\out\build\x64-release-gpu\framwork`为可执行文件路径
-<img src="docs/images/zaran.png" />
-其中`semd.exe`为可执行文件，使用cmd或powershell即可运行
+## Getting started
+
+run the example json file `rbmd.json` in `framework`, then rbmd is executed
 ```
-semd.exe -i xxx.i
+./rbmd -j rbmd.json
 ```
-zaran需要一个配置文件，设置运行的参数。
-#### config文件
-配置文件为 `.i` 作为后缀
-```
-[Mesh]
- dims = '200 200'
- x_range = '0 4'
- y_range = '0 2'
- z_range = '0 1'
-[]
 
 
-[Executioner]
-	steps = 100000
-	dt = 4e-04
-[]
-```
-*配置文件的结构和参数会随着程序开发改变*
-
-2DRiemann问题的运行结果：
-
-<img src="docs/images/riemann2d.png" />
+<!-- USAGE EXAMPLES -->
+## Usage
 
 
-## 开发路线图
-- [x] 加入fmt
-- [x] 加入gtest，放在contrib目录下
-- [x] 加入getpot，放在contrib目录下
-- [x] 文件目录结构重构
-- [ ] zaran作为命名空间
+_For more examples, please refer to the [https://www.randbatch.com/guide/](https://www.randbatch.com/guide/)_
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- CONTRIBUTING -->
+## Contributing
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- LICENSE -->
+## License
+
+Distributed under the GPL-3.0 License. See `LICENSE.txt` for more information.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- CONTACT -->
+## Contact
+
+<!--
+Your Name - [@your_twitter](https://twitter.com/your_username) - email@example.com
+-->
+Weizhu scientific computing platform Link: [https://github.com/randbatch-md](https://github.com/randbatch-md)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+<!-- ACKNOWLEDGMENTS -->
+## Acknowledgments
+
+<!--
+Use this space to list resources you find helpful and would like to give credit to. I've included a few of my favorites to kick things off!
+-->
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 
