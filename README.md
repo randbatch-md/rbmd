@@ -85,17 +85,17 @@ The third-party library vtk-m needs to be installed. First, clone the VTK-m from
 ```
 git clone https://gitlab.kitware.com/vtk/vtk-m.git
 ```
-Then switch to the branch: v1.9.0
+Then switch to the branch: v1.9.0 (`cat version.txt` to check the version of vtkm for install)
 ```
-git checkout v1.9.0
+git checkout -b 1.9.0 v1.9.0
 ```
-Finally, compile VTK-m with cmake (CUDA support required)  , CMake/3.22, GCC/9.3, and CUDA/11.8 have been confirmed to be necessary for compiling VTK-m.
+Finally, compile VTK-m with cmake (CUDA support required)  , CMake/3.20, GCC/9.0, and CUDA/11.0 have been confirmed to be necessary for compiling VTK-m. Furthermore, the compilation process is related to the GPU driver, and if deploying on a server, it needs to be compiled on the compute nodes.
 ```
-cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DVTKm_ENABLE_CUDA=ON -DVTKm_USE_64BIT_IDS=OFF -DVTKm_ENABLE_TESTING=OFF -DVTKm_ENABLE_RENDERING=OFF -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=your_folder/vtkm_out ..
+cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DVTKm_ENABLE_CUDA=ON -DVTKm_USE_64BIT_IDS=OFF -DVTKm_ENABLE_TESTING=OFF -DVTKm_ENABLE_RENDERING=OFF -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=your_folder/vtkm_out
 ```
 And install in the `vtkm-out`
 ```
-make -j
+make -j$(nproc)
 make install
 ```
 For rbmd compilation,
@@ -107,11 +107,11 @@ For rbmd compilation,
    ```
 2. cmake RBMD based on the same packages :CMake/3.22, GCC/9.3, and CUDA/11.8 in the `build` folder
    ```
-   cmake .. -DCMAKE_BUILD_TYPE=Release
+   cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_LINKER=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64
    ```
 3. compile the executable file `rbmd` and then `rbmd` is on the `framework` folder 
    ```
-   make -j
+   make -j$(nproc)
    ```
    
 
@@ -123,11 +123,10 @@ rm -rf your_folder/rbmd/framework/tools/Linux
 ```
 and complie again.
 
-2. If in the end of  `make`, the error `cannot find -ljsoncpp` is occured, the environment variables needs to be specified and the step for make is changed
+2. If in the end of  `make`, the error `cannot find -ljsoncpp` is occured, the environment variables needs to be specified in the `~/.bashrc`
 ```
 export LD_LIBRARY_PATH=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64:$LD_LIBRARY_PATH
 export LIBRARY_PATH=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64:$LIBRARY_PATH
-cmake  ..  -DCMAKE_BUILD_TYPE=Release -DCMAKE_LINKER=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64
 ```
 
 ### Docker Image
