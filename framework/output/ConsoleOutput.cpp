@@ -11,6 +11,7 @@ ConsoleOutput::ConsoleOutput(const Configuration& cfg) :
   , _timer(_app.GetSystem()->GetTimer())
   , _cumulative_time(0)
   , _output_screen(Get<bool>("output_screen"))
+  , _parser(*(_app.GetParser()))
 {
   _format_table = std::make_unique<FormatTable>();
   AddHeader(HEADER_STEP_NAME);

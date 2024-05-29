@@ -69,9 +69,17 @@ void AtomsTableOutput::Execute()
   {
     _tempT_sum = _system.GetParameter<Real>(PARA_TEMPT_SUM);
     _tempT = _system.GetParameter<Real>(PARA_TEMPT);
+    auto& system_node = _parser.GetJsonNode("system");
+    auto system_type = system_node["type"].asString();
 
-    //ComputePotentialEnergy();          ////////////////////         这里需要有判断
-    ComputeEAMPotentialEnergy();
+    if (system_type == "EAMSystem")
+    {
+      ComputeEAMPotentialEnergy();
+    }
+    else
+    {
+      ComputePotentialEnergy();   
+    }
 
     Residual();
 
