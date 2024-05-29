@@ -123,11 +123,10 @@ rm -rf your_folder/rbmd/framework/tools/Linux
 ```
 and complie again.
 
-2. If in the end of  `make`, the error `cannot find -ljsoncpp` is occured, the environment variables needs to be specified and the step for make is changed
+2. If in the end of  `make`, the error `cannot find -ljsoncpp` is occured, the environment variables needs to be specified in the `~/.bashrc`
 ```
 export LD_LIBRARY_PATH=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64:$LD_LIBRARY_PATH
 export LIBRARY_PATH=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64:$LIBRARY_PATH
-cmake  ..  -DCMAKE_BUILD_TYPE=Release -DCMAKE_LINKER=your_folder/rbmd/framework/tools/Linux/Release/jsoncpp/lib64
 ```
 
 ### Docker Image
