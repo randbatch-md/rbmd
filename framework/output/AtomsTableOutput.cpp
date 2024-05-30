@@ -237,8 +237,8 @@ void AtomsTableOutput::WriteToFile()
             << " , "                         //
             << "Residual" 
             << ", "
-            << "kBT"                         // add kBT
-            << ", "
+            //<< "kBT"                         // add kBT
+            //<< ", "
             << "KinteicEnergy"
             << ", "
             << "PotentialEnergy"
@@ -258,7 +258,7 @@ void AtomsTableOutput::WriteToFile()
             << _near_ele_potential_energy_avr << " , "
             << _far_ele_potential_energy_avr << " , " 
             << _residual << ", "
-            << _tempT  << ", "
+           // << _tempT  << ", "
             << _kinteic_energy << ", "
             << _potential_energy << ", "
             << _total_energy << ", "

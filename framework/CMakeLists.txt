@@ -55,6 +55,7 @@ system/H2OSystem.cpp
 system/NaClSystem.cpp
 system/EAMSystem.cpp
 output/MoleculesTableOutput.cpp
+output/TempOutput.cpp
 output/MoleculesFileOutput.cpp
 output/AtomsTableOutput.cpp
 output/AtomsFileOutput.cpp

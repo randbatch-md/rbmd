@@ -49,6 +49,16 @@
       "compute": true
     },
 
+    "temp_output": {
+      "type": "TempOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": false,
+      "output_screen": true,
+      "output_file": true,
+      "compute": true
+    },
+	
     "file_output": {
       "type": "AtomsFileOutput",
       "interval": 10,
