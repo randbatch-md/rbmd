@@ -9,6 +9,7 @@ public:
   
   void Execute() override;
   void UpdateField() override;
+  void AddMoleculeInfo();
 
 private:
   void DoInit();

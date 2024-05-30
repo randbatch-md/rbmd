@@ -39,7 +39,8 @@ public:
     , _drho(drho)
     , _nr(nr)
     , _dr(dr)
-  {
+  { 
+      _sum_gauss = Compute_S();
   }
  
   VTKM_EXEC vtkm::Vec3f ComputeLJForce(const Vec3f& r_ij,
@@ -214,7 +215,7 @@ public:
 
   VTKM_EXEC Vec3f ComputeRBEForce(const Id& p, Vec3f& force)
   {
-    return force * Compute_S() / p;
+    return force * _sum_gauss / p;
   }
 
   VTKM_EXEC Real Compute_S() const
@@ -562,6 +563,7 @@ public:
   Real _alpha;
   Real _volume;
   Real _Vlength;
+  Real _sum_gauss;
   IdComponent Kmax;
   IdComponent RBEP;
 

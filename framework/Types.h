@@ -30,5 +30,8 @@
                                             vtkm::cont::ArrayHandle<vtkm::Id>>;
   using Vec7f = vtkm::Vec<vtkm::FloatDefault, 7>;
 
+  using GroupRealType =
+    vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<Real>,
+                                            vtkm::cont::ArrayHandle<vtkm::Id>>;
   //using RealGradient = vtkm::Vec3f;
 //}

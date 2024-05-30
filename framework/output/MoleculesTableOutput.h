@@ -64,5 +64,7 @@ private:
   Real _self_potential_energy_avr;
   Real _temperature;
 
+  Real _dihedrals_energy;
+
   std::map<STATUS, std::vector<Real>> _status;
 };

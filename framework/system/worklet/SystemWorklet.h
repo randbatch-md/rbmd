@@ -5,6 +5,12 @@
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 #include "staticTable/ContStaticTable.h"
 
+using GroupIdIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Id>,
+                                                              vtkm::cont::ArrayHandle<vtkm::Id>>;
+
+using GroupRealIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<Real>,
+                                                                vtkm::cont::ArrayHandle<vtkm::Id>>;
+
 namespace SystemWorklet 
 {
     void ComputeNeighbours(const Real& cut_off,
@@ -119,6 +125,21 @@ namespace SystemWorklet
                          const CoordOffsetType& offset_verletlist_group,
                          vtkm::cont::ArrayHandle<Vec3f>& corr_force);
 
+    void NearForceRBLERFSpecialBonds(const Id& rs_num,
+                                     const Id& pice_num,
+                                     const Real& qqr2e,
+                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                     const ContPointLocator& locator,
+                                     const ContTopology& topology,
+                                     const ContForceFunction& force_function,
+                                     const ContStaticTable& static_table,
+                                     const GroupVecType& id_verletlist_group,
+                                     const GroupNumType& num_verletlist,
+                                     const CoordOffsetType& offset_verletlist_group,
+                                     const GroupIdIdType& group_ids,
+                                     const GroupRealIdType& group_weights,
+                                     vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+
     void NearForceRBL(const Id& rs_num,
                       const Id& pice_num,
                       const Real& qqr2e,
@@ -183,6 +204,14 @@ namespace SystemWorklet
                                const ContTopology& topology,
                                const ContForceFunction& force_function,
                                vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+    void SpecicalBondsLJForce(const Real& cut_off,
+                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                              const ContPointLocator& locator,
+                              const ContTopology& topology,
+                              const ContForceFunction& force_function,
+                              const GroupIdIdType& group_ids,
+                              const GroupRealIdType& group_weights,
+                              vtkm::cont::ArrayHandle<Vec3f>& LJforce);
     void ComputeNearElectrostatics(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                    const ContPointLocator& locator,
                                    const ContTopology& topology,
@@ -203,6 +232,15 @@ namespace SystemWorklet
                             const ContTopology& topology,
                             const ContPointLocator& locator,
                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce);
+    void ComputeSpecialCoulGeneral(const Real& Vlength,
+                                   const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                   const GroupVecType& group_vec,
+                                   const ContForceFunction& force_function,
+                                   const ContTopology& topology,
+                                   const ContPointLocator& locator,
+                                   const GroupIdIdType& group_ids,
+                                   const GroupRealIdType& group_weights,
+                                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce);
     void ComputeNewRBEForce(const IdComponent& rbeP, 
                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
@@ -261,6 +299,22 @@ namespace SystemWorklet
                                                const vtkm::cont::ArrayHandle<Real>& charge,
                                                vtkm::cont::ArrayHandle<Real>& Density_Real,
                                                vtkm::cont::ArrayHandle<Real>& Density_Image);
+    void ComputePnumberChargeStructureFactor(const Real& _Vlength,
+                                            const Id& pnumber,
+                                            const Id& pos_number,
+                                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                                             const vtkm::cont::ArrayHandle<Real>& charge,
+                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
+                                            // vtkm::cont::ArrayHandle<vtkm::Id>& psamplekey_group,
+                                             vtkm::cont::ArrayHandle<Real>& rhok_Re_group,
+                                             vtkm::cont::ArrayHandle<Real>& rhok_Im_group
+        /*                                     GroupVecType& psamplekey_group,
+                                             GroupRealType& rhok_Re_group,
+                                             GroupRealType& rhok_Im_group*/);
+    void ChangePnumberChargeStructureFactor(const vtkm::cont::ArrayHandle<Real>& rhok_Re,
+                                             const vtkm::cont::ArrayHandle<Real>& rhok_Im,
+                                             vtkm::cont::ArrayHandle<vtkm::Vec2f>& new_rhok);
     void UpdatePosition(const Real& dt,  
                         const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
                         const ContPointLocator& locator,
