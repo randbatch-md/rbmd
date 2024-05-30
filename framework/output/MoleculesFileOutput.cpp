@@ -113,7 +113,6 @@ void MoleculesFileOutput::ComputeRDF()
     locator.SetPosition(target_position, atom_id_target);
 
     auto radius = vtkm::cont::make_ArrayHandle(_vRadius);
-
     OutPut::ComputeRDF(num_center_pos,
                    _rdf_rho,
                    radius,

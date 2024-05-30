@@ -3,6 +3,13 @@
 #include "forceFunction/ContForceFunction.h"
 #include "topology/ContTopology.h"
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
+
+using GroupIdIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Id>,
+                                                              vtkm::cont::ArrayHandle<vtkm::Id>>;
+
+using GroupRealIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<Real>,
+                                                                vtkm::cont::ArrayHandle<vtkm::Id>>;
+
 namespace OutPut
 {
 void EAM_rho(const Real& eam_cut_off,
@@ -38,6 +45,15 @@ void ComputePotentialEnergy(const Real& cutoff,
                              const ContForceFunction& force_function,
                              vtkm::cont::ArrayHandle<Real>& potential_energy);
 
+void ComputeSpecialBondsLJPotential(const Real& cutoff,
+                                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                    const ContPointLocator& locator,
+                                    const ContTopology& topology,
+                                    const ContForceFunction& force_function,
+                                    const GroupIdIdType& group_ids,
+                                    const GroupRealIdType& group_weights,
+                                    vtkm::cont::ArrayHandle<Real>& potential_energy);
+
 void ComputeNearElePotential(const Real& cutoff,
                              const Real& alpha,
                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -64,6 +80,15 @@ void ComputeSpecialFarCoul(const Real& Vlength,
                            const ContTopology& topology,
                            const ContForceFunction& force_function,
                            vtkm::cont::ArrayHandle<Real>& SpecFarEnergy); 
+void ComputeSpecialBondsCoul(const Real& Vlength,
+                             const vtkm::cont::ArrayHandle<Id>& atoms_id,
+                             const GroupVecType& group_vec,
+                             const ContPointLocator& locator,
+                             const ContTopology& topology,
+                             const ContForceFunction& force_function,
+                             const GroupIdIdType& group_ids,
+                             const GroupRealIdType& group_weights,
+                             vtkm::cont::ArrayHandle<Real>& SpecFarEnergy);
 
  void ComputeRDF(const Id& num_center_pos,
                 const Real& _rho,

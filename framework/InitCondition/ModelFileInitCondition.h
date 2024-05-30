@@ -14,6 +14,7 @@ struct ModelHeader
   vtkm::Id _num_atoms_type;
   vtkm::Id _num_bound_type;
   vtkm::Id _num_angle_type;
+  vtkm::Id _num_dihedrals_type;
 };
 
 enum MolecularType
@@ -39,6 +40,7 @@ private:
   void PairCoeffs(std::ifstream& file, std::string& line);
   void BondCoeffs(std::ifstream& file, std::string& line);
   void AngleCoeffs(std::ifstream& file, std::string& line);
+  void DihedralsCoeffs(std::ifstream& file, std::string& line);
   void Group(std::string& line);
   void Atoms(std::ifstream& file, std::string& line);
   void Bonds(std::ifstream& file, std::string& line);
@@ -54,8 +56,11 @@ private:
   void SetMolecularGroup();
   void SetAtomsField();
   void SetBondField();
+  void SetSpecialBonds();
   void SetAngleField();
   void SetAtomsFieldEAM();
+  void SetDihedralsField();
+
 
 private:
   ModelHeader _header;
@@ -80,6 +85,10 @@ private:
   std::vector<Id> _dihedrals_type;
   std::vector<Id> _dihedrals_atoms_id;
 
+  std::vector<Real> _dihedrals_coeffs_k;
+  std::vector<vtkm::IdComponent> _dihedrals_coeffs_sign;
+  std::vector<vtkm::IdComponent> _dihedrals_coeffs_multiplicity;
+
   std::map<Id, std::vector<Id>> _molecular_map;
   std::map<Id, Id> atom_to_molecular_map;
   std::map<Id, std::vector<Id>> _atoms_map;
@@ -87,5 +96,6 @@ private:
   std::map<std::string, Id> group_id_init;
   std::map<Id, Id> _group_info;
   std::vector<Id> _molecular_type;
-
+  std::vector<Real> _special_bonds;
+  std::multimap<Id, Id> _special_map;
 };

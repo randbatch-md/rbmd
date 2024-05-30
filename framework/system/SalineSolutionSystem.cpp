@@ -181,9 +181,10 @@ void SalineSolutionSystem::TempConTypeForce()
 {
   vtkm::cont::ArrayHandle<Real> mass;
   mass.Allocate(_all_force.GetNumberOfValues());
+  auto writePortal = mass.WritePortal();
   for (size_t i = 0; i < _all_force.GetNumberOfValues(); i++)
   {
-    mass.WritePortal().Set(i, 1);
+    writePortal.Set(i, 1);
   }
   if (_temp_con_type == "LANGEVIN")
   {
