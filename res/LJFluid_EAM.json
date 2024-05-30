@@ -1,6 +1,6 @@
 ﻿{
   "parallel": {
-    "type": "serial",
+    "type": "cuda",
     "num_threads": 8
   },
 
@@ -21,14 +21,14 @@
 
   "system": {
     "type": "EAMSystem",
-    "potential_file": "E:/VS Librarys/1_library/semd/out/build/x64-Release-CUDA/framework/potentials/Cu_u3.eam",
+    "potential_file": "../../../../potentials/Cu_u3.eam",
     "alpha": 0.1,
     "rbeP": 100,
     "kmax": 4,
     "kbT": 298,
     "farforce_type": "RBE",
     "nearforce_type": "RBL",
-    "temp_con_type": "NOSE_HOOVER",
+    "temp_con_type": "BERENDSEN",
     "unit": "METAL",
     "use_erf": true
   },
@@ -70,7 +70,7 @@
       "binary": false,
       "out_initial": true,
       "output_file": true,
-      "compute": true,
+      "compute": false,
       "start_step": 0,
       "end_step": 10000
     },
@@ -81,7 +81,7 @@
       "binary": false,
       "out_initial": true,
       "output_file": true,
-      "compute": true,
+      "compute": false,
       "start_step": 0,
       "end_step": 10000
     },
@@ -90,7 +90,7 @@
       "type": "TrajectoryOutput",
       "interval": 100,
       "binary": false,
-      "output_file": false
+      "output_file": true
     },
 
     "progress": {

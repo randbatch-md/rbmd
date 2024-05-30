@@ -3,6 +3,8 @@
 #include "Output.h"
 #include "model/FormatTable.h"
 #include "System.h"
+class JsonParser;
+
 class ConsoleOutput : public Output
 {
 public:
@@ -31,4 +33,5 @@ protected:
   Real _time;
   Real _cumulative_time;
   bool _output_screen;
+  JsonParser& _parser;
 };
