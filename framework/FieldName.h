@@ -31,10 +31,13 @@ namespace field
 	const std::string dihedrals_atom_id = "dihedrals_atom_id";
 	const std::string dihedrals_type = "dihedrals_type";
 	const std::string signal_atoms_id = "signal_atoms_id";
-    const std::string frho_spline = "frho_spline";
-    const std::string rhor_spline = "rhor_spline";
-    const std::string z2r_spline = "z2r_spline";
-}
+    const std::string special_weights = "special_weights";
+    const std::string special_ids = "special_ids";
+    const std::string special_offsets = "special_offsets";
+    const std::string dihedrals_coeffs_k = "dihedrals_coeffs_k";
+    const std::string dihedrals_coeffs_sign = "dihedrals_coeffs_sign";
+    const std::string dihedrals_coeffs_multiplicity = "dihedrals_coeffs_multiplicity";
+        }
 
 namespace gtest
 {
@@ -66,12 +69,6 @@ const std::string PARA_TEMPT = "temp_t";
 const std::string PARA_RBE_P = "rbeP";
 const std::string PARA_CENTER_TYPE = "center_type";
 const std::string PARA_TARGET_TYPE = "target_type";
+
 const std::string PARA_LOCATOR = "locator";
-const std::string NTYPES = "num_atom_ntypes";
-const std::string ATOM_STYLE = "atom_style";
-const std::string EAM_PARA_CUTOFF = "eam_cut_off";
-const std::string EAM_PARA_RHOMAX = "eam_rhomax";
-const std::string EAM_PARA_NRHO = "eam_nrho";
-const std::string EAM_PARA_DRHO = "eam_drho";
-const std::string EAM_PARA_NR = "eam_nr";
-const std::string EAM_PARA_DR = "eam_dr";
+const std::string PARA_DIHEDRAL_ENERGY = "dihedral_energy";

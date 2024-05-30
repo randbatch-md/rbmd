@@ -1,13 +1,13 @@
 ﻿#pragma once
-#include "MDSystem.h"
 #include "Executioner.h"
+#include "MDSystem.h"
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 
-class H2OSystem : public MDSystem
+class PEOSystem : public MDSystem
 {
 public:
-  H2OSystem(const Configuration& cfg);
-  virtual ~H2OSystem(){};
+  PEOSystem(const Configuration& cfg);
+  virtual ~PEOSystem(){};
 
   void Init() override;
 
@@ -21,6 +21,7 @@ private:
   vtkm::cont::ArrayHandle<Vec3f> NearForce(); // NearForce: EleNearForce and LJforce
   vtkm::cont::ArrayHandle<Vec3f> BondForce();
   vtkm::cont::ArrayHandle<Vec3f> AngleForce();
+  vtkm::cont::ArrayHandle<Vec3f> DihedralsForce();
   vtkm::cont::ArrayHandle<Vec3f> SpecialCoulForce();
   vtkm::cont::ArrayHandle<Vec3f> EleNewForce();
   void TempConTypeForce();
@@ -36,9 +37,6 @@ private:
   void UpdateVelocityByTempConType();
   void SetCenterTargetPositions();
   void PreForce();
-  void Rattle();
-  void ConstraintA();
-  void ConstraintB();
 
 private:
   ArrayHandle<Vec3f> _nearforce;
@@ -52,8 +50,7 @@ private:
   std::string _farforce_type;
   std::string _nearforce_type;
   std::string _temp_con_type;
-  bool _use_shake;
-  
+
   ArrayHandle<Vec3f> _psample;
   Vec3f _gaussian;
 

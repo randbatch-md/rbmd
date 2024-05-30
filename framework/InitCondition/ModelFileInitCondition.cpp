@@ -12,12 +12,12 @@
 
 //RegisterObject(ModelFileInitCondition);
 ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
-  : MeshFreeFileInitCondition(cfg)
+  : MeshFreeFileInitCondition(cfg), 
+    _special_bonds(GetVectorValue<Real>("special_bonds"))
 {
   group_id_init.insert(std::make_pair("wat", MolecularType::H20));
   group_id_init.insert(std::make_pair("nacl", MolecularType::NACL));
   _system.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
-  _system.SetParameter(ATOM_STYLE, Get<std::string>("atom_style"));
 }
 
 void ModelFileInitCondition::Execute() 
@@ -98,6 +98,11 @@ void ModelFileInitCondition::Header(std::ifstream& file)
         std::istringstream iss(line);
         iss >> _header._num_angle_type;
       }
+      else if (line.find("dihedral types") != std::string::npos)
+      {
+        std::istringstream iss(line);
+        iss >> _header._num_dihedrals_type;
+      }
       else if (line.find("xlo xhi") != std::string::npos)
       {
         std::istringstream iss(line);
@@ -123,7 +128,6 @@ void ModelFileInitCondition::Header(std::ifstream& file)
   _system.SetParameter(PARA_VLENGTH, xLength);
   _system.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
   _system.SetParameter(PARA_RHO, _header._num_atoms / (xLength * yLength * zLength));
-  _system.SetParameter(NTYPES, _header._num_atoms_type);
   auto cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
   auto bin_number = Id3{
     static_cast<int>(xLength / cut_off),
@@ -161,6 +165,10 @@ void ModelFileInitCondition::Parser(std::ifstream& file)
       {
         AngleCoeffs(file, line);
       }
+      else if (line.find("Dihedral Coeffs") != std::string::npos)
+      {
+        DihedralsCoeffs(file, line);
+      }
       else if (line.find("group") != std::string::npos)
       {
         Group(line);
@@ -177,13 +185,13 @@ void ModelFileInitCondition::Parser(std::ifstream& file)
       {
         Angles(file, line);
       }
-      else if (line.find("Velocities") != std::string::npos)
-      {
-        VelocityRead(file, line);
-      }
       else if (line.find("Dihedrals") != std::string::npos)
       {
         Dihedrals(file, line);
+      }
+      else if (line.find("Velocities") != std::string::npos)
+      {
+        VelocityRead(file, line);
       }
     }
   }
@@ -269,6 +277,25 @@ void ModelFileInitCondition::AngleCoeffs(std::ifstream& file, std::string& line)
   }
 }
 
+void ModelFileInitCondition::DihedralsCoeffs(std::ifstream& file, std::string& line)
+{
+  std::vector<Real> bond_id_dihedralscoeffs(_header._num_dihedrals_type);
+  _dihedrals_coeffs_k.resize(_header._num_dihedrals_type);
+  _dihedrals_coeffs_sign.resize(_header._num_dihedrals_type);
+  _dihedrals_coeffs_multiplicity.resize(_header._num_dihedrals_type);
+
+  for (int i = 0; i < _header._num_dihedrals_type && getline(file, line); i)
+  {
+    if (!line.empty() && line != "\r")
+    {
+      std::istringstream iss(line);
+      iss >> bond_id_dihedralscoeffs[i] >> _dihedrals_coeffs_k[i] >> _dihedrals_coeffs_sign[i] >>
+        _dihedrals_coeffs_multiplicity[i];
+      i++;
+    }
+  }
+}
+
 void ModelFileInitCondition::Group(std::string& line)
 {
   std::istringstream iss(line);
@@ -309,67 +336,6 @@ void ModelFileInitCondition::Atoms(std::ifstream& file, std::string& line)
   vtkm::Id temp_type;
   vtkm::Id temp_id;
   vtkm::Id temp_molecule_id;
-  auto atom_style = _system.GetParameter<std::string>(ATOM_STYLE);
-  //
-  if (atom_style == "atomic")
-  {
-    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
-    {
-      if (!line.empty() && line != "\r")
-      {
-        std::istringstream iss(line);
-        iss >> temp_id >> temp_type >> _position[temp_id - 1][0] >> _position[temp_id - 1][1] >>
-          _position[temp_id - 1][2];
-        _atoms_type[temp_id - 1] = temp_type - 1;
-        _atoms_id[temp_id - 1] = temp_id - 1;
-        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
-        i++;
-      }
-    }
-    SetAtomsFieldEAM();
-  }
-  //
-  else if (atom_style == "full")
-  {
-    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
-    {
-      if (!line.empty() && line != "\r")
-      {
-        std::istringstream iss(line);
-        iss >> temp_id >> temp_molecule_id >> temp_type >> _charge[temp_id - 1] >>
-          _position[temp_id - 1][0] >> _position[temp_id - 1][1] >> _position[temp_id - 1][2];
-        _atoms_type[temp_id - 1] = temp_type - 1;
-        _molecular_type[temp_id - 1] = _group_info[temp_type];
-        _atoms_id[temp_id - 1] = temp_id - 1;
-        _molecules_id[temp_id - 1] = temp_molecule_id - 1;
-        MolecularMapInsert(_molecules_id[temp_id - 1], _atoms_id[temp_id - 1]);
-        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
-        AtomstoMolecular(_atoms_id[temp_id - 1], _molecules_id[temp_id - 1]);
-        i++;
-      }
-    }
-    SetAtomsField();
-    SetMolecularGroup();
-  }
-  //
-  else if (atom_style == "charge")
-  {
-    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
-    {
-      if (!line.empty() && line != "\r")
-      {
-        std::istringstream iss(line);
-        iss >> temp_id >> temp_type >> _charge[temp_id - 1] >> _position[temp_id - 1][0] >>
-          _position[temp_id - 1][1] >> _position[temp_id - 1][2];
-        _atoms_type[temp_id - 1] = temp_type - 1;
-        _atoms_id[temp_id - 1] = temp_id - 1;
-        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
-        i++;
-      }
-    }
-    SetAtomsField();
-  }
-  /*
   if (_header._num_bound_type!=0)
   {
     for (int i = 0; i < _header._num_atoms && getline(file, line); i)
@@ -408,8 +374,6 @@ void ModelFileInitCondition::Atoms(std::ifstream& file, std::string& line)
     }
   }
   SetAtomsField();
-  */
-
 }
 
 void ModelFileInitCondition::Bonds(std::ifstream& file, std::string& line)
@@ -429,12 +393,20 @@ void ModelFileInitCondition::Bonds(std::ifstream& file, std::string& line)
       std::istringstream iss(line);
       iss >> bond_id_vec[i] >> bond_type >> temp_id1 >> temp_id2;
       _bond_type[i] = bond_type - 1;
-      _bond_atoms_id[index++] = temp_id1 - 1;
-      _bond_atoms_id[index++] = temp_id2 - 1;
+
+      auto bond_id1 = temp_id1 - 1;
+      auto bond_id2 = temp_id2 - 1;
+
+      _bond_atoms_id[index++] = bond_id1;
+      _bond_atoms_id[index++] = bond_id2;
       i++;
 
-      bond_atoms_set.insert(temp_id1 - 1);
-      bond_atoms_set.insert(temp_id2 - 1);
+      bond_atoms_set.insert(bond_id1);
+      bond_atoms_set.insert(bond_id2);
+
+      //special
+      _special_map.insert(std::make_pair(bond_id1, bond_id2));
+      _special_map.insert(std::make_pair(bond_id2, bond_id1));
     }
   }
   for (const auto value : _atoms_id)
@@ -474,7 +446,7 @@ void ModelFileInitCondition::Angles(std::ifstream& file, std::string& line)
   SetAngleField();  
 }
 
-void ModelFileInitCondition::Dihedrals(std::ifstream& file, std::string& line) 
+void ModelFileInitCondition::Dihedrals(std::ifstream& file, std::string& line)
 {
   std::vector<vtkm::Id> dihedrals_id_vec(_header._num_dihedrals);
   _dihedrals_type.resize(_header._num_dihedrals);
@@ -499,6 +471,7 @@ void ModelFileInitCondition::Dihedrals(std::ifstream& file, std::string& line)
       _dihedrals_atoms_id[index++] = temp_id4 - 1;
       i++;
     }
+    SetDihedralsField();
   }
 
   auto dihedrals_atoms_id = _system.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
@@ -728,6 +701,118 @@ void ModelFileInitCondition::SetBondField()
   auto bond_coeffs_equilibrium = _system.GetFieldAsArrayHandle<Real>(field::bond_coeffs_equilibrium);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bond_coeffs_equilibrium_temp),
                         bond_coeffs_equilibrium);
+
+  SetSpecialBonds();
+}
+
+void ModelFileInitCondition::SetSpecialBonds() 
+{
+  std::vector<Real> special_weights;
+  std::vector<Id> special_ids;
+  std::vector<Id> special_offsets;
+
+  for (const auto& atoms_id : _atoms_id)
+  {
+    //没有成键的部分
+    if (_special_map.find(atoms_id) == _special_map.end())
+    {
+      special_weights.push_back(1.0);
+      special_ids.push_back(atoms_id);
+      special_offsets.push_back(1);
+      continue;
+    }
+
+    //成键的部分
+    Id offset = 0;
+    auto link_0 = _special_map.equal_range(atoms_id);
+    for (auto it0 = link_0.first; it0 != link_0.second; ++it0)
+    {
+      //一级连接
+      int key_1 = it0->second;
+      special_weights.push_back(_special_bonds[0]);
+      special_ids.push_back(key_1);
+      offset++;
+
+      if (_special_map.find(key_1) == _special_map.end())
+        continue;
+
+      //二级链接
+      auto link_1 = _special_map.equal_range(key_1);
+      for (auto it1 = link_1.first; it1 != link_1.second; ++it1)
+      {
+        auto key_2 = it1->second;
+        if (atoms_id == key_2)
+          continue;
+
+        special_weights.push_back(_special_bonds[1]);
+        special_ids.push_back(key_2);
+        offset++;
+
+        if (_special_map.find(key_2) == _special_map.end())
+          continue;
+
+        //三级连接
+        auto link_2 = _special_map.equal_range(key_2);
+        for (auto it2 = link_2.first; it2 != link_2.second; ++it2)
+        {
+          auto key_3 = it2->second;
+          if (key_1 == key_3)
+            continue;
+
+          special_weights.push_back(_special_bonds[2]);
+          special_ids.push_back(key_3);
+          offset++;
+        }
+      }
+    }
+
+    special_offsets.push_back(offset);
+  }
+
+  vtkm::Id offsetSize;
+  vtkm::cont::ArrayHandle<vtkm::Id> offsetsArray = vtkm::cont::ConvertNumComponentsToOffsets(
+    vtkm::cont::make_ArrayHandle(special_offsets), offsetSize);
+
+  auto special_offsets_array = _system.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  vtkm::cont::ArrayCopy(offsetsArray, special_offsets_array);
+
+  auto special_ids_array = _system.GetFieldAsArrayHandle<Id>(field::special_ids);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(special_ids), special_ids_array);
+
+  auto special_weights_array = _system.GetFieldAsArrayHandle<Real>(field::special_weights);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(special_weights), special_weights_array);
+
+  //vtkm::Id offsetSize;
+  //vtkm::cont::ArrayHandle<vtkm::Id> offsetsArray = vtkm::cont::ConvertNumComponentsToOffsets(
+  //  vtkm::cont::make_ArrayHandle(special_offsets), offsetSize);
+
+  //auto groupSpecialIds = vtkm::cont::make_ArrayHandleGroupVecVariable(
+  //  vtkm::cont::make_ArrayHandle(special_ids), offsetsArray);
+
+  //auto groupSpecialWeights = vtkm::cont::make_ArrayHandleGroupVecVariable(
+  //  vtkm::cont::make_ArrayHandle(special_weights), offsetsArray);
+
+  //if (groupSpecialIds.GetNumberOfValues() != groupSpecialWeights.GetNumberOfValues())
+  //  std::cout << "Error: Parse weight failed!" << std::endl;
+
+  //for (int i = 0; i < groupSpecialIds.GetNumberOfValues(); ++i)
+  //{
+  //  std::cout << "id: " << i << "  ";
+  //  auto item_ids = groupSpecialIds.ReadPortal().Get(i);
+  //  auto item_weights = groupSpecialWeights.ReadPortal().Get(i);
+  //  if (item_ids.GetNumberOfComponents() != item_weights.GetNumberOfComponents())
+  //    std::cout << "Error: Parse weight failed!" << std::endl;
+  //  for (int i = 0; i < item_ids.GetNumberOfComponents(); ++i)
+  //  {
+  //    std::cout << item_ids[i] << "-" << item_weights[i] << "  ";
+  //  }
+
+  //  std::cout << std::endl;
+  //}
+
+
+  //auto special_weights = _system.GetFieldAsArrayHandle<Real>(field::special_weights);
+  //vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_special_weights), special_weights);
 }
 
 void ModelFileInitCondition::SetAngleField() 
@@ -755,29 +840,34 @@ void ModelFileInitCondition::SetAngleField()
                         angle_coeffs_equilibrium);
 }
 
-void ModelFileInitCondition::SetAtomsFieldEAM()
+void ModelFileInitCondition::SetDihedralsField()
 {
-  // init Id
-  auto atom_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
-  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_id), atom_id);
+  auto dihedrals_atom_id = _system.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_dihedrals_atoms_id), dihedrals_atom_id);
 
-  // init position
-  ArrayHandle<Vec3f> position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
-  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_position), position);
+  auto dihedrals_type_array = _system.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_dihedrals_type), dihedrals_type_array);
 
-  // init mass
-  auto mass = _system.GetFieldAsArrayHandle<Real>(field::mass);
-  mass.Allocate(_header._num_atoms);
-  auto&& mass_protol = mass.WritePortal();
-  for (int i = 0; i < _header._num_atoms; ++i)
+  std::vector<Real> dihedrals_coeffs_k_temp(_header._num_dihedrals);
+  std::vector<vtkm::IdComponent> dihedrals_coeffs_sign_temp(_header._num_dihedrals);
+  std::vector<vtkm::IdComponent> dihedrals_coeffs_multiplicity_temp(_header._num_dihedrals);
+  for (size_t i = 0; i < _header._num_dihedrals; i++)
   {
-    mass_protol.Set(i, _mass[_atoms_type[i]]);
+    dihedrals_coeffs_k_temp[i] = _dihedrals_coeffs_k[_dihedrals_type[i]];
+    dihedrals_coeffs_sign_temp[i] = _dihedrals_coeffs_sign[_dihedrals_type[i]];
+    dihedrals_coeffs_multiplicity_temp[i] = _dihedrals_coeffs_multiplicity[_dihedrals_type[i]];
   }
 
-  auto pts_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type);
-  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
+  auto dihedrals_coeffs_k = _system.GetFieldAsArrayHandle<Real>(field::dihedrals_coeffs_k);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dihedrals_coeffs_k_temp), dihedrals_coeffs_k);
 
-    // init position_flag
-  auto position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
-  position_flag.AllocateAndFill(_header._num_atoms, { 0, 0, 0 });
+  auto dihedrals_coeffs_sign =
+    _system.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_sign);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dihedrals_coeffs_sign_temp),
+                        dihedrals_coeffs_sign);
+
+  auto dihedrals_coeffs_multiplicity =
+    _system.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dihedrals_coeffs_multiplicity_temp),
+                        dihedrals_coeffs_multiplicity);
 }

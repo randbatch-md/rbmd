@@ -9,10 +9,5 @@ VTKM_CONT ExecForceFunction ContForceFunction::PrepareForExecution(vtkm::cont::D
                            this->_volume,
                            this->_Vlength,
                            this->Kmax,
-                           this->RBEP,
-                           this->_rhomax,
-                           this->_nrho,
-                           this->_drho,
-                           this->_nr,
-                           this->_dr);
+                           this->RBEP);
 }

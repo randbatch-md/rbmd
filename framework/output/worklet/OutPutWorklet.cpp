@@ -9,108 +9,6 @@
 
 namespace OutPut
 {
-    struct ComputeEAMrhoWorklet : vtkm::worklet::WorkletMapField
-    {
-      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Real& Vlength)
-        : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
-      {
-      }
-    
-      using ControlSignature = void(FieldIn atoms_id,
-                                    WholeArrayIn rhor_spline,
-                                    ExecObject locator,
-                                    ExecObject topology,
-                                    ExecObject force_function,
-                                    FieldOut EAM_rho);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
-    
-      template<typename SpileType>
-      VTKM_EXEC void operator()(const Id atoms_id,
-                                const SpileType& rhor_spline,
-                                const ExecPointLocator& locator,
-                                const ExecTopology& topology,
-                                const ExecForceFunction& force_function,
-                                Real& EAM_rho) const
-      {
-        Real rho = 0;
-    
-        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
-        {
-          //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
-          rho += force_function.ComputeEAMrhoOUT(_eam_cut_off, r_ij, rhor_spline);
-        };
-        locator.ExecuteOnNeighbor(atoms_id, function);
-        EAM_rho = rho;
-      }
-      Real _eam_cut_off;
-      Real _Vlength;
-    };
-
-    struct ComputeEmbeddingEnergyWorklet : vtkm::worklet::WorkletMapField
-    {
-      ComputeEmbeddingEnergyWorklet() {}
-    
-      using ControlSignature = void(FieldIn atoms_id,
-                                    WholeArrayIn EAM_rho,
-                                    WholeArrayIn frho_spline,
-                                    ExecObject locator,
-                                    ExecObject topology,
-                                    ExecObject force_function,
-                                    FieldOut embedding_energy);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7);
-    
-      template<typename EAM_rhoype, typename SpileType>
-      VTKM_EXEC void operator()(const Id atoms_id,
-                                const EAM_rhoype& EAM_rho,
-                                const SpileType& frho_spline,
-                                const ExecPointLocator& locator,
-                                const ExecTopology& topology,
-                                const ExecForceFunction& force_function,
-                                Real& embedding_energy) const
-      {
-        embedding_energy = force_function.ComputeEmbeddingEnergy(atoms_id, EAM_rho, frho_spline);
-      }
-    };
-
-    struct ComputePairEnergyWorklet : vtkm::worklet::WorkletMapField
-    {
-      ComputePairEnergyWorklet(const Real& eam_cut_off, const Real& Vlength)
-        : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
-      {
-      }
-    
-      using ControlSignature = void(FieldIn atoms_id,
-                                    WholeArrayIn z2r_spline,
-                                    ExecObject locator,
-                                    ExecObject topology,
-                                    ExecObject force_function,
-                                    FieldOut pair_energy);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
-    
-      template<typename z2rSpileType>
-      VTKM_EXEC void operator()(const Id atoms_id,
-                                const z2rSpileType& z2r_spline,
-                                const ExecPointLocator& locator,
-                                const ExecTopology& topology,
-                                const ExecForceFunction& force_function,
-                                Real& pair_energy) const
-      {
-        pair_energy = 0;
-        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
-        {
-          //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
-          pair_energy += force_function.ComputePairEnergy(_eam_cut_off, r_ij, z2r_spline);
-        };
-        locator.ExecuteOnNeighbor(atoms_id, function);
-      }
-      Real _eam_cut_off;
-      Real _Vlength;
-    };
-
     struct ComputePotentialEnWorklet : vtkm::worklet::WorkletMapField
     {
       ComputePotentialEnWorklet(const Real& cut_off)
@@ -151,6 +49,70 @@ namespace OutPut
           IdComponent force_factor_ij = (molecular_id_i == molecular_id_j) ? 0 : 1.0;
 
           PE_ij += force_factor_ij * force_function.ComputePotentialEn(r_ij, eps_ij, sigma_ij, _cut_off);
+        };
+        locator.ExecuteOnNeighbor(atoms_id, function);
+
+        PotentialEnergy = PE_ij;
+      }
+      Real _cut_off;
+    };
+
+    struct ComputeSpecialBondsLJPotentialWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeSpecialBondsLJPotentialWorklet(const Real& cut_off)
+        : _cut_off(cut_off)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldIn special_ids,
+                                    FieldIn special_weights,
+                                    FieldOut PotentialEnergy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6,_7);
+
+      template<typename idsType, typename weightsType>
+      VTKM_EXEC void operator()(vtkm::Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const idsType& special_ids,
+                                const weightsType& special_weights,
+                                Real& PotentialEnergy) const
+      {
+        Real PE_ij = 0;
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+        auto num_components = special_ids.GetNumberOfComponents();
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+          auto r_ij = p_j - p_i;
+          auto eps_ij = vtkm::Sqrt(eps_i * eps_j);
+          auto sigma_ij = (sigma_i + sigma_j) / 2;
+
+          auto pe = 
+              force_function.ComputePotentialEn(r_ij, eps_ij, sigma_ij, _cut_off);
+
+           // special lj part
+          auto weight = 1.0;
+          for (auto i = 0; i < num_components; ++i)
+          {
+            if (special_ids[i] == pts_id_j)
+            {
+
+              weight = special_weights[i];
+            }
+          }
+
+          PE_ij += weight * pe;
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
 
@@ -278,6 +240,73 @@ namespace OutPut
         }
         Real _Vlength;
     };
+
+    struct ComputeSpecialBondsCoulWorklet : vtkm ::worklet::WorkletMapField
+    {
+      ComputeSpecialBondsCoulWorklet(const Real& Vlength)
+        : _Vlength(Vlength)
+      {
+      }
+      using ControlSignature = void(FieldIn current_atoms_id,
+                                    FieldIn group_vec,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject forcefunction,
+                                    FieldIn special_ids,
+                                    FieldIn special_weights,
+                                    FieldOut spec_far_coul_energy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6,_7,_8);
+
+      template<typename GroupVecType, typename idsType, typename weightsType>
+      VTKM_EXEC void operator()(const Id& atoms_id,
+                                const GroupVecType& group_vec,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const idsType& special_ids,
+                                const weightsType& special_weights,
+                                Real& spec_far_coul_energy) const
+      {
+        auto num = group_vec.GetNumberOfComponents();
+        spec_far_coul_energy = 0;
+
+        if (num < 3)
+        {
+          spec_far_coul_energy = 0;
+        }
+        else
+        {
+          auto charge_p_i = topology.GetCharge(atoms_id);
+          auto atoms_coord_i = locator.GetPtsPosition(atoms_id);
+          for (Id j = 0; j < num; ++j)
+          {
+            auto id = group_vec[j];
+            if (atoms_id == id)
+              continue;
+
+            auto atoms_charge_j = topology.GetCharge(id);
+            auto atoms_coord_j = locator.GetPtsPosition(id);
+            Vec3f rij = locator.MinDistanceIf(atoms_coord_i, atoms_coord_j, _Vlength);
+            Real dis_ij = vtkm::Magnitude(rij);
+            Real energy_atom = charge_p_i * atoms_charge_j / dis_ij;
+            //spec_far_coul_energy += energy_atom;
+
+            auto num_components = special_ids.GetNumberOfComponents();
+            Real weight = 1.0;
+            for (auto i = 0; i < num_components; ++i)
+            {
+              if (special_ids[i] == id)
+              {
+                weight = special_weights[i];
+              }
+            }
+
+            spec_far_coul_energy += (1.0 - weight) * energy_atom;
+          }
+        }
+      }
+      Real _Vlength;
+    };
     
     struct ComputeSqChargeWorklet : vtkm::worklet::WorkletMapField
     {
@@ -299,17 +328,15 @@ namespace OutPut
       }
       using ControlSignature = void(FieldIn current_radius,
                                     WholeArrayIn center_pts,
-                                    WholeArrayIn target_pts,
                                     WholeArrayIn center_ids,
                                     WholeArrayIn molecule_id,
                                     ExecObject locator,
                                     FieldInOut rdf);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5,_6);
 
       template<typename RadiusType, typename WholePtsType, typename RdfType, typename IdsType>
       VTKM_EXEC void operator()(const RadiusType& current_radius,
                                 const WholePtsType& center_pts,
-                                const WholePtsType& target_pts,
                                 const IdsType& center_ids,
                                 const IdsType& molecule_id,
                                 const ExecPointLocator& locator,
@@ -339,7 +366,7 @@ namespace OutPut
                 for (Id p = 0; p < num_pts; p++)
                 {
                   auto pts_id = locator.PtsInCell(ijk, p);
-                  auto p_j = target_pts.Get(pts_id) - coord_offset;
+                  auto p_j = locator.GetPtsPosition(pts_id) - coord_offset;
                   Real dis = vtkm::Magnitude(p_j - p_i);
                   const auto& target_molecule_id = molecule_id.Get(pts_id);
 
@@ -359,9 +386,9 @@ namespace OutPut
         auto total_num = 0;
         for (auto i = 0; i < _num_center_pos; ++i)
         {
-              const auto& p_i = center_pts.Get(i);
-              const auto& center_molecule_id = molecule_id.Get(center_ids.Get(i));
-              total_num += GetNumber(p_i, center_molecule_id);
+          const auto& p_i = center_pts.Get(i);
+          const auto& center_molecule_id = molecule_id.Get(center_ids.Get(i));
+          total_num += GetNumber(p_i, center_molecule_id);
         }
         auto dr3 = vtkm::Pow((current_radius + current_radius * 0.01), 3);
         auto r3 = vtkm::Pow(current_radius, 3);
@@ -483,62 +510,6 @@ namespace OutPut
       }
     };
 
-    void EAM_rho(const Real& eam_cut_off,
-                 const Real& Vlength,
-                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                 const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
-                 const ContPointLocator& locator,
-                 const ContTopology& topology,
-                 const ContForceFunction& force_function,
-                 vtkm::cont::ArrayHandle<Real>& EAM_rho)
-    {
-      vtkm::cont::Invoker{}(ComputeEAMrhoWorklet{ eam_cut_off, Vlength },
-                            atoms_id,
-                            rhor_spline,
-                            locator,
-                            topology,
-                            force_function,
-                            EAM_rho);
-    }
-
-    void EAM_EmbeddingEnergy(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                             const vtkm::cont::ArrayHandle<Real>& EAM_rho,
-                             const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
-                             const ContPointLocator& locator,
-                             const ContTopology& topology,
-                             const ContForceFunction& force_function,
-                             vtkm::cont::ArrayHandle<Real>& embedding_energy)
-    {
-
-      vtkm::cont::Invoker{}(ComputeEmbeddingEnergyWorklet{},
-                            atoms_id,
-                            EAM_rho,
-                            frho_spline,
-                            locator,
-                            topology,
-                            force_function,
-                            embedding_energy);
-    }
-
-    void EAM_PairEnergy(const Real& eam_cut_off,
-                        const Real& Vlength,
-                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                        const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
-                        const ContPointLocator& locator,
-                        const ContTopology& topology,
-                        const ContForceFunction& force_function,
-                        vtkm::cont::ArrayHandle<Real>& pair_energy)
-    {
-
-      vtkm::cont::Invoker{}(ComputePairEnergyWorklet{ eam_cut_off, Vlength },
-                            atoms_id,
-                            z2r_spline,
-                            locator,
-                            topology,
-                            force_function,
-                            pair_energy);
-    }
-
     //Statistical PotentialEnergy
     void ComputePotentialEnergy(const Real& cutoff,
                                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -552,6 +523,25 @@ namespace OutPut
                             locator,
                             topology,
                             force_function,
+                            potential_energy);
+    }
+
+    void ComputeSpecialBondsLJPotential(const Real& cutoff,
+                                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                        const ContPointLocator& locator,
+                                        const ContTopology& topology,
+                                        const ContForceFunction& force_function,
+                                        const GroupIdIdType& group_ids,
+                                        const GroupRealIdType& group_weights,
+                                        vtkm::cont::ArrayHandle<Real>& potential_energy)
+    {
+      vtkm::cont::Invoker{}(ComputeSpecialBondsLJPotentialWorklet{ cutoff },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            group_ids,
+                            group_weights,
                             potential_energy);
     }
 
@@ -594,6 +584,27 @@ namespace OutPut
       vtkm::cont::Invoker{}(ComputeSpecialFarCoulWorklet{ Vlength }, atoms_id, group_vec, locator, topology, force_function, SpecFarEnergy);
     }
 
+    void ComputeSpecialBondsCoul(const Real& Vlength,
+                               const vtkm::cont::ArrayHandle<Id>& atoms_id,
+                               const GroupVecType& group_vec,
+                               const ContPointLocator& locator,
+                               const ContTopology& topology,
+                               const ContForceFunction& force_function,
+                               const GroupIdIdType& group_ids,
+                               const GroupRealIdType& group_weights,
+                               vtkm::cont::ArrayHandle<Real>& SpecFarEnergy)
+    {
+      vtkm::cont::Invoker{}(ComputeSpecialBondsCoulWorklet{ Vlength },
+                            atoms_id,
+                            group_vec,
+                            locator,
+                            topology,
+                            force_function,
+                            group_ids,
+                            group_weights,
+                            SpecFarEnergy);
+    }
+
     void ComputeSqCharge(const vtkm::cont::ArrayHandle<Real>& charge,
                          vtkm::cont::ArrayHandle<Real>& SelfEnergy)
     {
@@ -604,7 +615,6 @@ namespace OutPut
                     const Real& _rho,
                     const vtkm::cont::ArrayHandle<Real>& radius,
                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& center_position,
-                    const vtkm::cont::ArrayHandle<vtkm::Vec3f>& target_position,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& center_ids,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& molecule_id,
                     const ContPointLocator& locator,
@@ -613,7 +623,6 @@ namespace OutPut
       vtkm::cont::Invoker{}(ComputeRDFWorklet{ num_center_pos, _rho },
                             radius,
                             center_position,
-                            target_position,
                             center_ids,
                             molecule_id,
                             locator,

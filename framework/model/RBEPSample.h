@@ -105,7 +105,6 @@ struct RBEPSAMPLE
   vtkm::cont::ArrayHandle<Vec3f> Fetch_P_Sample(const Real& mu, const Real& sigma) const
   {
     Real epsilonx = 1e-6; // precision
-    vtkm::cont::ArrayHandle<Vec3f> P_Sample;
     Vec3f X_0;
     do
     {
@@ -115,15 +114,17 @@ struct RBEPSAMPLE
     } while (vtkm::Abs(X_0[0]) < epsilonx && vtkm::Abs(X_0[1]) < epsilonx &&
              vtkm::Abs(X_0[2]) < epsilonx);
 
+    vtkm::cont::ArrayHandle<Vec3f> P_Sample;
     P_Sample.Allocate(_P);
-    P_Sample.WritePortal().Set(0, X_0);
+    auto writePortal = P_Sample.WritePortal();
+    writePortal.Set(0, X_0);
 
     for (int i = 1; i < _P; i++)
     {
       Vec3f X_1 = { MH_Algorithm(X_0[0], mu, sigma),
                     MH_Algorithm(X_0[1], mu, sigma),
                     MH_Algorithm(X_0[2], mu, sigma) };
-      P_Sample.WritePortal().Set(i, X_1);
+      writePortal.Set(i, X_1);
       X_0 = X_1;
       if (vtkm::Abs(X_1[0]) < epsilonx && vtkm::Abs(X_1[1]) < epsilonx &&
           vtkm::Abs(X_1[2]) < epsilonx)

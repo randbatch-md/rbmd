@@ -53,8 +53,7 @@ private:
   std::string _nearforce_type;
   std::string _temp_con_type;
   bool _use_shake;
-  
-  IdComponent _RBE_P;
+ 
   ArrayHandle<Vec3f> _psample;
   Vec3f _gaussian;
 

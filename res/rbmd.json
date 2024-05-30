@@ -14,7 +14,8 @@
     "model_init_Condition": {
       "type": "ModelFileInitCondition",
       "file": "rbmd.data",
-      "velocity_type": "GAUSS"
+      "velocity_type": "GAUSS",
+      "special_bonds": [ 0.1, 0.2, 0.3 ]
     }
   },
 

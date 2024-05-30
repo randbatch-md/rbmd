@@ -18,7 +18,6 @@ private:
   void AddDataToTable();
   void WriteToFile();
   bool ShouldOutput();
-  void ComputeEAMPotentialEnergy();
 
 private:
   vtkm::cont::Timer _PotentialTimer;

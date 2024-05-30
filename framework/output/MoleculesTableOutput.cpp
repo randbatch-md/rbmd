@@ -19,6 +19,7 @@ const std::string HEADER_BOND_ENERGY_NAME = "BOND_ENERGY";
 const std::string HEADER_ANGLE_ENERGY_NAME = "ANGLE_ENERGY";
 const std::string HEADER_KBT_NAME = "KBT";
 const std::string HEADER_CUMULATIVE_TIME_NAME = "CUMULATIVE_TIME";
+const std::string HEADER_DIHEDRAL_ENERGY_NAME = "DIHEDRAL_ENERGY";
 
 //RegisterObject(MoleculesTableOutput);
 
@@ -68,6 +69,7 @@ void MoleculesTableOutput::Init()
     AddHeader(HEADER_BOND_ENERGY_NAME);
     AddHeader(HEADER_ANGLE_ENERGY_NAME);
     AddHeader(HEADER_CUMULATIVE_TIME_NAME);
+    AddHeader(HEADER_DIHEDRAL_ENERGY_NAME);
 
     _cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
     _volume = _system.GetParameter<Real>(PARA_VOLUME);
@@ -91,7 +93,10 @@ void MoleculesTableOutput::Execute()
     {
       _angle_energy = _system.GetParameter<Real>(PARA_ANGLE_ENERGY);
     }
-
+    if (_system.HaveParameter(PARA_DIHEDRAL_ENERGY))
+    {
+      _dihedrals_energy = _system.GetParameter<Real>(PARA_DIHEDRAL_ENERGY);
+    }
     _tempT_sum = _system.GetParameter<Real>(PARA_TEMPT_SUM);
     _tempT = _system.GetParameter<Real>(PARA_TEMPT);
 
@@ -134,7 +139,16 @@ void MoleculesTableOutput::ComputePotentialEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
-  OutPut::ComputePotentialEnergy( _cut_off, atoms_id, locator, topology, force_function, lj_potential_energy);
+  //OutPut::ComputePotentialEnergy( _cut_off, atoms_id, locator, topology, force_function, lj_potential_energy);
+
+  auto special_offsets = _system.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  auto special_weights =  _system.GetFieldAsArrayHandle<Real>(field::special_weights);
+  auto specoal_ids = _system.GetFieldAsArrayHandle<Id>(field::special_ids);
+  auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+  auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+
+  OutPut::ComputeSpecialBondsLJPotential(
+    _cut_off, atoms_id, locator, topology, force_function, ids_group, weight_group, lj_potential_energy);
 
   auto lj_potential_energy_total =
     vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
@@ -243,7 +257,14 @@ void MoleculesTableOutput::SpecialFarCoulEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
-  OutPut::ComputeSpecialFarCoul(_Vlength, atoms_id, groupVecArray, locator, topology, force_function, Spec_far_coul_energy); 
+  //OutPut::ComputeSpecialFarCoul(_Vlength, atoms_id, groupVecArray, locator, topology, force_function, Spec_far_coul_energy); 
+  auto special_offsets = _system.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  auto special_weights = _system.GetFieldAsArrayHandle<Real>(field::special_weights);
+  auto specoal_ids = _system.GetFieldAsArrayHandle<Id>(field::special_ids);
+  auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+  auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+  OutPut::ComputeSpecialBondsCoul(
+    _Vlength, atoms_id, groupVecArray, locator, topology, force_function,ids_group,weight_group, Spec_far_coul_energy);
 
   _spec_far_ele_potential_energy_total = vtkm::cont::Algorithm::Reduce(
     Spec_far_coul_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
@@ -279,6 +300,7 @@ void MoleculesTableOutput::AddDataToTable()
     AddData(HEADER_BOND_ENERGY_NAME, _bond_energy);
     AddData(HEADER_ANGLE_ENERGY_NAME, _angle_energy);
     AddData(HEADER_CUMULATIVE_TIME_NAME, _cumulative_time + _timer.GetElapsedTime());
+    AddData(HEADER_DIHEDRAL_ENERGY_NAME, _dihedrals_energy);
   }
 }
 
@@ -314,6 +336,8 @@ void MoleculesTableOutput::WriteToFile()
             << ", "
             << "AngleEnergy"
             << ", "
+            << "DihedralEnergy"
+            << ", "
             << "CumulativeTime"
             << ", "
             << "SpecialEnergy"
@@ -333,7 +357,7 @@ void MoleculesTableOutput::WriteToFile()
             << _potential_energy_avr << ", "
             << _total_energy << ", "
             << _bond_energy << ", "
-            << _angle_energy << ", "
+            << _angle_energy << ", " << _dihedrals_energy << ", "
             << _cumulative_time + _timer.GetElapsedTime() << ", "
             << _spec_far_ele_potential_energy_avr 
             << std::endl;

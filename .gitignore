@@ -5,3 +5,4 @@ out
 CMakeSettings.json
 build
 framework/tools/Windows
+framework/tools/Linux

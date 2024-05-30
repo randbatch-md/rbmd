@@ -48,7 +48,6 @@ private:
   std::string _farforce_type;
   std::string _nearforce_type;
   std::string _temp_con_type;
-  IdComponent _RBE_P;
   IdComponent _Kmax;
   Real _dt;
   Real _kbT;
