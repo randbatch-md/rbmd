@@ -21,6 +21,19 @@ public:
     this->Kmax = kmax;
   }
 
+  void SetEAMParameters(const Real& rhomax,
+                        const Id& nrho,
+                        const Real& drho,
+                        const Id& nr,
+                        const Real& dr)
+  {
+    this->_rhomax = rhomax;
+    this->_nrho = nrho;
+    this->_drho = drho;
+    this->_nr = nr;
+    this->_dr = dr;
+  }
+
   VTKM_CONT
   ExecForceFunction PrepareForExecution(vtkm::cont::DeviceAdapterId device,
                                        vtkm::cont::Token& token) const;
@@ -32,4 +45,10 @@ public:
   Real _Vlength;
   IdComponent Kmax;
   IdComponent RBEP;
+
+  Real _rhomax;
+  Id _nrho;
+  Id _nr;
+  Real _drho;
+  Real _dr;
 };

@@ -15,7 +15,6 @@ set(VTKm_DIR "${CMAKE_CURRENT_LIST_DIR}/../../vtkm_out/lib/cmake/vtkm-1.9" CACHE
 endif()
 
 find_package(VTKm REQUIRED QUIET)
-find_package(OpenMP REQUIRED)
 
 set(target ${project_name})
 
@@ -54,6 +53,7 @@ system/MeshFreeSystem.cpp
 system/SalineSolutionSystem.cpp # Remove the "<vtkm/cont/Algorithm.h>" to move out of Devie_src
 system/H2OSystem.cpp
 system/NaClSystem.cpp
+system/EAMSystem.cpp
 system/PEOSystem.cpp
 output/MoleculesTableOutput.cpp
 output/MoleculesFileOutput.cpp

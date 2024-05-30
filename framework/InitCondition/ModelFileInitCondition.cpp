@@ -18,6 +18,7 @@ ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
   group_id_init.insert(std::make_pair("wat", MolecularType::H20));
   group_id_init.insert(std::make_pair("nacl", MolecularType::NACL));
   _system.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
+  _system.SetParameter(ATOM_STYLE, Get<std::string>("atom_style"));
 }
 
 void ModelFileInitCondition::Execute() 
@@ -128,6 +129,7 @@ void ModelFileInitCondition::Header(std::ifstream& file)
   _system.SetParameter(PARA_VLENGTH, xLength);
   _system.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
   _system.SetParameter(PARA_RHO, _header._num_atoms / (xLength * yLength * zLength));
+  _system.SetParameter(NTYPES, _header._num_atoms_type);
   auto cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
   auto bin_number = Id3{
     static_cast<int>(xLength / cut_off),
@@ -336,6 +338,67 @@ void ModelFileInitCondition::Atoms(std::ifstream& file, std::string& line)
   vtkm::Id temp_type;
   vtkm::Id temp_id;
   vtkm::Id temp_molecule_id;
+  auto atom_style = _system.GetParameter<std::string>(ATOM_STYLE);
+  //
+  if (atom_style == "atomic")
+  {
+    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
+    {
+      if (!line.empty() && line != "\r")
+      {
+        std::istringstream iss(line);
+        iss >> temp_id >> temp_type >> _position[temp_id - 1][0] >> _position[temp_id - 1][1] >>
+          _position[temp_id - 1][2];
+        _atoms_type[temp_id - 1] = temp_type - 1;
+        _atoms_id[temp_id - 1] = temp_id - 1;
+        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
+        i++;
+      }
+    }
+    SetAtomsFieldEAM();
+  }
+  //
+  else if (atom_style == "full")
+  {
+    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
+    {
+      if (!line.empty() && line != "\r")
+      {
+        std::istringstream iss(line);
+        iss >> temp_id >> temp_molecule_id >> temp_type >> _charge[temp_id - 1] >>
+          _position[temp_id - 1][0] >> _position[temp_id - 1][1] >> _position[temp_id - 1][2];
+        _atoms_type[temp_id - 1] = temp_type - 1;
+        _molecular_type[temp_id - 1] = _group_info[temp_type];
+        _atoms_id[temp_id - 1] = temp_id - 1;
+        _molecules_id[temp_id - 1] = temp_molecule_id - 1;
+        MolecularMapInsert(_molecules_id[temp_id - 1], _atoms_id[temp_id - 1]);
+        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
+        AtomstoMolecular(_atoms_id[temp_id - 1], _molecules_id[temp_id - 1]);
+        i++;
+      }
+    }
+    SetAtomsField();
+    SetMolecularGroup();
+  }
+  //
+  else if (atom_style == "charge")
+  {
+    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
+    {
+      if (!line.empty() && line != "\r")
+      {
+        std::istringstream iss(line);
+        iss >> temp_id >> temp_type >> _charge[temp_id - 1] >> _position[temp_id - 1][0] >>
+          _position[temp_id - 1][1] >> _position[temp_id - 1][2];
+        _atoms_type[temp_id - 1] = temp_type - 1;
+        _atoms_id[temp_id - 1] = temp_id - 1;
+        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
+        i++;
+      }
+    }
+    SetAtomsField();
+  }
+  /*
   if (_header._num_bound_type!=0)
   {
     for (int i = 0; i < _header._num_atoms && getline(file, line); i)
@@ -374,6 +437,8 @@ void ModelFileInitCondition::Atoms(std::ifstream& file, std::string& line)
     }
   }
   SetAtomsField();
+  */
+
 }
 
 void ModelFileInitCondition::Bonds(std::ifstream& file, std::string& line)
@@ -870,4 +935,31 @@ void ModelFileInitCondition::SetDihedralsField()
     _system.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dihedrals_coeffs_multiplicity_temp),
                         dihedrals_coeffs_multiplicity);
+}
+
+void ModelFileInitCondition::SetAtomsFieldEAM()
+{
+  // init Id
+  auto atom_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_id), atom_id);
+
+  // init position
+  ArrayHandle<Vec3f> position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_position), position);
+
+  // init mass
+  auto mass = _system.GetFieldAsArrayHandle<Real>(field::mass);
+  mass.Allocate(_header._num_atoms);
+  auto&& mass_protol = mass.WritePortal();
+  for (int i = 0; i < _header._num_atoms; ++i)
+  {
+    mass_protol.Set(i, _mass[_atoms_type[i]]);
+  }
+
+  auto pts_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
+
+    // init position_flag
+  auto position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+  position_flag.AllocateAndFill(_header._num_atoms, { 0, 0, 0 });
 }

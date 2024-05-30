@@ -19,6 +19,7 @@
 
 SalineSolutionSystem::SalineSolutionSystem(const Configuration& cfg)
   : MDSystem(cfg) 
+  , _RBE_P(Get<IdComponent>("rbeP"))  
   , _executioner((_app.GetExecutioner()))
   , _kbT(Get<IdComponent>("kbT"))
   , _Kmax(Get<IdComponent>("kmax"))
@@ -42,8 +43,6 @@ void SalineSolutionSystem::Init()
   InitialCondition();
 
   ComputeForce(); // Presolve force
-
-  _Elefartimer_counting = 0.0;
 }
 
 void SalineSolutionSystem::InitialCondition()
@@ -148,13 +147,10 @@ vtkm::cont::ArrayHandle<Vec3f> SalineSolutionSystem::EleNearForce()
 
 vtkm::cont::ArrayHandle<Vec3f> SalineSolutionSystem::EleNewForce()
 {
-  _EleFartimer.Start();
   if (_farforce_type == "RBE")
   {
     // New RBE force part
     ComputeRBEEleForce(_psample, _RBE_P, _ele_new_force);
-    _Elefartimer_counting = _Elefartimer_counting + _EleFartimer.GetElapsedTime();
-    std::cout << "RBE time: " << _Elefartimer_counting << std::endl;
   }
   if (_farforce_type == "EWALD")
   {

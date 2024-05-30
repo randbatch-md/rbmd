@@ -114,12 +114,13 @@ void MoleculesFileOutput::ComputeRDF()
 
     auto radius = vtkm::cont::make_ArrayHandle(_vRadius);
     OutPut::ComputeRDF(num_center_pos,
-                       _rdf_rho,
-                       radius,
-                       center_position,
-                       atom_id_center,
-                       molecule_id,
-                       locator,
-                       _rdf);
+                   _rdf_rho,
+                   radius,
+                   center_position,
+                   position,
+                   atom_id_center,
+                   molecule_id,
+                   locator,
+                   _rdf);
   }
 }

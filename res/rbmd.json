@@ -15,6 +15,7 @@
       "type": "ModelFileInitCondition",
       "file": "rbmd.data",
       "velocity_type": "GAUSS",
+      "atom_style": "full",
       "special_bonds": [ 0.1, 0.2, 0.3 ]
     }
   },

@@ -54,6 +54,7 @@ private:
   std::string _temp_con_type;
   bool _use_shake;
   
+  IdComponent _RBE_P;
   ArrayHandle<Vec3f> _psample;
   Vec3f _gaussian;
 
@@ -70,4 +71,6 @@ private:
   Real _alpha;
   Real _tempT_sum;
   Real _tempT;
+
+  Real _Elefartimer_counting;
 };

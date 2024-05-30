@@ -19,6 +19,7 @@
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 #include <vtkm/cont/ConvertNumComponentsToOffsets.h>
 #include <vtkm/worklet/Keys.h>
+
 #include <vtkm/worklet/WorkletMapField.h>
 #include <vtkm/worklet/WorkletReduceByKey.h>
 //RegisterObject(H2OSystem);
@@ -35,7 +36,8 @@ void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
 }
 
 H2OSystem::H2OSystem(const Configuration& cfg)
-  : MDSystem(cfg)
+  : MDSystem(cfg) 
+  , _RBE_P(Get<IdComponent>("rbeP"))
   , _executioner((_app.GetExecutioner()))
   , _kbT(Get<IdComponent>("kbT"))
   , _farforce_type(Get<std::string>("farforce_type"))
@@ -125,17 +127,18 @@ void H2OSystem::ComputeForce()
 
 void H2OSystem::ComputeAllForce()
 {
-  
-  // FarNearLJforce
-  //SystemWorklet::SumFarNearLJForce(EleNewForce(), EleNearForce(), LJForce(), _all_force); //RBE + LJ
-  SystemWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force); //RBE + LJ
-  
-  // special coul
-  Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
- 
-  //all force with angleforce
-  Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
-  
+    // FarNearLJforce
+    //SystemWorklet::SumFarNearLJForce(EleNewForce(), EleNearForce(), LJForce(), _all_force); //RBE + LJ
+    SystemWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force); //RBE + LJ
+
+    // special coul
+    Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
+
+    //all force with bondforce
+    Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
+    
+    //all force with angleforce
+    Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);  
 }
 
 void H2OSystem::UpdateVelocity()
@@ -278,8 +281,6 @@ vtkm::cont::ArrayHandle<Vec3f> H2OSystem::EleNearForce()
 
 vtkm::cont::ArrayHandle<Vec3f> H2OSystem::NearForce()
 {
-  vtkm::cont::Timer timer4NearForce;
-  timer4NearForce.Start();
   if (_nearforce_type == "RBL")
   {
     ComputeRBLNearForce(_nearforce);
@@ -292,8 +293,6 @@ vtkm::cont::ArrayHandle<Vec3f> H2OSystem::NearForce()
   {
     SystemWorklet::SumFarNearForce(EleNearForce(), LJForce(), _nearforce);
   }
-  auto timeNearForce = timer4NearForce.GetElapsedTime();
-  std::cout << "timeNearForce: " << timeNearForce << std::endl;
   return _nearforce;
 }
 
@@ -392,13 +391,13 @@ vtkm::cont::ArrayHandle<Vec3f> H2OSystem::SpecialCoulForce()
 
 vtkm::cont::ArrayHandle<Vec3f> H2OSystem::EleNewForce()
 {
-  _EleFartimer.Start();
+  //_EleFartimer.Start();
   if (_farforce_type == "RBE")
   {
     // New RBE force part
     ComputeRBEEleForce(_psample, _RBE_P, _ele_new_force);
-    _Elefartimer_counting = _Elefartimer_counting + _EleFartimer.GetElapsedTime();
-    std::cout << "RBE time: " << _Elefartimer_counting << std::endl;
+    //_Elefartimer_counting = _Elefartimer_counting + _EleFartimer.GetElapsedTime();
+    //std::cout << "RBE time: " << _Elefartimer_counting << std::endl;
   }
   else if (_farforce_type == "EWALD")
   {

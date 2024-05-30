@@ -58,6 +58,7 @@ private:
   void SetBondField();
   void SetSpecialBonds();
   void SetAngleField();
+  void SetAtomsFieldEAM();
   void SetDihedralsField();
 
 

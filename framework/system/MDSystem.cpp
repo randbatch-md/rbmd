@@ -544,7 +544,7 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
                                           id_verletlist_group,
                                           num_verletlist_group,
                                           offset_verletlist_group);
-  _EleNearPairtimer.Start();
+
   SystemWorklet::LJForceRBL(rs_num,
                             pice_num,
                             _atoms_id,
@@ -559,8 +559,6 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   SystemWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
-  _EleNearPairtimer_counting = _EleNearPairtimer_counting + _EleNearPairtimer.GetElapsedTime();
-  std::cout << "RBL pair time: " << _EleNearPairtimer_counting << std::endl;
 }
 
 void MDSystem::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
@@ -654,6 +652,186 @@ void MDSystem::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 
   SystemWorklet::LJForceWithPeriodicBC(
     cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+}
+
+void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
+{
+  ArrayHandle<Real> fp;
+  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+  auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+  auto N = _position.GetNumberOfValues();
+
+  auto rc = GetParameter<Real>(PARA_CUTOFF);
+  auto rs = GetParameter<Real>(PARA_RS);
+  auto rho_system = GetParameter<Real>(PARA_RHO);
+  vtkm::cont::ArrayHandle<Vec3f> corr_force;
+  corr_force.Allocate(N);
+
+  vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+  vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
+  vtkm::cont::ArrayHandle<vtkm::Vec3f> offset_verletlist;
+
+  Id rs_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
+  Id rc_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
+  Id rcs_num = rc_num - rs_num;
+  Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
+  Real random_rate = random_num / (rcs_num);
+  Id pice_num = std::ceil(1.0 / random_rate);
+  //Id cutoff_num = rs_num + random_num;
+  Id cutoff_num = rc_num + random_num;
+  Id verletlist_num = N * cutoff_num;
+
+  num_verletlist.Allocate(N * 2);
+  id_verletlist.Allocate(verletlist_num);
+  offset_verletlist.Allocate(verletlist_num);
+
+  std::vector<Id> stride_vec(N + 1);
+  Id inc = 0;
+  std::generate(
+    stride_vec.begin(), stride_vec.end(), [&](void) -> Id { return (inc++) * cutoff_num; });
+  vtkm::cont::ArrayHandle<vtkm::Id> stride_array = vtkm::cont::make_ArrayHandle(stride_vec);
+
+  auto id_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, stride_array);
+  auto offset_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, stride_array);
+  auto num_verletlist_group = vtkm::cont::make_ArrayHandleGroupVec<2>(num_verletlist);
+
+  SystemWorklet::ComputeRBLNeighboursOnce(rs_num,
+                                          pice_num,
+                                          _atoms_id,
+                                          _locator,
+                                          id_verletlist_group,
+                                          num_verletlist_group,
+                                          offset_verletlist_group);
+
+  SystemWorklet::EAMfp(rc,
+                       Vlength,
+                       rs,
+                       rs_num,
+                       pice_num,
+                       _atoms_id,
+                       rhor_spline,
+                       frho_spline,
+                       _locator,
+                       _force_function,
+                       id_verletlist_group,
+                       num_verletlist_group,
+                       offset_verletlist_group,
+                       fp);
+
+ SystemWorklet::EAMRBLForce(rc,
+                            Vlength,
+                            rs,
+                            rs_num,                            
+                            pice_num,
+                            _atoms_id,
+                            rhor_spline,
+                            z2r_spline,
+                            fp,
+                            _locator,
+                            _force_function,
+                            id_verletlist_group,
+                            num_verletlist_group,
+                            offset_verletlist_group,
+                            corr_force);
+
+  Vec3f corr_value =
+    vtkm::cont::Algorithm::Reduce(corr_force, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
+ SystemWorklet::SumRBLCorrForce(corr_value, corr_force, force);
+}
+
+void MDSystem::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
+{
+ ArrayHandle<Real> fp;
+ auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+ auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+ auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+ auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+
+  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  auto N = _position.GetNumberOfValues();
+  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+  auto verletlist_num = N * max_j_num;
+
+  ArrayHandle<Id> id_verletlist;
+  ArrayHandle<Vec3f> offset_verletlist;
+  offset_verletlist.Allocate(verletlist_num);
+  id_verletlist.Allocate(verletlist_num);
+
+  std::vector<Id> temp_vec(N + 1);
+  Id inc = 0;
+  std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * max_j_num; });
+  vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+  vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+  auto id_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+  auto offset_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+
+  SystemWorklet::ComputeNeighbours(
+    cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+
+  SystemWorklet::EAMfpVerlet(cut_off,
+                             Vlength,
+                             _atoms_id,
+                             rhor_spline,
+                             frho_spline,
+                             _locator,
+                             _force_function,
+                             id_verletlist_group,
+                             num_verletlist,
+                             offset_verletlist_group,
+                             fp);
+
+  SystemWorklet::EAMForceVerlet(cut_off,
+                                Vlength,
+                               _atoms_id,
+                                rhor_spline,
+                                z2r_spline,
+                                fp,
+                               _locator,
+                               _force_function,
+                               id_verletlist_group,
+                               num_verletlist,
+                               offset_verletlist_group,
+                               force);
+}
+
+void MDSystem::ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force)
+{
+  auto cut_off = GetParameter<Real>(EAM_PARA_CUTOFF);
+  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+
+  auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+
+  ArrayHandle<Real> EAM_rho;
+  ArrayHandle<Real> fp;
+
+  //1:compute _EAM_rho   = density at each atom
+  SystemWorklet::EAM_rho(
+    cut_off, Vlength, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
+
+  // 2:compute fp    = derivative of embedding energy at each atom
+  SystemWorklet::EAM_fp(_atoms_id, EAM_rho, frho_spline, _locator, _topology, _force_function, fp);
+
+  // 3:compute force  = EAM_force
+  SystemWorklet::EAM_force(cut_off,
+                           Vlength,
+                           _atoms_id,
+                           fp,
+                           rhor_spline,
+                           z2r_spline,
+                           _locator,
+                           _topology,
+                           _force_function,
+                           force);
 }
 
 void MDSystem::ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce) 

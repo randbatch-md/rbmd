@@ -35,6 +35,7 @@ void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
 
 NaClSystem::NaClSystem(const Configuration& cfg)
   : MDSystem(cfg) 
+  , _RBE_P(Get<IdComponent>("rbeP"))
   , _executioner((_app.GetExecutioner()))
   , _kbT(Get<IdComponent>("kbT"))
   , _farforce_type(Get<std::string>("farforce_type"))
