@@ -2421,12 +2421,12 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
         if (whole_position_pbc[i][j] < _range[j][0])
         {
           whole_position_pbc[i][j] += (_range[j][1] - _range[j][0]);
-          whole_pts_flag_pbc[i][j] = -1;
+          whole_pts_flag_pbc[i][j] -= 1;
         }
         if (whole_position_pbc[i][j] > _range[j][1])
         {
           whole_position_pbc[i][j] -= (_range[j][1] - _range[j][0]);
-          whole_pts_flag_pbc[i][j] = 1;
+          whole_pts_flag_pbc[i][j] += 1;
         }
       }
     }
