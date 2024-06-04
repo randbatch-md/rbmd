@@ -526,6 +526,271 @@ struct ComputeDihedralOPLSWorklet : vtkm::worklet::WorkletMapField
   Real _Vlength;
 };
 
+struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
+{
+
+  ComputeDihedralHarmonicWorklet(const Real& Vlength)
+    : _Vlength(Vlength)
+  {
+  }
+  using ControlSignature = void(FieldIn dihedral_type,
+                                FieldIn dihedrallist,
+                                FieldIn dihedral_coeffs_k,
+                                FieldIn dihedral_coeffs_sign,
+                                FieldIn dihedral_coeffs_multiplicity,
+                                WholeArrayIn whole_pts,
+                                FieldOut forcedihedral,
+                                FieldOut dihedralEnergy,
+                                ExecObject locator);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
+
+  template<typename DihedralType,
+           typename DihedralListType,
+           typename WholePtsType,
+           typename ForceDihedralType,
+           typename DihedralEnergyType>
+  VTKM_EXEC void operator()(const DihedralType& dihedral_type,
+                            const DihedralListType& dihedrallist,
+                            const Real& dihedral_coeffs_k,
+                            const vtkm::IdComponent& dihedral_coeffs_sign,
+                            const vtkm::IdComponent& dihedral_coeffs_multiplicity,
+                            const WholePtsType& whole_pts,
+                            ForceDihedralType& forcedihedral,
+                            DihedralEnergyType& dihedralEnergy,
+                            const ExecPointLocator& locator) const
+  {
+
+    vtkm::IdComponent dihedrali = dihedrallist[0];
+    vtkm::IdComponent dihedralj = dihedrallist[1];
+    vtkm::IdComponent dihedralk = dihedrallist[2];
+    vtkm::IdComponent dihedralw = dihedrallist[3];
+    vtkm::IdComponent dihedraltype = dihedral_type;
+
+    Real cos_shift, sin_shift;
+    if (dihedral_coeffs_sign == 1)
+    {
+      cos_shift = 1.0;
+      sin_shift = 0.0;
+    }
+    else
+    {
+      cos_shift = -1.0;
+      sin_shift = 0.0;
+    }
+    Vec3f force_dihedrali;
+    Vec3f force_dihedralj;
+    Vec3f force_dihedralk;
+    Vec3f force_dihedralw;
+
+    ComputeijDihedralHarmonicEnergyForce(dihedrali,
+                                         dihedralj,
+                                         dihedralk,
+                                         dihedralw,
+                                         dihedraltype,
+                                         dihedral_coeffs_k,
+                                         dihedral_coeffs_multiplicity,
+                                         cos_shift,
+                                         sin_shift,
+                                         whole_pts,
+                                         force_dihedrali,
+                                         force_dihedralj,
+                                         force_dihedralk,
+                                         force_dihedralw,
+                                         dihedralEnergy,
+                                         locator);
+    forcedihedral[0] = force_dihedrali;
+    forcedihedral[1] = force_dihedralj;
+    forcedihedral[2] = force_dihedralk;
+    forcedihedral[3] = force_dihedralw;
+  }
+  template<typename WholePtsType>
+  VTKM_EXEC void ComputeijDihedralHarmonicEnergyForce(
+    const vtkm::IdComponent& dihedrali,
+    const vtkm::IdComponent& dihedralj,
+    const vtkm::IdComponent& dihedralk,
+    const vtkm::IdComponent& dihedralw,
+    const vtkm::IdComponent& dihedraltype,
+    const Real& dihedral_coeffs_k,
+    const vtkm::IdComponent& dihedral_coeffs_multiplicity,
+    const Real& cos_shift,
+    const Real& sin_shift,
+    const WholePtsType& whole_pts,
+    Vec3f& force_dihedrali,
+    Vec3f& force_dihedralj,
+    Vec3f& force_dihedralk,
+    Vec3f& force_dihedralw,
+    Real& dihedralEnergy,
+    const ExecPointLocator& locator) const
+  {
+
+    Vec3f p_i = whole_pts.Get(dihedrali);
+    Vec3f p_j = whole_pts.Get(dihedralj);
+    Vec3f p_k = whole_pts.Get(dihedralk);
+    Vec3f p_w = whole_pts.Get(dihedralw);
+
+    
+    Vec3f vb1 = locator.MinDistance(p_i, p_j, _Vlength);
+    Vec3f vb2 = locator.MinDistance(p_k, p_j, _Vlength);
+
+    Vec3f vb2m = -vb2;
+    Vec3f vb3 = locator.MinDistance(p_w, p_k, _Vlength);
+
+    // c,s calculation
+
+    Real ax = vb1[1] * vb2m[2] - vb1[2] * vb2m[1];
+    Real ay = vb1[2] * vb2m[0] - vb1[0] * vb2m[2];
+    Real az = vb1[0] * vb2m[1] - vb1[1] * vb2m[0];
+    Real bx = vb3[1] * vb2m[2] - vb3[2] * vb2m[1];
+    Real by = vb3[2] * vb2m[0] - vb3[0] * vb2m[2];
+    Real bz = vb3[0] * vb2m[1] - vb3[1] * vb2m[0];
+
+    /*ax = vb1y * vb2zm - vb1z * vb2ym;
+    ay = vb1z * vb2xm - vb1x * vb2zm;
+    az = vb1x * vb2ym - vb1y * vb2xm;
+    bx = vb3y * vb2zm - vb3z * vb2ym;
+    by = vb3z * vb2xm - vb3x * vb2zm;
+    bz = vb3x * vb2ym - vb3y * vb2xm;*/
+
+    Real rasq = ax * ax + ay * ay + az * az;
+    Real rbsq = bx * bx + by * by + bz * bz;
+    Real rgsq = vb2m[0] * vb2m[0] + vb2m[1] * vb2m[1] + vb2m[2] * vb2m[2];
+    Real rg = vtkm::Sqrt(rgsq);
+    /*rasq = ax * ax + ay * ay + az * az;
+    rbsq = bx * bx + by * by + bz * bz;
+    rgsq = vb2xm * vb2xm + vb2ym * vb2ym + vb2zm * vb2zm;
+    rg = sqrt(rgsq);*/
+
+    Real rginv, ra2inv, rb2inv;
+    rginv = ra2inv = rb2inv = 0.0;
+    if (rg > 0)
+    {
+      rginv = 1.0 / rg;
+    }
+    if (rasq > 0)
+    {
+      ra2inv = 1.0 / rasq;
+    }
+    if (rbsq > 0)
+    {
+      rb2inv = 1.0 / rbsq;
+    }
+    Real rabinv = vtkm::Sqrt(ra2inv * rb2inv);
+
+    Real c = (ax * bx + ay * by + az * bz) * rabinv;
+    Real s = rg * rabinv * (ax * vb3[0] + ay * vb3[1] + az * vb3[2]);
+    //s = rg * rabinv * (ax * vb3x + ay * vb3y + az * vb3z);
+
+    // error check
+
+    //if (c > 1.0 + TOLERANCE || c < (-1.0 - TOLERANCE))
+    //  problem(FLERR, i1, i2, i3, i4);
+
+    if (c > 1.0)
+    {
+      c = 1.0;
+    }
+    if (c < -1.0)
+    {
+      c = -1.0;
+    }
+
+    vtkm::IdComponent m = dihedral_coeffs_multiplicity;
+    Real p = 1.0;
+    Real ddf1, df1;
+    ddf1 = df1 = 0.0;
+
+    /*m = multiplicity[type];
+    p = 1.0;
+    ddf1 = df1 = 0.0;*/
+
+    for (vtkm::IdComponent i = 0; i < m; i++)
+    {
+      ddf1 = p * c - df1 * s;
+      df1 = p * s + df1 * c;
+      p = ddf1;
+    }
+
+    p = p * cos_shift + df1 * sin_shift;
+    df1 = df1 * cos_shift - ddf1 * sin_shift;
+    /*p = p * cos_shift[type] + df1 * sin_shift[type];
+    df1 = df1 * cos_shift[type] - ddf1 * sin_shift[type];*/
+    df1 *= -m;
+    p += 1.0;
+
+    if (m == 0)
+    {
+      p = 1.0 + cos_shift;
+      //p = 1.0 + cos_shift[type];
+      df1 = 0.0;
+    }
+
+    dihedralEnergy = dihedral_coeffs_k * p;
+    //if (eflag)
+    //  edihedral = k[type] * p;
+
+    Real fg = vb1[0] * vb2m[0] + vb1[1] * vb2m[1] + vb1[2] * vb2m[2];
+    Real hg = vb3[0] * vb2m[0] + vb3[1] * vb2m[1] + vb3[2] * vb2m[2];
+    //fg = vb1x * vb2xm + vb1y * vb2ym + vb1z * vb2zm;
+    //hg = vb3x * vb2xm + vb3y * vb2ym + vb3z * vb2zm;
+    Real fga = fg * ra2inv * rginv;
+    Real hgb = hg * rb2inv * rginv;
+    Real gaa = -ra2inv * rg;
+    Real gbb = rb2inv * rg;
+
+    Real dtfx = gaa * ax;
+    Real dtfy = gaa * ay;
+    Real dtfz = gaa * az;
+    Real dtgx = fga * ax - hgb * bx;
+    Real dtgy = fga * ay - hgb * by;
+    Real dtgz = fga * az - hgb * bz;
+    Real dthx = gbb * bx;
+    Real dthy = gbb * by;
+    Real dthz = gbb * bz;
+
+    Real df = -dihedral_coeffs_k * df1;
+    //df = -k[type] * df1;
+
+    Real sx2 = df * dtgx;
+    Real sy2 = df * dtgy;
+    Real sz2 = df * dtgz;
+
+
+    force_dihedrali[0] = df * dtfx;
+    force_dihedrali[1] = df * dtfy;
+    force_dihedrali[2] = df * dtfz;
+
+    /*f1[0] = df * dtfx;
+    f1[1] = df * dtfy;
+    f1[2] = df * dtfz;*/
+
+    force_dihedralj[0] = sx2 - force_dihedrali[0];
+    force_dihedralj[1] = sy2 - force_dihedrali[1];
+    force_dihedralj[2] = sz2 - force_dihedrali[2];
+
+    //f2[0] = sx2 - f1[0];
+    //f2[1] = sy2 - f1[1];
+    //f2[2] = sz2 - f1[2];
+
+    force_dihedralw[0] = df * dthx;
+    force_dihedralw[1] = df * dthy;
+    force_dihedralw[2] = df * dthz;
+
+    //f4[0] = df * dthx;
+    //f4[1] = df * dthy;
+    //f4[2] = df * dthz;
+
+    force_dihedralk[0] = -sx2 - force_dihedralw[0];
+    force_dihedralk[1] = -sy2 - force_dihedralw[1];
+    force_dihedralk[2] = -sz2 - force_dihedralw[2];
+
+    //f3[0] = -sx2 - f4[0];
+    //f3[1] = -sy2 - f4[1];
+    //f3[2] = -sz2 - f4[2];
+  }
+
+  Real _Vlength;
+};
+
 struct ComputeImproperHarmonicWorklet : vtkm::worklet::WorkletMapField
 {
 
@@ -2056,8 +2321,8 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
     Real quad3_2012 = -2.0 * (invmass0 + invmass2) * invmass2 * r2012;
 
     // iterate until converged
-    Real tolerance = 0.0001;     // original 0.001
-    IdComponent max_iter = 1000; // original: 100
+    Real tolerance = 0.00001;     // original 0.001
+    IdComponent max_iter = 5000; // original: 100
 
     Real lamda01 = 0.0;
     Real lamda20 = 0.0;
@@ -2156,12 +2421,12 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
         if (whole_position_pbc[i][j] < _range[j][0])
         {
           whole_position_pbc[i][j] += (_range[j][1] - _range[j][0]);
-          whole_pts_flag_pbc[i][j] = -1;
+          whole_pts_flag_pbc[i][j] -= 1;
         }
         if (whole_position_pbc[i][j] > _range[j][1])
         {
           whole_position_pbc[i][j] -= (_range[j][1] - _range[j][0]);
-          whole_pts_flag_pbc[i][j] = 1;
+          whole_pts_flag_pbc[i][j] += 1;
         }
       }
     }

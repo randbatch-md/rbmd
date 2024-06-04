@@ -53,6 +53,8 @@ system/MeshFreeSystem.cpp
 system/SalineSolutionSystem.cpp # Remove the "<vtkm/cont/Algorithm.h>" to move out of Devie_src
 system/H2OSystem.cpp
 system/NaClSystem.cpp
+system/EAMSystem.cpp
+system/PEOSystem.cpp
 output/MoleculesTableOutput.cpp
 output/MoleculesFileOutput.cpp
 output/AtomsTableOutput.cpp

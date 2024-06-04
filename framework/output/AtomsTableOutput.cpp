@@ -69,8 +69,17 @@ void AtomsTableOutput::Execute()
   {
     _tempT_sum = _system.GetParameter<Real>(PARA_TEMPT_SUM);
     _tempT = _system.GetParameter<Real>(PARA_TEMPT);
+    auto& system_node = _parser.GetJsonNode("system");
+    auto system_type = system_node["type"].asString();
 
-    ComputePotentialEnergy();
+    if (system_type == "EAMSystem")
+    {
+      ComputeEAMPotentialEnergy();
+    }
+    else
+    {
+      ComputePotentialEnergy();   
+    }
 
     Residual();
 
@@ -263,4 +272,69 @@ void AtomsTableOutput::WriteToFile()
       console::Error(e.what());
     }
   }
+}
+
+void AtomsTableOutput::ComputeEAMPotentialEnergy()
+{
+  auto atoms_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto N = atoms_id.GetNumberOfValues();
+  //
+  auto cut_off = _system.GetParameter<Real>(EAM_PARA_CUTOFF);
+  auto Vlength = _system.GetParameter<Real>(PARA_VLENGTH);
+
+  auto rhor_spline = _system.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = _system.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = _system.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+
+  //
+  ContForceFunction force_function;
+  SetForceFunction(force_function);
+
+  ContTopology topology;
+  SetTopology(topology);
+
+  ContPointLocator locator;
+  SetLocator(locator);
+
+  //1:compute EAM_rho;
+  ArrayHandle<Real> EAM_rho;
+  OutPut::EAM_rho(
+    cut_off, Vlength, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
+
+  //2: embedding_energy_atom
+  ArrayHandle<Real> embedding_energy_atom;
+  OutPut::EAM_EmbeddingEnergy(
+    atoms_id, EAM_rho, frho_spline, locator, topology, force_function, embedding_energy_atom);
+
+  auto embedding_energy_total = vtkm::cont::Algorithm::Reduce(
+    embedding_energy_atom, vtkm::TypeTraits<Real>::ZeroInitialization());
+
+  //3: pair_energy_atom
+  ArrayHandle<Real> pair_energy_atom;
+  OutPut::EAM_PairEnergy(
+    cut_off, Vlength, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
+
+  auto pair_energy_atom_total =
+    vtkm::cont::Algorithm::Reduce(pair_energy_atom, vtkm::TypeTraits<Real>::ZeroInitialization());
+
+  //4:_potential_energy = embedding_energy_total +  pair_energy_atom_total
+  _potential_energy = (embedding_energy_total + pair_energy_atom_total) / N; // ;
+
+  //5._kinteic_energy
+  _kinteic_energy = _tempT_sum / N * 0.5;
+
+  _total_energy = _potential_energy + _kinteic_energy;
+
+  //6:temperature
+  _temperature = _tempT;
+
+  //7.all_potential_atom
+
+  //ArrayHandle<Real> all_potential_atom;
+  //OutPut::SumEAM_Pe_Atom(embedding_energy_atom, pair_energy_atom, all_potential_atom);
+
+  //for (Id i = 0; i < all_potential_atom.GetNumberOfValues(); i++)
+  //{
+  //  std::cout << "id" << i << "，all_potential_atom= " << all_potential_atom.ReadPortal().Get(i) << std::endl;
+  //}
 }

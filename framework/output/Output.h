@@ -53,6 +53,16 @@ protected:
       locator.SetPosition(_system.GetFieldAsArrayHandle<Vec3f>(field::position));
   }
 
+  void SetForceFunction(ContForceFunction& force_function)
+  {
+      auto rhomax = _system.GetParameter<Real>(EAM_PARA_RHOMAX);
+      auto nrho = _system.GetParameter<Id>(EAM_PARA_NRHO);
+      auto drho = _system.GetParameter<Real>(EAM_PARA_DRHO);
+      auto nr = _system.GetParameter<Id>(EAM_PARA_NR);
+      auto dr = _system.GetParameter<Real>(EAM_PARA_DR);
+      force_function.SetEAMParameters(rhomax, nrho, drho, nr, dr);
+  }
+
 protected:
   Application& _app;
   System& _system;

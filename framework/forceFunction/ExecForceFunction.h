@@ -7,6 +7,8 @@
 #include <vtkm/Math.h>
 #include "Types.h"
 #include "math/Math.h"
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 class ExecForceFunction
 {
@@ -20,14 +22,25 @@ public:
                     const Real& volume,
                     const Real& vlength,
                     const IdComponent& kmax,
-                    const IdComponent& rbeP)
+                    const IdComponent& rbeP,
+                    const Real& rhomax,
+                    const Id& nrho,
+                    const Real& drho,
+                    const Id& nr,
+                    const Real& dr)
     : _cut_Off(cut_off)
     , _alpha(alpha)
     , _volume(volume)
     , _Vlength(vlength)
     , Kmax(kmax)
     , RBEP(rbeP)
-  {
+    , _rhomax(rhomax)
+    , _nrho(nrho)
+    , _drho(drho)
+    , _nr(nr)
+    , _dr(dr)
+  { 
+      _sum_gauss = Compute_S();
   }
  
   VTKM_EXEC vtkm::Vec3f ComputeLJForce(const Vec3f& r_ij,
@@ -202,7 +215,7 @@ public:
 
   VTKM_EXEC Vec3f ComputeRBEForce(const Id& p, Vec3f& force)
   {
-    return force * Compute_S() / p;
+    return force * _sum_gauss / p;
   }
 
   VTKM_EXEC Real Compute_S() const
@@ -261,12 +274,303 @@ public:
     return 0.5 * ComputePE_ij;
   }
 
+    //compute EAMforce;
+  template<typename rhor_splineType>
+  VTKM_EXEC Real ComputeEAMrho(const Real& rc,
+                               const Vec3f& r_ij,
+                               const rhor_splineType& rhor_spline) const
+  {
+    Real EAM_rho = 0;
+    auto rdr = 1 / _dr;
+
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = rc * rc;
+
+    if (rsq < cutsq && rsq > 0.01)
+    {
+      auto p = vtkm::Sqrt(rsq) * rdr + 1.0;
+      auto m = static_cast<Id>(p);
+      // Id m = p;
+      m = MIN(m, _nr - 1);
+      p -= m;
+      p = MIN(p, 1.0);
+      auto coeff = rhor_spline.Get(m);
+      EAM_rho = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+    }
+    return EAM_rho;
+  }
+
+  template<typename rhor_splineType>
+  VTKM_EXEC Real ComputeEAMrhoRs(const Real& rc,
+                                 const Real& rs,
+                                 const Vec3f& r_ij,
+                                 const rhor_splineType& rhor_spline) const
+  {
+    Real EAM_rho = 0;
+    auto rdr = 1 / _dr;
+
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = rc * rc;
+    auto rs_2 = rs * rs;
+    if (rsq < cutsq && rsq > rs_2)
+    {
+      auto p = vtkm::Sqrt(rsq) * rdr + 1.0;
+      auto m = static_cast<Id>(p);
+      // Id m = p;
+      m = MIN(m, _nr - 1);
+      p -= m;
+      p = MIN(p, 1.0);
+      auto coeff = rhor_spline.Get(m);
+      EAM_rho = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+    }
+    return EAM_rho;
+  }
+
+  template<typename rhoType, typename frho_splineType>
+  VTKM_EXEC Real ComputeEAMfp(const Id& atoms_id,
+                              const rhoType& EAM_rho,
+                              const frho_splineType& frho_spline) const
+  {
+    Real fp = 0;
+    auto rdrho = 1 / _drho;
+    //auto p = EAM_rho.Get(atoms_id) * rdrho + 1.0;
+    auto p = EAM_rho * rdrho + 1.0;
+    auto m = static_cast<int>(p);
+    //Id m = p;
+    m = MAX(1, MIN(m, _nrho - 1));
+    p -= m;
+    p = MIN(p, 1.0);
+    auto coeff = frho_spline.Get(m);
+    fp = (coeff[0] * p + coeff[1]) * p + coeff[2];
+    return fp;
+  }
+
+  template<typename rhoType, typename frho_splineType>
+  VTKM_EXEC Real ComputeEAMfpOriginal(const Id& atoms_id,
+                              const rhoType& EAM_rho,
+                              const frho_splineType& frho_spline) const
+  {
+    Real fp = 0;
+    auto rdrho = 1 / _drho;
+    auto p = EAM_rho.Get(atoms_id) * rdrho + 1.0;
+    //auto p = EAM_rho * rdrho + 1.0;
+    auto m = static_cast<int>(p);
+    //Id m = p;
+    m = MAX(1, MIN(m, _nrho - 1));
+    p -= m;
+    p = MIN(p, 1.0);
+    auto coeff = frho_spline.Get(m);
+    fp = (coeff[0] * p + coeff[1]) * p + coeff[2];
+    return fp;
+  }
+
+
+  template<typename fpType, typename rhor_splineType, typename z2r_splineType>
+  VTKM_EXEC Vec3f ComputeEAMforce(const Real& eam_cut_off,
+                                  const Id& atoms_id,
+                                  const Id& pts_id_j,
+                                  const Vec3f& r_ij,
+                                  const fpType fp,
+                                  const rhor_splineType& rhor_spline,
+                                  const z2r_splineType& z2r_spline) const
+  {
+    Vec3f eam_force = { 0, 0, 0 };
+
+    auto rdr = 1 / _dr;
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = eam_cut_off * eam_cut_off;
+
+    if (rsq < cutsq && rsq > 0.01)
+    {
+      auto r = vtkm::Sqrt(rsq);
+      auto p = r * rdr + 1.0;
+      auto m = static_cast<int>(p);
+      //Id m = p;
+      m = MIN(m, _nr - 1);
+      p -= m;
+      p = MIN(p, 1.0);
+
+      // rhoip = derivative of (density at atom j due to atom i)
+      // rhojp = derivative of (density at atom i due to atom j)
+      // phi = pair potential energy
+      // phip = phi'
+      // z2 = phi * r
+      // z2p = (phi * r)' = (phi' r) + phi
+      // psip needs both fp[i] and fp[j] terms since r_ij appears in two
+      //   terms of embed eng: Fi(sum rho_ij) and Fj(sum rho_ji)
+      //   hence embed' = Fi(sum rho_ij) rhojp + Fj(sum rho_ji) rhoip
+      // scale factor can be applied by thermodynamic integration
+
+      auto coeffi = rhor_spline.Get(m);
+      auto rhoip = (coeffi[0] * p + coeffi[1]) * p + coeffi[2];
+
+      auto coeffj = rhor_spline.Get(m);
+      auto rhojp = (coeffj[0] * p + coeffj[1]) * p + coeffj[2];
+
+      auto coeff = z2r_spline.Get(m);
+      auto z2p = (coeff[0] * p + coeff[1]) * p + coeff[2];
+      auto z2 = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+
+      auto recip = 1.0 / r;
+      auto phi = z2 * recip;                 //pair potential energy
+      auto phip = z2p * recip - phi * recip; //pair force
+      auto psip = fp.Get(atoms_id) * rhojp + fp.Get(pts_id_j) * rhoip + phip;
+      auto fpair = -psip * recip;
+      //std::cout << fpair << "," << r_ij[0] << "," << r_ij[1] << ","  << r_ij[2] << std::endl;
+
+      //compute f
+      eam_force[0] = r_ij[0] * fpair;
+      eam_force[1] = r_ij[1] * fpair;
+      eam_force[2] = r_ij[2] * fpair;
+    }
+    return eam_force;
+  }
+
+  template<typename fpType, typename rhor_splineType, typename z2r_splineType>
+  VTKM_EXEC Vec3f ComputeEAMforceRBL(const Real& eam_cut_off,
+                                     const Real& rs,
+                                     const Id& atoms_id,
+                                     const Id& pts_id_j,
+                                     const Vec3f& r_ij,
+                                     const fpType fp,
+                                     const rhor_splineType& rhor_spline,
+                                     const z2r_splineType& z2r_spline) const
+  {
+    Vec3f eam_force = { 0, 0, 0 };
+
+    auto rdr = 1 / _dr;
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = eam_cut_off * eam_cut_off;
+    auto rs_2 = rs * rs;
+    if (rsq < cutsq && rsq > rs_2)
+    {
+      auto r = vtkm::Sqrt(rsq);
+      auto p = r * rdr + 1.0;
+      auto m = static_cast<int>(p);
+      //Id m = p;
+      m = MIN(m, _nr - 1);
+      p -= m;
+      p = MIN(p, 1.0);
+
+      auto coeffi = rhor_spline.Get(m);
+      auto rhoip = (coeffi[0] * p + coeffi[1]) * p + coeffi[2];
+
+      auto coeffj = rhor_spline.Get(m);
+      auto rhojp = (coeffj[0] * p + coeffj[1]) * p + coeffj[2];
+
+      auto coeff = z2r_spline.Get(m);
+      auto z2p = (coeff[0] * p + coeff[1]) * p + coeff[2];
+      auto z2 = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+
+      auto recip = 1.0 / r;
+      auto phi = z2 * recip;                 //pair potential energy
+      auto phip = z2p * recip - phi * recip; //pair force
+      auto psip = fp.Get(atoms_id) * rhojp + fp.Get(pts_id_j) * rhoip + phip;
+      auto fpair = -psip * recip;
+      //std::cout << fpair << "," << r_ij[0] << "," << r_ij[1] << ","  << r_ij[2] << std::endl;
+
+      //compute f
+      eam_force[0] = r_ij[0] * fpair;
+      eam_force[1] = r_ij[1] * fpair;
+      eam_force[2] = r_ij[2] * fpair;
+    }
+    return eam_force;
+  }
+
+
+  //compute EAM Energy = EmbeddingEnergy + PairEnergy;
+  template<typename rhor_splineType>
+  VTKM_EXEC Real ComputeEAMrhoOUT(const Real& eam_cut_off,
+                                  const Vec3f& r_ij,
+                                  const rhor_splineType& rhor_spline) const
+  {
+    Real EAM_rho = 0;
+    auto rdr = 1 / _dr;
+
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = eam_cut_off * eam_cut_off;
+
+    if (rsq < cutsq && rsq > 0.01)
+    {
+      auto p = vtkm::Sqrt(rsq) * rdr + 1.0;
+      auto m = static_cast<Id>(p);
+      //Id m = p;
+      m = MIN(m, _nr - 1);
+      p -= m;
+      p = MIN(p, 1.0);
+      auto coeff = rhor_spline.Get(m);
+      EAM_rho = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+    }
+    return EAM_rho;
+  }
+
+  template<typename rhoType, typename frho_splineType>
+  VTKM_EXEC Real ComputeEmbeddingEnergy(const Id& atoms_id,
+                                        const rhoType& EAM_rho,
+                                        const frho_splineType& frho_spline) const
+  {
+    Real phi = 0;
+
+    auto rdrho = 1 / _drho;
+    auto p = EAM_rho.Get(atoms_id) * rdrho + 1.0;
+    auto m = static_cast<int>(p);
+    //Id m = p;
+    m = MAX(1, MIN(m, _nrho - 1));
+    p -= m;
+    p = MIN(p, 1.0);
+    auto coeff = frho_spline.Get(m);
+    auto fp = (coeff[0] * p + coeff[1]) * p + coeff[2];
+    phi = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+    if (EAM_rho.Get(atoms_id) > _rhomax)
+    {
+      phi += fp * (EAM_rho.Get(atoms_id) - _rhomax);
+    }
+    return phi;
+  }
+
+  template<typename z2r_splineType>
+  VTKM_EXEC Real ComputePairEnergy(const Real& eam_cut_off,
+                                   const Vec3f& r_ij,
+                                   const z2r_splineType& z2r_spline) const
+  {
+    Real phi = 0;
+    auto rdr = 1 / _dr;
+    auto rsq = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    auto cutsq = eam_cut_off * eam_cut_off;
+
+    if (rsq < cutsq && rsq > 0.01)
+    {
+      auto r = vtkm::Sqrt(rsq);
+      auto p = r * rdr + 1.0;
+      auto m = static_cast<int>(p);
+      //Id m = p;
+      m = MIN(m, _nr - 1);
+      p -= m;
+      p = MIN(p, 1.0);
+
+      auto coeff = z2r_spline.Get(m);
+      auto z2p = (coeff[0] * p + coeff[1]) * p + coeff[2];
+      auto z2 = ((coeff[3] * p + coeff[4]) * p + coeff[5]) * p + coeff[6];
+
+      auto recip = 1.0 / r;
+      phi = z2 * recip; //pair potential energy
+    }
+    return 0.5 * phi;
+  }
+
   private:
   Real _cut_Off;
   Real _alpha;
   Real _volume;
   Real _Vlength;
+  Real _sum_gauss;
   IdComponent Kmax;
   IdComponent RBEP;
+
+  Real _rhomax;
+  Id _nr;
+  Id _nrho;
+  Real _dr;
+  Real _drho;
 
 };

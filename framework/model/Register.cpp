@@ -17,7 +17,8 @@
 #include "ERFInitCondition.h"
 #include "TrajectoryOutput.h"
 #include "VACFOutput.h"
-
+#include "PEOSystem.h"
+#include "EAMSystem.h"
 void RegisterObjectGlobal() 
 {
   RegisterObject(LJInitCondition);
@@ -38,4 +39,6 @@ void RegisterObjectGlobal()
   RegisterObject(NaClSystem);
   //RegisterObject(ERFInitCondition);
   RegisterObject(VACFOutput);
+  RegisterObject(PEOSystem);
+  RegisterObject(EAMSystem);  
 }
