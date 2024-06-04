@@ -391,8 +391,12 @@ void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Vec3f> offset_verletlist;
 
-  Id rs_num =  6* rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
-  Id rc_num =  6* rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
+  //0.05 is a temp parameter, to fit with the low density of system requirement
+  //so as the RBL for LJ
+  Real coeff_rcs = 1.0 + (0.05 / rho_system - 0.05);
+  Id Id_coeff_rcs = vtkm::Round(coeff_rcs);
+  Id rs_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
+  Id rc_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
   Id rcs_num = rc_num - rs_num;
   Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
   Real random_rate = random_num / (rcs_num);
@@ -511,8 +515,12 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Vec3f> offset_verletlist;
 
-  Id rs_num = 6*rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
-  Id rc_num = 6*rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
+  //0.05 is a temp parameter, to fit with the low density of system requirement
+  //so as the RBL for LJ
+  Real coeff_rcs = 1.0 + (0.05 / rho_system - 0.05);
+  Id Id_coeff_rcs = vtkm::Round(coeff_rcs);
+  Id rs_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
+  Id rc_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
   Id rcs_num = rc_num - rs_num;
   Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
   Real random_rate = random_num / (rcs_num);
