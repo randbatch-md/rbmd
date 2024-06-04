@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string>
 
-const std::string RBMD_VERSION = "1.0.0";
+const std::string RBMD_VERSION = "1.1.0";
 int main(int argc, char* argv[])
 {
   if (std::string(argv[1]) == "--version")
