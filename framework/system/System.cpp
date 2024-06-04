@@ -4,7 +4,8 @@
 
 System::System(const Configuration& cfg)
   : Object(cfg)
-  , _app(*(Get<Application*>("_app")))
+  , _app(*(Get<Application*>("app")))
+  , _para(*(_app.GetParameter()))
 {
 }
 

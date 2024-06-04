@@ -14,6 +14,8 @@ public:
 protected:
   void Execute() override;
   void UpdateField() override;
+  void InitField() override;
+  void SetParameters() override;
 
 private:
   std::vector<int> _dims;

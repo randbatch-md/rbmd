@@ -28,10 +28,10 @@ void TrajectoryOutput::Execute()
     {
       try
       {
-        auto position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+        auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
         auto portal_pos = position.ReadPortal();
-        vtkm::Vec<vtkm::Range, 3> range = _system.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-        auto atom_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type);
+        vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+        auto atom_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
         auto portal_atomtype = atom_type.ReadPortal();
         int a = _executioner.CurrentStep();
         _trajectory_file << "ITEM: TIMESTEP" << std::endl

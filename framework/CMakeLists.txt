@@ -23,13 +23,13 @@ parser/Configuration.cpp
 
 application/Application.cpp
 application/MDApplication.cpp
-
-action/Action.cpp
-action/CreateSystemAction.cpp
-action/CreateExecutionerAction.cpp
-action/AddOutputAction.cpp
-action/SetupDeviceAction.cpp
-action/CreateInitConditionAction.cpp
+application/Input.cpp
+#action/Action.cpp
+#action/CreateSystemAction.cpp
+#action/CreateExecutionerAction.cpp
+#action/AddOutputAction.cpp
+#action/SetupDeviceAction.cpp
+#action/CreateInitConditionAction.cpp
 
 executioner/Executioner.cpp
 
@@ -39,12 +39,26 @@ output/ConsoleOutput.cpp
 output/Progress.cpp
 
 model/FormatTable.cpp
-model/Register.cpp
+#model/Register.cpp
 
 system/System.cpp
 InitCondition/MeshFreeCondition.cpp
 InitCondition/ModelFileInitCondition.cpp
-InitCondition/MeshFreeFileInitCondition.cpp)
+InitCondition/MeshFreeFileInitCondition.cpp
+
+#parameters/hyperparameters/Coulomb.cpp
+#parameters/hyperparameters/Extend.cpp
+#parameters/hyperparameters/ForceField.cpp
+#parameters/hyperparameters/Neighbor.cpp
+#parameters/InitConfiguration
+#parameters/ExecutionParameters.cpp
+#parameters/initconfiguration/ReadData.cpp
+#parameters/initconfiguration/InBuild.cpp
+hyperparameters/Coulomb.cpp
+hyperparameters/Extend.cpp
+hyperparameters/ForceField.cpp
+hyperparameters/Neighbor.cpp
+)
 
 set(device_src
 system/MadelungSystem.cpp
@@ -74,6 +88,7 @@ forceFunction/ContForceFunction.cpp
 topology/ContTopology.cpp
 system/InitGlobal.cpp
 staticTable/ContStaticTable.cpp
+run/ExecutionNPT.cpp
 )
 
 # 头文件引入
@@ -94,12 +109,17 @@ target_include_directories(_compiler_flags INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/locator
   ${CMAKE_CURRENT_SOURCE_DIR}/forceFunction
   ${CMAKE_CURRENT_SOURCE_DIR}/topology
+  ${CMAKE_CURRENT_SOURCE_DIR}/hyperparameters
+  #${CMAKE_CURRENT_SOURCE_DIR}/parameters
+  #${CMAKE_CURRENT_SOURCE_DIR}/parameters/hyperparameters
+  #${CMAKE_CURRENT_SOURCE_DIR}/parameters/initconfiguration
+  ${CMAKE_CURRENT_SOURCE_DIR}/run
   ${JSON_INSTALL_PATH}/include
   ${CXXOPTS_INSTALL_PATH}/include
   )
   # 看来要在res 文件下建立cmake文件
   # 定义lib
-add_library(libsemd STATIC ${host_src} ${device_src}  )
+add_library(libsemd STATIC ${host_src} ${device_src})
 target_link_libraries(libsemd PUBLIC _compiler_flags)
 
 #链接json库

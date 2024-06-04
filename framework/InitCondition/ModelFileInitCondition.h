@@ -30,6 +30,9 @@ public:
 
   void Execute() override;
   void ReadDataFile(std::ifstream&file);
+  //void InitParameter() override;
+  void InitField() override;
+  void SetParameters() override;
 
 private:
   void Header(std::ifstream& file);

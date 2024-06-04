@@ -54,12 +54,12 @@ void AtomsTableOutput::Init()
     AddHeader(HEADER_TOTAL_ENERGY_NAME);
     AddHeader(HEADER_CUMULATIVE_TIME_NAME);
 
-    _cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
-    _volume = _system.GetParameter<Real>(PARA_VOLUME);
-    _Vlength = _system.GetParameter<Real>(PARA_VLENGTH);
-    _Kmax = _system.GetParameter<IdComponent>(PARA_KMAX);
-    _alpha = _system.GetParameter<Real>(PARA_ALPHA);
-    _rho = _system.GetParameter<Real>(PARA_RHO);
+    _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+    _volume = _para.GetParameter<Real>(PARA_VOLUME);
+    _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+    _alpha = _para.GetParameter<Real>(PARA_ALPHA);
+    _rho = _para.GetParameter<Real>(PARA_RHO);
   }
 }
 
@@ -67,8 +67,8 @@ void AtomsTableOutput::Execute()
 {
   if (_compute)
   {
-    _tempT_sum = _system.GetParameter<Real>(PARA_TEMPT_SUM);
-    _tempT = _system.GetParameter<Real>(PARA_TEMPT);
+    _tempT_sum = _para.GetParameter<Real>(PARA_TEMPT_SUM);
+    _tempT = _para.GetParameter<Real>(PARA_TEMPT);
 
     ComputePotentialEnergy();          ////////////////////         这里需要有判断
     //ComputeEAMPotentialEnergy();
@@ -95,9 +95,9 @@ bool AtomsTableOutput::ShouldOutput()
 
 void AtomsTableOutput::ComputePotentialEnergy()
 { 
-  auto atoms_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
-  auto charge = _system.GetFieldAsArrayHandle<Real>(field::charge);
-  auto position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+  auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   ArrayHandle<Real> lj_potential_energy;
 
   ContForceFunction force_function;
@@ -116,7 +116,7 @@ void AtomsTableOutput::ComputePotentialEnergy()
   //TODO: turn to parameter
   auto N = position.GetNumberOfValues();
 
-  auto unit_factor = _system.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
+  auto unit_factor = _para.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
   // self potential energy
   ArrayHandle<Real> _self_energy;
   OutPut::ComputeSqCharge(charge, _self_energy);
@@ -268,15 +268,15 @@ void AtomsTableOutput::WriteToFile()
 
 void AtomsTableOutput::ComputeEAMPotentialEnergy()
 {
-  auto atoms_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   auto N = atoms_id.GetNumberOfValues();
   //
-  auto cut_off = _system.GetParameter<Real>(EAM_PARA_CUTOFF);
-  auto Vlength = _system.GetParameter<Real>(PARA_VLENGTH);
+  auto cut_off = _para.GetParameter<Real>(EAM_PARA_CUTOFF);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
 
-  auto rhor_spline = _system.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
-  auto frho_spline = _system.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
-  auto z2r_spline = _system.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+  auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
 
   //
   ContForceFunction force_function;

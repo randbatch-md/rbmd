@@ -14,7 +14,7 @@ void CreateSystemAction::Execute()
 {
   auto& system_node = _parser.GetJsonNode("system");
   Configuration cfg;
-  cfg.Add<Application*>("_app", &_app);
+  cfg.Add<Application*>("app", &_app);
   cfg.Add<Json::Value*>("_json_node", &system_node);
 
   auto type = system_node["type"].asString();

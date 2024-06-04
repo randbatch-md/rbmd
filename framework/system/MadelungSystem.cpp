@@ -42,20 +42,20 @@ void MadelungSystem::Init()
 
 void MadelungSystem::Evolve() 
 {
-  auto&& charge = GetFieldAsArrayHandle<Real>(field::charge);
-  auto&& position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  auto&& charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+  auto&& position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
 
   ArrayHandle<Real> force;
   vtkm::cont::Invoker{}(MadelungSystem::ComputeCoeffient{}, position, charge, force);
 
   _madelung_result = vtkm::cont::Algorithm::Reduce(force, vtkm::TypeTraits<Real>::ZeroInitialization());
-  SetParameter(gtest::madelung, _madelung_result);
+  _para.SetParameter(gtest::madelung, _madelung_result);
   console::Info("Madelung常数：", _madelung_result);
   console::Info("MadelungSystem::Evolve运行完成，", "计算时间: ", _timer.GetElapsedTime(), " s");
 }
 
 void MadelungSystem::InitField() 
 {
-  AddField(field::position, ArrayHandle<Vec3f>{});
-  AddField(field::charge, ArrayHandle<Real>{});
+  _para.AddField(field::position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::charge, ArrayHandle<Real>{});
 }

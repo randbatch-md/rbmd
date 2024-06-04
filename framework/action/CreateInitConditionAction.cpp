@@ -23,7 +23,7 @@ void CreateInitConditionAction::Execute()
   {
     auto& initput_child_node = init_node[initPut.c_str()];
     Configuration cfg;
-    cfg.Add<Application*>("_app", &_app);
+    cfg.Add<Application*>("app", &_app);
     cfg.Add<Json::Value*>("_json_node", &initput_child_node);
 
     auto type = initput_child_node["type"].asString();

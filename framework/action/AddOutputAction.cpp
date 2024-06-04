@@ -31,7 +31,7 @@ void AddOutputAction::Execute()
   {
     auto& output_child_node = outputs_node[outPut.c_str()];
     Configuration cfg;
-    cfg.Add<Application*>("_app", &_app);
+    cfg.Add<Application*>("app", &_app);
     cfg.Add<Json::Value*>("_json_node", &output_child_node);
 
     auto type = output_child_node["type"].asString();

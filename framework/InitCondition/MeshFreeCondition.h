@@ -13,15 +13,22 @@ public:
   ~MeshFreeCondition();
   void Execute() override;
   void UpdateField() override;
+  void InitField() override;
+  void SetParameters() override;
 
 protected:
   void SetTopology(ContTopology& topology) 
   {
-    auto pts_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type );
-    auto epsilon = _system.GetFieldAsArrayHandle<Real>(field::epsilon);
-    auto sigma = _system.GetFieldAsArrayHandle<Real>(field::sigma);
-    auto charge = _system.GetFieldAsArrayHandle<Real>(field::charge );
-    auto molecule_id = _system.GetFieldAsArrayHandle<Id>(field::molecule_id);
+    //auto pts_type =  GetFieldAsArrayHandle<Id>(field::pts_type );
+    //auto epsilon =  GetFieldAsArrayHandle<Real>(field::epsilon);
+    //auto sigma =  GetFieldAsArrayHandle<Real>(field::sigma);
+    //auto charge =  GetFieldAsArrayHandle<Real>(field::charge );
+    //auto molecule_id =  GetFieldAsArrayHandle<Id>(field::molecule_id);
+    auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
+    auto epsilon = _para.GetFieldAsArrayHandle<Real>(field::epsilon);
+    auto sigma = _para.GetFieldAsArrayHandle<Real>(field::sigma);
+    auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+    auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
     topology.SetAtomsType(pts_type);
     topology.SetEpsAndSigma(epsilon, sigma);
     topology.SetCharge(charge);
@@ -30,7 +37,7 @@ protected:
 
   void SetLocator(ContPointLocator& locator)
   {
-    vtkm::Vec<vtkm::Range, 3> range = _system.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+    vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
     vtkm::Vec3f left_bottom{ {
                                static_cast<vtkm::FloatDefault>(range[0].Min),
                              },
@@ -52,11 +59,11 @@ protected:
 
     locator.SetRange(left_bottom, right_top);
 
-    locator.SetCutOff(_system.GetParameter<Real>(PARA_CUTOFF));
+    locator.SetCutOff(_para.GetParameter<Real>(PARA_CUTOFF));
 
-    locator.SetRs(_system.GetParameter<Real>(PARA_RS));
+    locator.SetRs(_para.GetParameter<Real>(PARA_R_CORE));
 
-    locator.SetPosition(_system.GetFieldAsArrayHandle<Vec3f>(field::position));
+    locator.SetPosition(_para.GetFieldAsArrayHandle<Vec3f>(field::position));
   }
 
 private:
@@ -68,8 +75,6 @@ private:
 
 protected:
   ArrayHandle<Vec3f> _position;
-
-private:
   std::vector<int> _dims;
   std::vector<Real> _x_range;
   std::vector<Real> _y_range;

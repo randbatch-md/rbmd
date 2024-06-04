@@ -13,25 +13,6 @@ MeshFreeCondition::MeshFreeCondition(const Configuration& cfg)
   , _y_range(GetVectorValue<Real>("y_range"))
   , _z_range(GetVectorValue<Real>("z_range"))
 {
-  auto xLength = _x_range[1] - _x_range[0];
-  auto yLength = _y_range[1] - _y_range[0];
-  auto zLength = _z_range[1] - _z_range[0];
-  auto num_pos = _dims[0] * _dims[1] * _dims[2];
-  _system.SetParameter(PARA_VLENGTH, xLength);
-  _system.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
-  _system.SetParameter(PARA_RHO, num_pos / (xLength * yLength * zLength));
-  auto cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
-  auto bin_number = Id3{
-    static_cast<int>(xLength / cut_off),
-    static_cast<int>(yLength / cut_off),
-    static_cast<int>(zLength / cut_off),
-  };
-  auto range = vtkm::Vec<vtkm::Range, 3>{ { _x_range[0], _x_range[1] },
-                                          { _y_range[0], _y_range[1] },
-                                          { _z_range[0], _z_range[1] } };
-  _system.SetParameter(PARA_BIN_NUMBER, bin_number);
-  _system.SetParameter(PARA_RANGE, range);
-  _system.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
 }
 
 MeshFreeCondition::~MeshFreeCondition() {}
@@ -42,15 +23,39 @@ void MeshFreeCondition::Execute()
 void MeshFreeCondition::UpdateField()
 {
   InitPosition();
+  InitParameters();
   InitMassAndVelocity();
   InitPositionFlag();
   InitId();
-  InitParameters();
 }
+
+//void MeshFreeCondition::InitParameter()
+//{
+//  auto& app = _app.GetSystem();
+//  auto xLength = _x_range[1] - _x_range[0];
+//  auto yLength = _y_range[1] - _y_range[0];
+//  auto zLength = _z_range[1] - _z_range[0];
+//  auto num_pos = _dims[0] * _dims[1] * _dims[2];
+//   SetParameter(PARA_VLENGTH, xLength);
+//   SetParameter(PARA_VOLUME, xLength * yLength * zLength);
+//   SetParameter(PARA_RHO, num_pos / (xLength * yLength * zLength));
+//  auto cut_off =  GetParameter<Real>(PARA_CUTOFF);
+//  auto bin_number = Id3{
+//    static_cast<int>(xLength / cut_off),
+//    static_cast<int>(yLength / cut_off),
+//    static_cast<int>(zLength / cut_off),
+//  };
+//  auto range = vtkm::Vec<vtkm::Range, 3>{ { _x_range[0], _x_range[1] },
+//                                          { _y_range[0], _y_range[1] },
+//                                          { _z_range[0], _z_range[1] } };
+//   SetParameter(PARA_BIN_NUMBER, bin_number);
+//   SetParameter(PARA_RANGE, range);
+//   SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
+//}
 
 void MeshFreeCondition::InitPosition()
 {
-  _position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  _position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   Vec3f start{ _x_range[0], _y_range[0], _z_range[0] };
   Vec3f end{ _x_range[1], _y_range[1], _z_range[1] };
   Vec3f space = end - start;
@@ -71,7 +76,7 @@ void MeshFreeCondition::InitMassAndVelocity()
 
   velocity_temp.Allocate(num);
   auto write_portal = velocity_temp.WritePortal();
-  auto velocity_type = _system.GetParameter<std::string>(gtest::velocity_type);
+  auto velocity_type = _para.GetParameter<std::string>(gtest::velocity_type);
   if (velocity_type == "GAUSS")
   {
     for (auto i = 0; i < num; ++i)
@@ -97,8 +102,8 @@ void MeshFreeCondition::InitMassAndVelocity()
       write_portal.Set(i, { 0, 0, 0 });
     }
   }
-  auto velocity = _system.GetFieldAsArrayHandle<Vec3f>(field::velocity);
-  auto mass = _system.GetFieldAsArrayHandle<Real>(field::mass);
+  auto velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
+  auto mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
   SystemWorklet::InitCondtion(_position, velocity_temp, mass, velocity);
 }
 
@@ -106,14 +111,14 @@ void MeshFreeCondition::InitPositionFlag()
 {
   auto num = _position.GetNumberOfValues();
 
-  auto position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+  auto position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
   position_flag.AllocateAndFill(num, { 0, 0, 0 });
 }
 
 void MeshFreeCondition::InitId()
 {
-  auto atom_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
-  auto molecule_id = _system.GetFieldAsArrayHandle<Id>(field::molecule_id);
+  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
   vtkm::cont::ArrayHandleIndex atomsIdIndex(_position.GetNumberOfValues());
   vtkm::cont::ArrayCopy(atomsIdIndex, atom_id);
   vtkm::cont::ArrayHandleIndex moleculeIdIndex(_position.GetNumberOfValues());
@@ -125,14 +130,26 @@ void MeshFreeCondition::InitParameters()
   auto num_pos = _position.GetNumberOfValues();
 
   //pts type
-  auto pts_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type );
+  auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
   pts_type.AllocateAndFill(num_pos, 0);
 
   //eps
-  auto epsilon = _system.GetFieldAsArrayHandle<Real>(field::epsilon);
+  auto epsilon = _para.GetFieldAsArrayHandle<Real>(field::epsilon);
   epsilon.AllocateAndFill(1, 1.0);
 
   //sigma
-  auto sigma = _system.GetFieldAsArrayHandle<Real>(field::sigma);
+  auto sigma = _para.GetFieldAsArrayHandle<Real>(field::sigma);
   sigma.AllocateAndFill(1, 1.0);
 }
+
+void MeshFreeCondition::InitField()
+{
+  _para.AddField(field::charge, ArrayHandle<Real>{});
+  _para.AddField(field::velocity, ArrayHandle<Vec3f>{});
+  _para.AddField(field::mass, ArrayHandle<Real>{});
+  _para.AddField(field::molecule_id, ArrayHandle<Id>{});
+  _para.AddField(field::atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::position, ArrayHandle<Vec3f>{});
+}
+
+void MeshFreeCondition::SetParameters() {}

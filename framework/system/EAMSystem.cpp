@@ -33,11 +33,11 @@ EAMSystem::EAMSystem(const Configuration& cfg)
   , _temp_con_type(Get<std::string>("temp_con_type"))
   , _potential_file(Get<std::string>("potential_file"))
 {
-  SetParameter(PARA_RBE_P, _RBE_P);
-  SetParameter(PARA_ALPHA, _alpha);
-  SetParameter(PARA_KMAX, _Kmax);
-  SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
-  SetParameter(PARA_TEMPT, Real{ 0.0 });
+  _para.SetParameter(PARA_RBE_P, _RBE_P);
+  _para.SetParameter(PARA_ALPHA, _alpha);
+  _para.SetParameter(PARA_KMAX, _Kmax);
+  _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
+  _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
 }
 
 void EAMSystem::Init()
@@ -57,10 +57,10 @@ void EAMSystem::Init()
 void EAMSystem::InitialCondition()
 {
   MDSystem::InitialCondition();
-  _rho = GetParameter<Real>(PARA_RHO);
+  _rho = _para.GetParameter<Real>(PARA_RHO);
   _nosehooverxi = 0.0;
 
-  SetParameter(PARA_RDF_RHO, _rho);
+  _para.SetParameter(PARA_RDF_RHO, _rho);
   SetCharge();
   PreForce();
 }
@@ -258,24 +258,24 @@ void EAMSystem::array2spline()
 
 void EAMSystem::SetEAM()
 {
-  SetParameter(EAM_PARA_CUTOFF, file.cut_off);
-  SetParameter(EAM_PARA_RHOMAX, rhomax);
-  SetParameter(EAM_PARA_NRHO, nrho);
-  SetParameter(EAM_PARA_DRHO, drho);
-  SetParameter(EAM_PARA_NR, nr);
-  SetParameter(EAM_PARA_DR, dr);
+  _para.SetParameter(EAM_PARA_CUTOFF, file.cut_off);
+  _para.SetParameter(EAM_PARA_RHOMAX, rhomax);
+  _para.SetParameter(EAM_PARA_NRHO, nrho);
+  _para.SetParameter(EAM_PARA_DRHO, drho);
+  _para.SetParameter(EAM_PARA_NR, nr);
+  _para.SetParameter(EAM_PARA_DR, dr);
   //
 
-  AddField(field::rhor_spline, ArrayHandle<Vec7f>{});
-  auto rhor_spline_get = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  _para.AddField(field::rhor_spline, ArrayHandle<Vec7f>{});
+  auto rhor_spline_get = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle<Vec7f>(rhor_spline), rhor_spline_get);
 
-  AddField(field::frho_spline, ArrayHandle<Vec7f>{});
-  auto frho_spline_get = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  _para.AddField(field::frho_spline, ArrayHandle<Vec7f>{});
+  auto frho_spline_get = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle<Vec7f>(frho_spline), frho_spline_get);
 
-  AddField(field::z2r_spline, ArrayHandle<Vec7f>{});
-  auto z2r_spline_get = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+  _para.AddField(field::z2r_spline, ArrayHandle<Vec7f>{});
+  auto z2r_spline_get = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle<Vec7f>(z2r_spline), z2r_spline_get);
 }
 
@@ -321,7 +321,7 @@ void EAMSystem::UpdateVelocity()
 
 void EAMSystem::UpdatePosition()
 {
-  auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
+  auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
@@ -329,7 +329,7 @@ void EAMSystem::UpdatePosition()
 
 void EAMSystem::SetCharge()
 {
-  _charge = GetFieldAsArrayHandle<Real>(field::charge);
+  _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
   auto n = _position.GetNumberOfValues();
   _charge.AllocateAndFill(n, 0);
   _topology.SetCharge(_charge);
@@ -350,8 +350,8 @@ void EAMSystem::ComputeTempe()
   Real temperature_kB = _unit_factor._kB;
   _tempT = 0.5 * _tempT_sum / (3 * n * temperature_kB / 2.0);
 
-  SetParameter(PARA_TEMPT_SUM, _tempT_sum);
-  SetParameter(PARA_TEMPT, _tempT);
+  _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
+  _para.SetParameter(PARA_TEMPT, _tempT);
 }
 
 void EAMSystem::UpdateVelocityByTempConType()
@@ -409,10 +409,10 @@ void EAMSystem::PostSolve()
 
 void EAMSystem::PreForce()
 {
-  _Vlength = GetParameter<Real>(PARA_VLENGTH);
+  _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   _dt = _executioner->Dt();
   // prepare for RBE force
-  auto velocity_type = GetParameter<std::string>(gtest::velocity_type);
+  auto velocity_type = _para.GetParameter<std::string>(gtest::velocity_type);
   auto random = (velocity_type != "TEST") ? true : false;
   RBEPSAMPLE rbe_presolve_psample = { _alpha, _Vlength, _RBE_P };
   rbe_presolve_psample._RBE_random = random;
@@ -431,12 +431,12 @@ void EAMSystem::PreForce()
 void EAMSystem::InitField()
 {
   MDSystem::InitField();
-  AddField(field::pts_type , ArrayHandle<Id>{});
-  AddField(field::position_flag, ArrayHandle<Id3>{});
-  AddField(field::center_position, ArrayHandle<Vec3f>{});
-  AddField(field::target_position, ArrayHandle<Vec3f>{});
-  AddField(field::epsilon, ArrayHandle<Real>{});
-  AddField(field::sigma, ArrayHandle<Real>{});
+  _para.AddField(field::pts_type , ArrayHandle<Id>{});
+  _para.AddField(field::position_flag, ArrayHandle<Id3>{});
+  _para.AddField(field::center_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::target_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::epsilon, ArrayHandle<Real>{});
+  _para.AddField(field::sigma, ArrayHandle<Real>{});
 }
 
 void EAMSystem::SetCenterTargetPositions()
@@ -458,16 +458,16 @@ void EAMSystem::SetCenterTargetPositions()
   //  write_prot_target.Set(i, read_prot_target.Get(i + (num_pos / 2)));
   //}
   //
-  //auto center_position = GetFieldAsArrayHandle<Vec3f>(field::center_position);
+  //auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
   //vtkm::cont::ArrayCopy(center_position_temp, center_position);
   //
-  //auto target_position = GetFieldAsArrayHandle<Vec3f>(field::target_position);
+  //auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
   //vtkm::cont::ArrayCopy(target_position_temp, target_position);
 
-  auto center_position = GetFieldAsArrayHandle<Vec3f>(field::center_position);
+  auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
   vtkm::cont::ArrayCopy(_position, center_position);
 
-  auto target_position = GetFieldAsArrayHandle<Vec3f>(field::target_position);
+  auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
   vtkm::cont::ArrayCopy(_position, target_position);
 }
 
@@ -476,21 +476,21 @@ void EAMSystem::TimeIntegration() {}
 void EAMSystem::SetForceFunction()
 {
   InitERF();
-  auto rhomax = GetParameter<Real>(EAM_PARA_RHOMAX);
-  auto nrho = GetParameter<Id>(EAM_PARA_NRHO);
-  auto drho = GetParameter<Real>(EAM_PARA_DRHO);
-  auto nr = GetParameter<Id>(EAM_PARA_NR);
-  auto dr = GetParameter<Real>(EAM_PARA_DR);
+  auto rhomax = _para.GetParameter<Real>(EAM_PARA_RHOMAX);
+  auto nrho = _para.GetParameter<Id>(EAM_PARA_NRHO);
+  auto drho = _para.GetParameter<Real>(EAM_PARA_DRHO);
+  auto nr = _para.GetParameter<Id>(EAM_PARA_NR);
+  auto dr = _para.GetParameter<Real>(EAM_PARA_DR);
 
   _force_function.SetEAMParameters(rhomax, nrho, drho, nr, dr);
 }
 
 void EAMSystem::SetTopology()
 {
-  auto pts_type = GetFieldAsArrayHandle<Id>(field::pts_type);
-  auto molecule_id = GetFieldAsArrayHandle<Id>(field::molecule_id);
-  auto epsilon = GetFieldAsArrayHandle<Real>(field::epsilon);
-  auto sigma = GetFieldAsArrayHandle<Real>(field::sigma);
+  auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
+  auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
+  auto epsilon = _para.GetFieldAsArrayHandle<Real>(field::epsilon);
+  auto sigma = _para.GetFieldAsArrayHandle<Real>(field::sigma);
   _topology.SetAtomsType(pts_type);
   _topology.SetMolecularId(molecule_id);
   _topology.SetEpsAndSigma(epsilon, sigma);

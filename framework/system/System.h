@@ -5,6 +5,7 @@
 #include "Logging.h"
 #include "Object.h"
 #include "Timer.h"
+#include "Para.h"
 
 class Application;
 class InitCondition;
@@ -16,7 +17,7 @@ public:
 
   virtual void Init();
   virtual void Evolve() = 0;
-
+  /*
   template<typename T>
   void AddField(const std::string& name, const ArrayHandle<T>& arrayHandle)
   {
@@ -59,7 +60,7 @@ public:
   {
     return _parameters.find(name) != _parameters.end();
   }
-
+  */
   auto& App() { return this->_app; }
   auto& GetTimer() { return this->_timer; }
 
@@ -70,5 +71,6 @@ protected:
   std::map<std::string, vtkm::cont::Field> _field;
   std::map<std::string, std::any> _parameters;
   Application& _app;
+  Para& _para;
   Timer _timer;
 };

@@ -9,6 +9,9 @@ public:
   
   void Execute() override;
   void UpdateField() override;
+  //void InitParameter() override;
+  void InitField() override;
+  void SetParameters() override;
 
 private:
   void DoInit();

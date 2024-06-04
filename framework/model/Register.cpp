@@ -14,7 +14,7 @@
 #include "MadelungSystem.h"
 #include "SalineSolutionSystem.h"
 #include "NaClSystem.h"
-#include "ERFInitCondition.h"
+//#include "ERFInitCondition.h"
 #include "TrajectoryOutput.h"
 #include "VACFOutput.h"
 #include "EAMSystem.h"

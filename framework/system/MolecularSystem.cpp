@@ -20,13 +20,13 @@ void MolecularSystem::Init()
 void MolecularSystem::InitialCondition() 
 {
 	// 物理场初始化
-  _charge = GetFieldAsArrayHandle<Real>(field::charge);
+  _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
   _topology.SetCharge(_charge);
-  _velocity = GetFieldAsArrayHandle<Vec3f>(field::velocity);
-  _mass = GetFieldAsArrayHandle<Real>(field::mass);
+  _velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
+  _mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
 
-  _molecule_id = GetFieldAsArrayHandle<Id>(field::molecule_id);
-  _atoms_id = GetFieldAsArrayHandle<Id>(field::atom_id);
+  _molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
+  _atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
 }
 
 void MolecularSystem::SetForceFunction() {}
@@ -36,11 +36,11 @@ void MolecularSystem::SetTopology() {}
 void MolecularSystem::InitField() 
 {
   MeshFreeSystem::InitField();
-  AddField(field::charge, ArrayHandle<Real>{});
-  AddField(field::velocity, ArrayHandle<Vec3f>{});
-  AddField(field::mass, ArrayHandle<Real>{});
-  AddField(field::molecule_id, ArrayHandle<Id>{});
-  AddField(field::atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::charge, ArrayHandle<Real>{});
+  _para.AddField(field::velocity, ArrayHandle<Vec3f>{});
+  _para.AddField(field::mass, ArrayHandle<Real>{});
+  _para.AddField(field::molecule_id, ArrayHandle<Id>{});
+  _para.AddField(field::atom_id, ArrayHandle<Id>{});
 }
 
 std::vector<Vec2f> MolecularSystem::ComputeChargeStructureFactorRBE(Real& _Vlength,
@@ -103,7 +103,7 @@ void MolecularSystem::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                          IdComponent& RBE_P,
                                          ArrayHandle<Vec3f>& RBE_ele_force)
 {
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto rhok = ComputeChargeStructureFactorRBE(Vlength, psample);
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   SystemWorklet::ComputeNewRBEForce(RBE_P, _atoms_id, psample, whole_rhok, _force_function,  _topology,  _locator, RBE_ele_force);
@@ -114,7 +114,7 @@ void MolecularSystem::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
 void MolecularSystem::ComputeEwaldEleForce(IdComponent& Kmax,
                                            ArrayHandle<Vec3f>& Ewald_ele_force)
 {
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto rhok = ComputeChargeStructureFactorEwald(Vlength, Kmax);
   ArrayHandle<Vec2f>  whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
     SystemWorklet::ComputeNewFarElectrostatics(Kmax,

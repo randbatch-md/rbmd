@@ -8,7 +8,7 @@
 
 Executioner::Executioner(const Configuration& cfg)
   : Object(cfg)
-  , _app(*(Get<Application*>("_app")))
+  , _app(*(Get<Application*>("app")))
   , _system(*(_app.GetSystem()))
   , _timer(_system.GetTimer())
   , _dt(Get<Real>("dt"))

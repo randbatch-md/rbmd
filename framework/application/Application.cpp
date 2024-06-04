@@ -1,7 +1,7 @@
 ﻿#include "Application.h"
 #include "CommandLine.h"
 #include "InitGlobal.h"
-#include "Register.h"
+//#include "Register.h"
 #include "SetupDeviceAction.h"
 #include <vtkm/cont/RuntimeDeviceTracker.h>
 
@@ -29,7 +29,7 @@ Application::Application(int argc, char** argv)
     {
       _command_line = std::make_unique<CommandLine>(argc, argv);
       _init_global = std::make_unique<InitGlobal>(argc, argv);
-      RegisterObjectGlobal();
+      //RegisterObjectGlobal();
     }
     else if (std::string(argv[iargc]) == "-j" && argc > 3)
     {
@@ -46,7 +46,7 @@ Application::Application(int argc, char** argv)
     ErrerMessages();
   }
 }
-
+Application::Application(){};
 Application::~Application() {}
 
 void Application::SetupDevice()

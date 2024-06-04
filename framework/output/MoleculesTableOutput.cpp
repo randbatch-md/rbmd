@@ -69,12 +69,12 @@ void MoleculesTableOutput::Init()
     AddHeader(HEADER_ANGLE_ENERGY_NAME);
     AddHeader(HEADER_CUMULATIVE_TIME_NAME);
 
-    _cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
-    _volume = _system.GetParameter<Real>(PARA_VOLUME);
-    _Vlength = _system.GetParameter<Real>(PARA_VLENGTH);
-    _Kmax = _system.GetParameter<IdComponent>(PARA_KMAX);
-    _alpha = _system.GetParameter<Real>(PARA_ALPHA);
-    _rho = _system.GetParameter<Real>(PARA_RHO);
+    _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+    _volume = _para.GetParameter<Real>(PARA_VOLUME);
+    _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+    _alpha = _para.GetParameter<Real>(PARA_ALPHA);
+    _rho = _para.GetParameter<Real>(PARA_RHO);
   }
 }
 
@@ -82,18 +82,18 @@ void MoleculesTableOutput::Execute()
 {
   if (_compute)
   {
-    if (_system.HaveParameter(PARA_BOND_ENERGY))
+    if (_para.HaveParameter(PARA_BOND_ENERGY))
     {
-      _bond_energy = _system.GetParameter<Real>(PARA_BOND_ENERGY);
+      _bond_energy = _para.GetParameter<Real>(PARA_BOND_ENERGY);
       
     }
-    if (_system.HaveParameter(PARA_ANGLE_ENERGY))
+    if (_para.HaveParameter(PARA_ANGLE_ENERGY))
     {
-      _angle_energy = _system.GetParameter<Real>(PARA_ANGLE_ENERGY);
+      _angle_energy = _para.GetParameter<Real>(PARA_ANGLE_ENERGY);
     }
 
-    _tempT_sum = _system.GetParameter<Real>(PARA_TEMPT_SUM);
-    _tempT = _system.GetParameter<Real>(PARA_TEMPT);
+    _tempT_sum = _para.GetParameter<Real>(PARA_TEMPT_SUM);
+    _tempT = _para.GetParameter<Real>(PARA_TEMPT);
 
     ComputePotentialEnergy();
 
@@ -123,8 +123,8 @@ bool MoleculesTableOutput::ShouldOutput()
 void MoleculesTableOutput::ComputePotentialEnergy()
 { 
   ArrayHandle<Real> lj_potential_energy;
-  auto atoms_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
-  auto position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
 
   ContForceFunction force_function;
 
@@ -143,10 +143,10 @@ void MoleculesTableOutput::ComputePotentialEnergy()
   //TODO: turn to parameter
   auto N = position.GetNumberOfValues();
 
-  auto unit_factor = _system.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
+  auto unit_factor = _para.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
   // self potential energy
   ArrayHandle<Real> _self_energy;
-  auto charge = _system.GetFieldAsArrayHandle<Real>(field::charge);
+  auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
   OutPut::ComputeSqCharge(charge, _self_energy);
   auto self_potential_energy_total = -vtkm::Sqrt(_alpha / vtkm::Pi()) *
     vtkm::cont::Algorithm::Reduce(_self_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
@@ -221,18 +221,18 @@ void MoleculesTableOutput::ComputePotentialEnergy()
 
 void MoleculesTableOutput::SpecialFarCoulEnergy()
 {
-  auto position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   auto N = position.GetNumberOfValues();
 
   Real Volume = vtkm::Pow(_Vlength, 3);
 
   ArrayHandle<Real> Spec_far_coul_energy;
   Real _spec_far_ele_potential_energy_total = 0.0;
-  auto atoms_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
-  auto unit_factor = _system.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
+  auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto unit_factor = _para.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
 
-  auto source_array = _system.GetFieldAsArrayHandle<Id>(field::special_source_array);
-  auto offsets_array = _system.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
+  auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
+  auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
   auto groupVecArray = vtkm::cont::make_ArrayHandleGroupVecVariable(source_array, offsets_array);
 
   ContForceFunction force_function;
@@ -407,7 +407,7 @@ void MoleculesTableOutput::PostExecute()
     auto final_potential_energy = *((_status[POTENTIAL_ENERGY]).end() - 1);
     auto average_potential_energy = std::accumulate(_status[POTENTIAL_ENERGY].begin(),_status[POTENTIAL_ENERGY].end(),(Real)0.0) 
         / _status[POTENTIAL_ENERGY].size();
-    _system.SetParameter(gtest::ave_potential_energy, average_potential_energy);
+    _para.SetParameter(gtest::ave_potential_energy, average_potential_energy);
     Real sum_std_potential_energy = 0.0;
     std::for_each(_status[POTENTIAL_ENERGY].begin(), _status[POTENTIAL_ENERGY].end(), [&](const auto& energy) -> void
                   { sum_std_potential_energy += std::pow(energy - average_potential_energy, 2); });
@@ -418,7 +418,7 @@ void MoleculesTableOutput::PostExecute()
     auto final_kin_energy = *((_status[KIN_ENERGY]).end() - 1);
     auto average_kin_energy = std::accumulate(_status[KIN_ENERGY].begin(),_status[KIN_ENERGY].end(),(Real)0.0) 
         / _status[KIN_ENERGY].size();
-    _system.SetParameter(gtest::ave_kin_energy, average_kin_energy);
+    _para.SetParameter(gtest::ave_kin_energy, average_kin_energy);
     Real sum_std_kin_energy = 0.0;
     std::for_each(_status[KIN_ENERGY].begin(), _status[KIN_ENERGY].end(), [&](const auto& energy) -> void
                   { sum_std_kin_energy += std::pow(energy - average_kin_energy, 2); });
@@ -429,7 +429,7 @@ void MoleculesTableOutput::PostExecute()
     auto final_temperature = *((_status[TEMPERATURE]).end() - 1);
     auto average_temperature = std::accumulate(_status[TEMPERATURE].begin(), _status[TEMPERATURE].end(), (Real)0.0) 
         / _status[TEMPERATURE].size();
-    _system.SetParameter(gtest::ave_temp_t ,average_temperature);
+    _para.SetParameter(gtest::ave_temp_t ,average_temperature);
     Real sum_std_temperature = 0.0;
     std::for_each(_status[TEMPERATURE].begin(),_status[TEMPERATURE].end(), [&](const auto& energy) -> void
                   { sum_std_temperature += std::pow(energy - average_temperature, 2); });

@@ -1,19 +1,23 @@
 ﻿#pragma once
 #include "Object.h"
+#include "Configuration.h"
 #include <memory>
 #include <vector>
+#include "JsonParser.h"
 
 class CommandLine;
-class JsonParser;
 class System;
 class Executioner;
 class Action;
 class Output;
 class ConsoleOutput;
 class InitCondition;
-class MyTestFixture;
+//class MyTestFixture;
 class InitGlobal;
-
+class HyperParameters;
+class Execution;
+class Para;
+//class Parameters;
 namespace vtkm
 {
 namespace cont
@@ -24,10 +28,11 @@ class DeviceAdapterId;
 
 class Application
 {
-  friend class MyTestFixture;
+  //friend class MyTestFixture;
 
 public:
   Application(int argc, char** argv);
+  Application();
   virtual ~Application();
 
   virtual void PrintLogo();
@@ -38,6 +43,7 @@ public:
   virtual void CreateActions();
 
   virtual void Run();
+  virtual void ExecuteCommandom()=0;
   void SetupDevice();
   void OutputVersion();
   void HelpMessages();
@@ -53,6 +59,7 @@ public:
   auto& GetExecutioner() { return this->_executioner; }
   auto& GetOutputWarehouse() { return this->_owh; }
   auto& GetInitConditionWarehouse() { return this->_init_condition_wh; }
+  auto& GetParameter() { return this->_parameter; }
 
   template<typename T>
   T& GetSystem()
@@ -70,8 +77,19 @@ protected:
   std::shared_ptr<System> _system;
   std::shared_ptr<Executioner> _executioner;
   std::shared_ptr<InitCondition> _init_condition;
+  std::shared_ptr<Execution> _run;
+  std::shared_ptr<Para> _parameter;  
+  std::shared_ptr<Object> _obj;
+  std::shared_ptr<Configuration> _cfg;
+  std::shared_ptr<HyperParameters> _hyper_parameters;
+  //std::shared_ptr<Parameters> _parameters;
+
+
+
   std::vector<std::shared_ptr<InitCondition>> _init_condition_wh; //init condition ware house
 
+
+ 
 
   // 不使用unique_ptr，因为需要#include DeviceAdapterId
   std::shared_ptr<vtkm::cont::DeviceAdapterId> _device;
