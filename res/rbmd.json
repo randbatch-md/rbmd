@@ -15,8 +15,8 @@
       "type": "ModelFileInitCondition",
       "file": "rbmd.data",
       "velocity_type": "GAUSS",
-      "atom_style": "full",
-      "special_bonds": [ 0.1, 0.2, 0.3 ]
+	    "atom_style":"full",
+      "special_bonds": [ 0, 0, 0 ]
     }
   },
 
@@ -49,42 +49,52 @@
       "output_file": true,
       "compute": true
     },
-
+	
     "file_output": {
       "type": "MoleculesFileOutput",
       "interval": 10,
       "binary": false,
       "out_initial": false,
-      "output_file": false,
-      "compute": false,
-      "radius": 5,
-      "dr": 0.1,
+      "output_file": true,
+      "compute": true,
+      "radius": 10,
+      "dr": 0.01,
       "min_radius": 0.0,
       "statistics_rdf_steps": 1000,
       "center_type": 1,
       "target_type": 1
     },
+	
+	"temp_output": {
+      "type": "TempOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": false,
+      "output_screen": true,
+      "output_file": true,
+      "compute": true
+    },
 
     "msd_output": {
       "type": "MSDOutput",
-      "interval": 1,
+      "interval": 10,
       "binary": false,
       "out_initial": true,
       "output_file": true,
       "compute": true,
-      "start_step": 500,
-      "end_step": 600
+      "start_step": 0,
+      "end_step": 10000
     },
 
     "vacf_output": {
       "type": "VACFOutput",
-      "interval": 1,
+      "interval": 10,
       "binary": false,
       "out_initial": true,
       "output_file": true,
       "compute": true,
-      "start_step": 500,
-      "end_step": 600
+      "start_step": 0,
+      "end_step": 10000
     },
 
     "trajectory_output": {

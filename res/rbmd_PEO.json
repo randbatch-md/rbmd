@@ -5,53 +5,43 @@
   },
 
   "locator": {
-    "cut_off": 4.94999,
-    "rs": 2.5,
+    "cut_off": 12,
+    "rs": 6,
     "random_num": 100
   },
 
   "init_condition": {
     "model_init_Condition": {
       "type": "ModelFileInitCondition",
-      "file": "Cu10_v.data",
-      "atom_style": "atomic",
+      "file": "1122PEO+200Li_nvt.data",
       "velocity_type": "GAUSS",
-	   "special_bonds": [ 0, 0, 0 ]
+	  "atom_style":"full",
+      "special_bonds": [ 0, 0, 0 ]
     }
   },
 
   "system": {
-    "type": "EAMSystem",
-    "potential_file": "../../../../potentials/Cu_u3.eam",
-    "alpha": 0.1,
+    "type": "PEOSystem",
+    "alpha": 0.04,
     "rbeP": 100,
     "kmax": 4,
-    "kbT": 298,
+    "kbT": 298.0,
     "farforce_type": "RBE",
     "nearforce_type": "RBL",
     "temp_con_type": "BERENDSEN",
-    "unit": "METAL",
+    "unit": "REAL",
+    "use_shake": true,
     "use_erf": true
   },
 
   "executioner": {
-    "dt": 1e-03,
+    "dt": 0.5,
     "num_steps": 10000
   },
 
   "outputs": {
     "table_output": {
-      "type": "AtomsTableOutput",
-      "interval": 1,
-      "binary": false,
-      "out_initial": false,
-      "output_screen": true,
-      "output_file": true,
-      "compute": true
-    },
-
-    "temp_output": {
-      "type": "TempOutput",
+      "type": "MoleculesTableOutput",
       "interval": 1,
       "binary": false,
       "out_initial": false,
@@ -61,18 +51,28 @@
     },
 	
     "file_output": {
-      "type": "AtomsFileOutput",
+      "type": "MoleculesFileOutput",
       "interval": 10,
       "binary": false,
       "out_initial": false,
       "output_file": true,
       "compute": true,
-      "radius": 4.94999,
+      "radius": 10,
       "dr": 0.1,
       "min_radius": 0.0,
       "statistics_rdf_steps": 1000,
-      "center_type": 1,
-      "target_type": 1
+      "center_type": 0,
+      "target_type": 0
+    },
+	
+	"temp_output": {
+      "type": "TempOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": false,
+      "output_screen": true,
+      "output_file": true,
+      "compute": true
     },
 
     "msd_output": {

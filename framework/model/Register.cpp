@@ -7,6 +7,7 @@
 #include "AtomsTableOutput.h"
 #include "MoleculesFileOutput.h"
 #include "MoleculesTableOutput.h"
+#include "TempOutput.h"
 #include "MSDOutput.h"
 #include "Progress.h"
 #include "H2OSystem.h"
@@ -29,6 +30,7 @@ void RegisterObjectGlobal()
   RegisterObject(ConsoleOutput);
   RegisterObject(MoleculesFileOutput);
   RegisterObject(MoleculesTableOutput);
+  RegisterObject(TempOutput);
   RegisterObject(MSDOutput);
   RegisterObject(TrajectoryOutput);
   RegisterObject(Progress);
