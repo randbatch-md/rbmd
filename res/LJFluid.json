@@ -1,6 +1,6 @@
 ﻿{
   "parallel": {
-    "type": "serial",
+    "type": "cuda",
     "num_threads": 8
   },
 
@@ -38,7 +38,7 @@
 
   "executioner": {
     "dt": 1e-02,
-    "num_steps": 10000
+    "num_steps": 1000
   },
 
   "outputs": {
@@ -52,6 +52,16 @@
       "compute": true
     },
 
+    "temp_output": {
+      "type": "TempOutput",
+      "interval": 1,
+      "binary": false,
+      "out_initial": false,
+      "output_screen": true,
+      "output_file": true,
+      "compute": true
+    },
+	
     "file_output": {
       "type": "AtomsFileOutput",
       "interval": 10,
@@ -73,7 +83,7 @@
       "binary": false,
       "out_initial": true,
       "output_file": true,
-      "compute": true,
+      "compute": false,
       "start_step": 0,
       "end_step": 10000
     },
@@ -84,7 +94,7 @@
       "binary": false,
       "out_initial": true,
       "output_file": true,
-      "compute": true,
+      "compute": false,
       "start_step": 0,
       "end_step": 10000
     },

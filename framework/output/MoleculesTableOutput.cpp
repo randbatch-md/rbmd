@@ -322,8 +322,8 @@ void MoleculesTableOutput::WriteToFile()
             << " , "                         //
             << "Residual" 
             << ", "
-            << "kBT"                         // add kBT
-            << ", "
+  //          << "kBT"                         // the value of kBT  in file of MoleculesTempOutput.csv
+  //          << ", "
             << "KinteicEnergy"
             << ", "
             << "PotentialEnergy"
@@ -351,7 +351,7 @@ void MoleculesTableOutput::WriteToFile()
             << _near_ele_potential_energy_avr << " , "
             << _far_ele_potential_energy_avr << " , " 
             << _residual << ", "
-            << _tempT  << ", "
+   //         << _tempT  << ", "
             << _kinteic_energy << ", "
             << _potential_energy << ", "
             << _potential_energy_avr << ", "
