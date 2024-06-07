@@ -54,7 +54,7 @@ void VACFOutput::Execute()
 
     if (ShouldOutput() && _output_file)
     {
-      if (_executioner.CurrentStep() ==  1)
+        if (_executioner.CurrentStep() > 0) //
       {
         _VACF_file << "Step"
                    << " , "

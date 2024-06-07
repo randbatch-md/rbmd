@@ -58,7 +58,7 @@ void MSDOutput::Execute()
 
     if (ShouldOutput() && _output_file)
     {
-      if (_executioner.CurrentStep() ==  1)
+      if (_executioner.CurrentStep() >  0) //title out 
       {
         _MSD_file << "Step"
               << " , "
