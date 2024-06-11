@@ -52,25 +52,16 @@ void MSDOutput::Execute()
 
     if (_executioner.CurrentStep() >= _start_step && _executioner.CurrentStep() <= _end_step)
     {
-        ExecuteMSD();
+       ExecuteMSD();
     }
-    
+
+    if (_executioner.CurrentStep() == 1)
+    {
+       _MSD_file << "Step , MSDx , MSDy , MSDz , MSD" << std::endl;
+    }
 
     if (ShouldOutput() && _output_file)
     {
-      if (_executioner.CurrentStep() >  0) //title out 
-      {
-        _MSD_file << "Step"
-              << " , "
-              << "MSDx"
-              << " , "
-              << "MSDy"
-              << " , "
-              << "MSDz"
-              << " , "
-              << "MSD"
-              << std::endl;
-      }
       try
       {
         _MSD_file << _executioner.CurrentStep() << " , " << _MSD_value_ave[0] << " , "

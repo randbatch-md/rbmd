@@ -51,11 +51,8 @@ void VACFOutput::Execute()
         ExecuteMSD();
     }
     
-
-    if (ShouldOutput() && _output_file)
+    if (_executioner.CurrentStep() == 1)
     {
-        if (_executioner.CurrentStep() > 0) //
-      {
         _VACF_file << "Step"
                    << " , "
                    << "VACFx"
@@ -64,9 +61,11 @@ void VACFOutput::Execute()
                    << " , "
                    << "VACFz"
                    << " , "
-                   << "VACF" 
-                   << std::endl;
-      }
+                   << "VACF" << std::endl;
+    }
+
+    if (ShouldOutput() && _output_file)
+    {
       try
       {
         _VACF_file << _executioner.CurrentStep() << " , " << _VACF_value_ave[0] << " , "
