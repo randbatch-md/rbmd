@@ -25,14 +25,14 @@ MSDOutput::MSDOutput(const Configuration& cfg)
 
 void MSDOutput::Init() 
 {  
-  _position = _system.GetFieldAsArrayHandle<vtkm::Vec3f>(field::position);
+  _position = _para.GetFieldAsArrayHandle<vtkm::Vec3f>(field::position);
   _original_position.AllocateAndFill(_position.GetNumberOfValues(), 0);
   temp_position_flag.AllocateAndFill(_position.GetNumberOfValues(), 0);
   _temp_MSD_position.Allocate(_position.GetNumberOfValues());
  
   if (_comput_MSD)
   {
-    _Vlength = _system.GetParameter<Real>(PARA_VLENGTH);
+    _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   }
 }
 
@@ -45,7 +45,7 @@ void MSDOutput::Execute()
       _original_position.DeepCopyFrom(_position);
       _MSD_position.DeepCopyFrom(_position);
       _temp_MSD_position.DeepCopyFrom(_position);
-      auto&& position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+      auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
 
       _MSD_value_ave = {0,0,0,0};
     }
@@ -100,7 +100,7 @@ void MSDOutput::ExecuteMSD()
   auto n = _position.GetNumberOfValues();  
   vtkm::cont::ArrayHandle<vtkm::Vec4f> MSD_vector;
   
-  auto&& position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+  auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
 
   if (_executioner.CurrentStep() == _start_step)
   {

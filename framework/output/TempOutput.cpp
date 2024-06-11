@@ -45,7 +45,7 @@ void TempOutput::Execute()
 {
   if (_compute)
   {
-    _temperature = _system.GetParameter<Real>(PARA_TEMPT);
+    _temperature = _para.GetParameter<Real>(PARA_TEMPT);
 
     WriteToFile();
   }

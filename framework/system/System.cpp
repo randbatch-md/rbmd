@@ -5,6 +5,7 @@
 System::System(const Configuration& cfg)
   : Object(cfg)
   , _app(*(Get<Application*>("_app")))
+  , _para(*(_app.GetParameter()))
 {
 }
 

@@ -24,12 +24,12 @@ parser/Configuration.cpp
 application/Application.cpp
 application/MDApplication.cpp
 
-action/Action.cpp
-action/CreateSystemAction.cpp
-action/CreateExecutionerAction.cpp
-action/AddOutputAction.cpp
-action/SetupDeviceAction.cpp
-action/CreateInitConditionAction.cpp
+#action/Action.cpp
+#action/CreateSystemAction.cpp
+#action/CreateExecutionerAction.cpp
+#action/AddOutputAction.cpp
+#action/SetupDeviceAction.cpp
+#action/CreateInitConditionAction.cpp
 
 executioner/Executioner.cpp
 
@@ -39,12 +39,17 @@ output/ConsoleOutput.cpp
 output/Progress.cpp
 
 model/FormatTable.cpp
-model/Register.cpp
+#model/Register.cpp
 
 system/System.cpp
 InitCondition/MeshFreeCondition.cpp
 InitCondition/ModelFileInitCondition.cpp
-InitCondition/MeshFreeFileInitCondition.cpp)
+InitCondition/MeshFreeFileInitCondition.cpp
+hyperparameters/Coulomb.cpp
+hyperparameters/Extend.cpp
+hyperparameters/ForceField.cpp
+hyperparameters/Neighbor.cpp
+)
 
 set(device_src
 system/MadelungSystem.cpp
@@ -76,6 +81,11 @@ forceFunction/ContForceFunction.cpp
 topology/ContTopology.cpp
 system/InitGlobal.cpp
 staticTable/ContStaticTable.cpp
+run/ExecutionNPT.cpp
+run/ExecutionNVT.cpp
+run/ExecutionNVE.cpp
+run/ExecutionMD.cpp
+run/worklet/RunWorklet.cpp
 )
 
 # 头文件引入
@@ -96,6 +106,8 @@ target_include_directories(_compiler_flags INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/locator
   ${CMAKE_CURRENT_SOURCE_DIR}/forceFunction
   ${CMAKE_CURRENT_SOURCE_DIR}/topology
+  ${CMAKE_CURRENT_SOURCE_DIR}/hyperparameters
+  ${CMAKE_CURRENT_SOURCE_DIR}/run
   ${JSON_INSTALL_PATH}/include
   ${CXXOPTS_INSTALL_PATH}/include
   )

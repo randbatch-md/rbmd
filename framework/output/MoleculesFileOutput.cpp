@@ -36,15 +36,15 @@ MoleculesFileOutput::MoleculesFileOutput(const Configuration& cfg)
                 });
 
   _rdf.AllocateAndFill(radius_num, 0);
-  _system.SetParameter(PARA_CENTER_TYPE, Get<vtkm::IdComponent>("center_type"));
-  _system.SetParameter(PARA_TARGET_TYPE, Get<vtkm::IdComponent>("target_type"));
+  _para.SetParameter(PARA_CENTER_TYPE, Get<vtkm::IdComponent>("center_type"));
+  _para.SetParameter(PARA_TARGET_TYPE, Get<vtkm::IdComponent>("target_type"));
 }
 
 void MoleculesFileOutput::Init() 
 {
   if (_comput_RDF)
   {
-    _rdf_rho = _system.GetParameter<Real>(PARA_RDF_RHO);
+    _rdf_rho = _para.GetParameter<Real>(PARA_RDF_RHO);
     FileOutput::Init();
   }
 }
@@ -100,12 +100,12 @@ void MoleculesFileOutput::ComputeRDF()
 {
   if (_executioner.CurrentStep() >= _step_lower && _executioner.CurrentStep() < _step_upper)
   {
-    auto center_position = _system.GetFieldAsArrayHandle<Vec3f>(field::center_position);
-    auto target_position = _system.GetFieldAsArrayHandle<Vec3f>(field::target_position);
-    auto atom_id_center = _system.GetFieldAsArrayHandle<Id>(field::atom_id_center);
-    auto atom_id_target = _system.GetFieldAsArrayHandle<Id>(field::atom_id_target);
-    auto molecule_id = _system.GetFieldAsArrayHandle<Id>(field::molecule_id);
-    auto position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+    auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
+    auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
+    auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
+    auto atom_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
+    auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
+    auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
 
     auto num_center_pos = center_position.GetNumberOfValues();
     ContPointLocator locator;

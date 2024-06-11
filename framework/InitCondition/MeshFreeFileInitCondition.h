@@ -10,6 +10,8 @@ public:
 
   void Execute() override {};
   void UpdateField() override {};
+  void InitField() override;
+  void SetParameters() override;
 
 protected:
   std::ifstream _file;

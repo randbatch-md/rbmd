@@ -41,7 +41,7 @@ void MadelungInitCondition::Execute()
 void MadelungInitCondition::UpdateField() 
 {
   //update position
-  auto position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   Vec3f start{ _x_range[0], _y_range[0], _z_range[0] };
   Vec3f end{ _x_range[1], _y_range[1], _z_range[1] };
   Vec3f space = end - start;
@@ -54,6 +54,6 @@ void MadelungInitCondition::UpdateField()
   vtkm::cont::ArrayCopy(data_set.GetCoordinateSystem().GetData(), position);
   
   //update charge
-  auto charge = _system.GetFieldAsArrayHandle<Real>(field::charge);
+  auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
   vtkm::cont::Invoker{}(SetChargeWorklet{}, data_set.GetCellSet(),charge);
 }

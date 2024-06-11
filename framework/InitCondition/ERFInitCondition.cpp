@@ -14,7 +14,7 @@
 //  , _file_gnear_geq2("./res/Gnear_table_geq2_2.txt")
 //  , _file_gnear_leq2("./res/Gnear_table_leq2_2.txt")
 //{
-//  _system.SetParameter(PARA_USE_ERF, _use_erf);
+//  _para.SetParameter(PARA_USE_ERF, _use_erf);
 //}
 //
 //void ERFInitCondition::Execute()
@@ -64,19 +64,19 @@
 //      }
 //    }
 //
-//    auto erf_index_geq2 = _system.GetFieldAsArrayHandle<IdComponent>(field::erf_index_geq2);
+//    auto erf_index_geq2 = _para.GetFieldAsArrayHandle<IdComponent>(field::erf_index_geq2);
 //    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(index_geq2), erf_index_geq2);
 //
-//    auto erf_dis_geq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_dis_geq2);
+//    auto erf_dis_geq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_dis_geq2);
 //    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dis_geq2), erf_dis_geq2);
 //
-//    auto erf_dis_dif_geq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_dis_dif_geq2);
+//    auto erf_dis_dif_geq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_dis_dif_geq2);
 //    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dis_dif_geq2), erf_dis_dif_geq2);
 //
-//    auto erf_gnear_geq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_gnear_geq2);
+//    auto erf_gnear_geq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_gnear_geq2);
 //    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(gnear_geq2), erf_gnear_geq2);
 //
-//    auto erf_gnear_der_geq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_gnear_der_geq2);
+//    auto erf_gnear_der_geq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_gnear_der_geq2);
 //    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(gnear_der_geq2), erf_gnear_der_geq2);
 //}
 //
@@ -109,18 +109,18 @@
 //    }
 //  }
 //
-//  auto erf_index_leq2 = _system.GetFieldAsArrayHandle<IdComponent>(field::erf_index_leq2);
+//  auto erf_index_leq2 = _para.GetFieldAsArrayHandle<IdComponent>(field::erf_index_leq2);
 //  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(index_leq2), erf_index_leq2);
 //
-//  auto erf_dis_leq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_dis_leq2);
+//  auto erf_dis_leq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_dis_leq2);
 //  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dis_leq2), erf_dis_leq2);
 //
-//  auto erf_dis_dif_leq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_dis_dif_leq2);
+//  auto erf_dis_dif_leq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_dis_dif_leq2);
 //  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dis_dif_leq2), erf_dis_dif_leq2);
 //
-//  auto erf_gnear_leq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_gnear_leq2);
+//  auto erf_gnear_leq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_gnear_leq2);
 //  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(gnear_leq2), erf_gnear_leq2);
 //
-//  auto erf_gnear_der_leq2 = _system.GetFieldAsArrayHandle<Real>(field::erf_gnear_der_leq2);
+//  auto erf_gnear_der_leq2 = _para.GetFieldAsArrayHandle<Real>(field::erf_gnear_der_leq2);
 //  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(gnear_der_leq2), erf_gnear_der_leq2);
 //}

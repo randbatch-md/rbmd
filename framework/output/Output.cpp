@@ -5,7 +5,7 @@
 Output::Output(const Configuration& cfg)
   : Object(cfg)
   , _app(*(Get<Application*>("_app")))
-  , _system(*(_app.GetSystem()))
+  , _para(*(_app.GetParameter()))
   , _executioner(_app.GetExecutioner())
 {
 

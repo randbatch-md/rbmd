@@ -25,10 +25,10 @@ VACFOutput::VACFOutput(const Configuration& cfg)
 
 void VACFOutput::Init() 
 {  
-  _position = _system.GetFieldAsArrayHandle<vtkm::Vec3f>(field::position);
+  _position = _para.GetFieldAsArrayHandle<vtkm::Vec3f>(field::position);
   //_original_position.AllocateAndFill(_position.GetNumberOfValues(), 0);
   //temp_position_flag.AllocateAndFill(_position.GetNumberOfValues(), 0);
-  _velocity = _system.GetFieldAsArrayHandle<vtkm::Vec3f>(field::velocity);
+  _velocity = _para.GetFieldAsArrayHandle<vtkm::Vec3f>(field::velocity);
   _original_velocity.AllocateAndFill(_position.GetNumberOfValues(), 0);
 }
 
@@ -39,7 +39,7 @@ void VACFOutput::Execute()
     if (_executioner.CurrentStep() == _start_step)
     {
       //_original_position.DeepCopyFrom(_position);
-      //auto&& position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+      //auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
 
       //_VACF_value_ave = {0,0,0,0};
 

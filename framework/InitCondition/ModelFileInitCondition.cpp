@@ -17,14 +17,14 @@ ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
 {
   group_id_init.insert(std::make_pair("wat", MolecularType::H20));
   group_id_init.insert(std::make_pair("nacl", MolecularType::NACL));
-  _system.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
-  _system.SetParameter(ATOM_STYLE, Get<std::string>("atom_style"));
 }
 
 void ModelFileInitCondition::Execute() 
 {
   try
   {
+    SetParameters();
+    InitField();
     ReadDataFile(_file);
     _file.close();
     UpdateField();
@@ -49,6 +49,39 @@ void ModelFileInitCondition::ReadDataFile(std::ifstream& file)
   {
     std::cout << "Unable to open file";
   }
+}
+
+void ModelFileInitCondition::SetParameters()
+{
+  _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
+  _para.SetParameter(ATOM_STYLE, Get<std::string>("atom_style"));
+  _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
+}
+
+void ModelFileInitCondition::InitField()
+{
+  MeshFreeFileInitCondition::InitField();
+  _para.AddField(field::position_flag, ArrayHandle<Id3>{});
+  _para.AddField(field::bond_atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::bond_type, ArrayHandle<Id>{});
+  _para.AddField(field::bond_coeffs_k, ArrayHandle<Real>{});
+  _para.AddField(field::bond_coeffs_equilibrium, ArrayHandle<Real>{});
+  _para.AddField(field::angle_atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::angle_type, ArrayHandle<Id>{});
+  _para.AddField(field::angle_coeffs_k, ArrayHandle<Real>{});
+  _para.AddField(field::angle_coeffs_equilibrium, ArrayHandle<Real>{});
+  _para.AddField(field::atom_id_center, ArrayHandle<Id>{});
+  _para.AddField(field::atom_id_target, ArrayHandle<Id>{});
+  _para.AddField(field::pts_type, ArrayHandle<Id>{});
+  _para.AddField(field::center_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::target_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::epsilon, ArrayHandle<Real>{});
+  _para.AddField(field::sigma, ArrayHandle<Real>{});
+  _para.AddField(field::dihedrals_atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::dihedrals_type, ArrayHandle<Id>{});
+  _para.AddField(field::signal_atoms_id, ArrayHandle<Id>{});
+  _para.AddField(field::special_source_array, ArrayHandle<Id>{});
+  _para.AddField(field::special_offsets_array, ArrayHandle<Id>{});
 }
 
 void ModelFileInitCondition::Header(std::ifstream& file)
@@ -126,11 +159,11 @@ void ModelFileInitCondition::Header(std::ifstream& file)
   auto xLength = x_high - x_low;
   auto yLength = y_high - y_low;
   auto zLength = z_high - z_low;
-  _system.SetParameter(PARA_VLENGTH, xLength);
-  _system.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
-  _system.SetParameter(PARA_RHO, _header._num_atoms / (xLength * yLength * zLength));
-  _system.SetParameter(NTYPES, _header._num_atoms_type);
-  auto cut_off = _system.GetParameter<Real>(PARA_CUTOFF);
+  _para.SetParameter(PARA_VLENGTH, xLength);
+  _para.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
+  _para.SetParameter(PARA_RHO, _header._num_atoms / (xLength * yLength * zLength));
+  _para.SetParameter(NTYPES, _header._num_atoms_type);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto bin_number = Id3{
     static_cast<int>(xLength / cut_off),
     static_cast<int>(yLength / cut_off),
@@ -140,8 +173,8 @@ void ModelFileInitCondition::Header(std::ifstream& file)
     { x_low, x_high },
     { y_low, y_high },
     { z_low, z_high }};
-  _system.SetParameter(PARA_BIN_NUMBER, bin_number);
-  _system.SetParameter(PARA_RANGE, range);
+  _para.SetParameter(PARA_BIN_NUMBER, bin_number);
+  _para.SetParameter(PARA_RANGE, range);
 }
 
 void ModelFileInitCondition::Parser(std::ifstream& file) 
@@ -199,7 +232,6 @@ void ModelFileInitCondition::Parser(std::ifstream& file)
   }
 }
 
-
 void ModelFileInitCondition::Masses(std::ifstream& file, std::string line)
 {
   _mass.resize(_header._num_atoms_type);
@@ -214,7 +246,7 @@ void ModelFileInitCondition::Masses(std::ifstream& file, std::string line)
     }
   }
 
-  auto unit = _system.GetParameter<std::string>(PARA_UNIT);
+  auto unit = _para.GetParameter<std::string>(PARA_UNIT);
   if (unit == "LJ")
   {
     _mass = std::vector<Real>(_header._num_atoms_type, 1.0);
@@ -238,10 +270,10 @@ void ModelFileInitCondition::PairCoeffs(std::ifstream& file, std::string& line)
   }
 
   // EPS SIGMA Pts_type
-  auto epsilon = _system.GetFieldAsArrayHandle<Real>(field::epsilon);
+  auto epsilon = _para.GetFieldAsArrayHandle<Real>(field::epsilon);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_eps_atom), epsilon);
 
-  auto sigma = _system.GetFieldAsArrayHandle<Real>(field::sigma);
+  auto sigma = _para.GetFieldAsArrayHandle<Real>(field::sigma);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_sigma_atom), sigma);
 }
 
@@ -338,7 +370,7 @@ void ModelFileInitCondition::Atoms(std::ifstream& file, std::string& line)
   vtkm::Id temp_type;
   vtkm::Id temp_id;
   vtkm::Id temp_molecule_id;
-  auto atom_style = _system.GetParameter<std::string>(ATOM_STYLE);
+  auto atom_style = _para.GetParameter<std::string>(ATOM_STYLE);
   //
   if (atom_style == "atomic")
   {
@@ -539,10 +571,10 @@ void ModelFileInitCondition::Dihedrals(std::ifstream& file, std::string& line)
     SetDihedralsField();
   }
 
-  auto dihedrals_atoms_id = _system.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
+  auto dihedrals_atoms_id = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_dihedrals_atoms_id), dihedrals_atoms_id);
 
-  auto dihedrals_type_array = _system.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
+  auto dihedrals_type_array = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_dihedrals_type), dihedrals_type_array);
 }
 
@@ -561,7 +593,7 @@ void ModelFileInitCondition::VelocityRead(std::ifstream& file, std::string& line
     }
   }
 
-  auto velocity = _system.GetFieldAsArrayHandle<Vec3f>(field::velocity);
+  auto velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_velocity), velocity);
 }
 
@@ -570,7 +602,7 @@ void ModelFileInitCondition::Velocity()
   if (_velocity.size() == NULL)
   {
     _velocity.resize(_header._num_atoms);
-    auto velocity_type = _system.GetParameter<std::string>(gtest::velocity_type);
+    auto velocity_type = _para.GetParameter<std::string>(gtest::velocity_type);
 
     if (velocity_type == "GAUSS")
     {
@@ -588,7 +620,7 @@ void ModelFileInitCondition::Velocity()
         //Real sigmaz = 1;
         auto kB = 1.9872067 * vtkm::Pow(10.0, -3);
         Real sigmaz;
-        auto unit = _system.GetParameter<std::string>(PARA_UNIT);
+        auto unit = _para.GetParameter<std::string>(PARA_UNIT);
         if (unit == "REAL")
         {
           sigmaz = vtkm::Sqrt(kB * 298.0 / _mass[_atoms_type[i]]);
@@ -608,7 +640,7 @@ void ModelFileInitCondition::Velocity()
         _velocity[i] = Vec3f(0.0, 0.0, 0.0);
       }
     }
-    auto velocity = _system.GetFieldAsArrayHandle<Vec3f>(field::velocity);
+    auto velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
     vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_velocity), velocity);
   }
   else
@@ -689,28 +721,28 @@ void ModelFileInitCondition::SetMolecularGroup()
   vtkm::cont::ArrayHandle<vtkm::Id> offsetsArray =
            vtkm::cont::ConvertNumComponentsToOffsets(countArray, sourceArraySize);
 
-  auto source_array = _system.GetFieldAsArrayHandle<Id>(field::special_source_array);
+  auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
   vtkm::cont::ArrayCopy(sourceArray, source_array);
-  auto offsets_array = _system.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
+  auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
   vtkm::cont::ArrayCopy(offsetsArray, offsets_array);
 
   //
-  auto molecule_id = _system.GetFieldAsArrayHandle<Id>(field::molecule_id);
+  auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_molecules_id), molecule_id);
 }
 
 void ModelFileInitCondition::SetAtomsField() 
 {
   // init Id
-  auto atom_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_id), atom_id);
 
   // init position
-  ArrayHandle<Vec3f> position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  ArrayHandle<Vec3f> position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_position), position);
 
   // init mass
-  auto mass = _system.GetFieldAsArrayHandle<Real>(field::mass);
+  auto mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
   mass.Allocate(_header._num_atoms);
   auto&& mass_protol = mass.WritePortal();
   for (int i = 0; i < _header._num_atoms; ++i)
@@ -719,37 +751,37 @@ void ModelFileInitCondition::SetAtomsField()
   }
 
   // init charge
-  auto charge = _system.GetFieldAsArrayHandle<Real>(field::charge);
+  auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_charge), charge);
 
-  auto pts_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type);
+  auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
 
   // Init Center_Target Position
-  auto center_type = _system.GetParameter<IdComponent>(PARA_CENTER_TYPE);
+  auto center_type = _para.GetParameter<IdComponent>(PARA_CENTER_TYPE);
   auto atoms_center = _atoms_map[center_type];
-  auto atoms_id_center = _system.GetFieldAsArrayHandle<Id>(field::atom_id_center);
+  auto atoms_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_center), atoms_id_center);
 
-  auto target_type = _system.GetParameter<IdComponent>(PARA_TARGET_TYPE);
+  auto target_type = _para.GetParameter<IdComponent>(PARA_TARGET_TYPE);
   auto atoms_target = _atoms_map[target_type];
-  auto atoms_id_target = _system.GetFieldAsArrayHandle<Id>(field::atom_id_target);
+  auto atoms_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_target), atoms_id_target);
 
   // init position_flag
-  auto position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+  auto position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
   position_flag.AllocateAndFill(_header._num_atoms, { 0, 0, 0 });
 }
 
 void ModelFileInitCondition::SetBondField() 
 {
-  auto signal_atoms_id = _system.GetFieldAsArrayHandle<Id>(field::signal_atoms_id);
+  auto signal_atoms_id = _para.GetFieldAsArrayHandle<Id>(field::signal_atoms_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_signal_atoms_id), signal_atoms_id);
 
-  auto bond_atom_id = _system.GetFieldAsArrayHandle<Id>(field::bond_atom_id);
+  auto bond_atom_id = _para.GetFieldAsArrayHandle<Id>(field::bond_atom_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_bond_atoms_id), bond_atom_id);
 
-  auto bond_type_handle = _system.GetFieldAsArrayHandle<Id>(field::bond_type);
+  auto bond_type_handle = _para.GetFieldAsArrayHandle<Id>(field::bond_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_bond_type), bond_type_handle);
 
   std::vector<Real> bond_coeffs_k_temp(_header._num_bonds);
@@ -760,10 +792,10 @@ void ModelFileInitCondition::SetBondField()
     bond_coeffs_equilibrium_temp[i] = _bond_coeffs_equilibrium[_bond_type[i]];
   }
 
-  auto bond_coeffs_k = _system.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k);
+  auto bond_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bond_coeffs_k_temp), bond_coeffs_k);
 
-  auto bond_coeffs_equilibrium = _system.GetFieldAsArrayHandle<Real>(field::bond_coeffs_equilibrium);
+  auto bond_coeffs_equilibrium = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_equilibrium);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bond_coeffs_equilibrium_temp),
                         bond_coeffs_equilibrium);
 
@@ -838,13 +870,13 @@ void ModelFileInitCondition::SetSpecialBonds()
   vtkm::cont::ArrayHandle<vtkm::Id> offsetsArray = vtkm::cont::ConvertNumComponentsToOffsets(
     vtkm::cont::make_ArrayHandle(special_offsets), offsetSize);
 
-  auto special_offsets_array = _system.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  auto special_offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
   vtkm::cont::ArrayCopy(offsetsArray, special_offsets_array);
 
-  auto special_ids_array = _system.GetFieldAsArrayHandle<Id>(field::special_ids);
+  auto special_ids_array = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(special_ids), special_ids_array);
 
-  auto special_weights_array = _system.GetFieldAsArrayHandle<Real>(field::special_weights);
+  auto special_weights_array = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(special_weights), special_weights_array);
 
   //vtkm::Id offsetSize;
@@ -876,16 +908,16 @@ void ModelFileInitCondition::SetSpecialBonds()
   //}
 
 
-  //auto special_weights = _system.GetFieldAsArrayHandle<Real>(field::special_weights);
+  //auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
   //vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_special_weights), special_weights);
 }
 
 void ModelFileInitCondition::SetAngleField() 
 {
-  auto angle_atom_id = _system.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
+  auto angle_atom_id = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_angle_atoms_id), angle_atom_id);
 
-  auto angle_type_array = _system.GetFieldAsArrayHandle<Id>(field::angle_type);
+  auto angle_type_array = _para.GetFieldAsArrayHandle<Id>(field::angle_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_angle_type), angle_type_array);
 
   std::vector<Real> angle_coeffs_k_temp(_header._num_angles);
@@ -896,21 +928,21 @@ void ModelFileInitCondition::SetAngleField()
     angle_coeffs_equilibrium_temp[i] = _angle_coeffs_equilibrium[_angle_type[i]];
   }
 
-  auto angle_coeffs_k = _system.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);
+  auto angle_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(angle_coeffs_k_temp), angle_coeffs_k);
 
   auto angle_coeffs_equilibrium =
-    _system.GetFieldAsArrayHandle<Real>(field::angle_coeffs_equilibrium);
+    _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_equilibrium);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(angle_coeffs_equilibrium_temp),
                         angle_coeffs_equilibrium);
 }
 
 void ModelFileInitCondition::SetDihedralsField()
 {
-  auto dihedrals_atom_id = _system.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
+  auto dihedrals_atom_id = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_dihedrals_atoms_id), dihedrals_atom_id);
 
-  auto dihedrals_type_array = _system.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
+  auto dihedrals_type_array = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_dihedrals_type), dihedrals_type_array);
 
   std::vector<Real> dihedrals_coeffs_k_temp(_header._num_dihedrals);
@@ -923,16 +955,16 @@ void ModelFileInitCondition::SetDihedralsField()
     dihedrals_coeffs_multiplicity_temp[i] = _dihedrals_coeffs_multiplicity[_dihedrals_type[i]];
   }
 
-  auto dihedrals_coeffs_k = _system.GetFieldAsArrayHandle<Real>(field::dihedrals_coeffs_k);
+  auto dihedrals_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::dihedrals_coeffs_k);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dihedrals_coeffs_k_temp), dihedrals_coeffs_k);
 
   auto dihedrals_coeffs_sign =
-    _system.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_sign);
+    _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_sign);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dihedrals_coeffs_sign_temp),
                         dihedrals_coeffs_sign);
 
   auto dihedrals_coeffs_multiplicity =
-    _system.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
+    _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(dihedrals_coeffs_multiplicity_temp),
                         dihedrals_coeffs_multiplicity);
 }
@@ -940,15 +972,15 @@ void ModelFileInitCondition::SetDihedralsField()
 void ModelFileInitCondition::SetAtomsFieldEAM()
 {
   // init Id
-  auto atom_id = _system.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_id), atom_id);
 
   // init position
-  ArrayHandle<Vec3f> position = _system.GetFieldAsArrayHandle<Vec3f>(field::position);
+  ArrayHandle<Vec3f> position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_position), position);
 
   // init mass
-  auto mass = _system.GetFieldAsArrayHandle<Real>(field::mass);
+  auto mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
   mass.Allocate(_header._num_atoms);
   auto&& mass_protol = mass.WritePortal();
   for (int i = 0; i < _header._num_atoms; ++i)
@@ -956,10 +988,10 @@ void ModelFileInitCondition::SetAtomsFieldEAM()
     mass_protol.Set(i, _mass[_atoms_type[i]]);
   }
 
-  auto pts_type = _system.GetFieldAsArrayHandle<Id>(field::pts_type);
+  auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
 
     // init position_flag
-  auto position_flag = _system.GetFieldAsArrayHandle<Id3>(field::position_flag);
+  auto position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
   position_flag.AllocateAndFill(_header._num_atoms, { 0, 0, 0 });
 }

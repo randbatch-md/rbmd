@@ -6,19 +6,19 @@ MeshFreeSystem::MeshFreeSystem(const Configuration& cfg)
   , _unit(Get<std::string>("unit"))
 {
   InitPara();
-  SetParameter(PARA_UNIT, _unit);
+  _para.SetParameter(PARA_UNIT, _unit);
 }
 
 void MeshFreeSystem::Init()
 {
   System::Init();
-  _position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  _position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   InitPointLocator();
 }
 
 void MeshFreeSystem::InitField()
 {
-  AddField(field::position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::position, ArrayHandle<Vec3f>{});
 }
 
 void MeshFreeSystem::Evolve()
@@ -36,9 +36,9 @@ void MeshFreeSystem::InitPara()
   if (nullptr != parser)
   {
     auto& locator_node = parser->GetJsonNode("locator");
-    SetParameter(PARA_CUTOFF, static_cast<Real>(locator_node["cut_off"].asFloat()));
-    SetParameter(PARA_RS, static_cast<Real>(locator_node["rs"].asFloat()));
-    SetParameter(PARA_RANDOM_NUM, static_cast<Real>(locator_node["random_num"].asFloat()));  }
+    _para.SetParameter(PARA_CUTOFF, static_cast<Real>(locator_node["cut_off"].asFloat()));
+    _para.SetParameter(PARA_R_CORE, static_cast<Real>(locator_node["rs"].asFloat()));
+    _para.SetParameter(PARA_NEIGHBOR_SAMPLE_NUM, static_cast<Real>(locator_node["random_num"].asFloat()));  }
   else
   {
     console::Error("Parser is NULL!");
@@ -67,12 +67,12 @@ void MeshFreeSystem::InitPara()
     _unit_factor._mvv2e = 1.0364269e-4;
     _unit_factor._qqr2e = 14.399645;
   }
-  SetParameter(PARA_UNIT_FACTOR, _unit_factor);
+  _para.SetParameter(PARA_UNIT_FACTOR, _unit_factor);
 }
 
 void MeshFreeSystem::InitPointLocator()
 {
-  vtkm::Vec<vtkm::Range, 3> range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
   vtkm::Vec3f left_bottom{ {
                              static_cast<vtkm::FloatDefault>(range[0].Min),
                            },
@@ -93,9 +93,9 @@ void MeshFreeSystem::InitPointLocator()
                          } };
   _locator.SetRange(left_bottom, right_top);
 
-  _locator.SetCutOff(GetParameter<Real>(PARA_CUTOFF));
+  _locator.SetCutOff(_para.GetParameter<Real>(PARA_CUTOFF));
 
-  _locator.SetRs(GetParameter<Real>(PARA_RS));
+  _locator.SetRs(_para.GetParameter<Real>(PARA_R_CORE));
 
   _locator.SetPosition(_position);
 }

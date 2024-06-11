@@ -43,13 +43,13 @@ PEOSystem::PEOSystem(const Configuration& cfg)
   //, _use_shake(Get<bool>("use_shake"))
   , _Kmax(Get<IdComponent>("kmax"))
   , _alpha(Get<Real>("alpha"))
-  , _cut_off(GetParameter<Real>(PARA_CUTOFF))
+  , _cut_off(_para.GetParameter<Real>(PARA_CUTOFF))
 {
-  SetParameter(PARA_RBE_P, _RBE_P);
-  SetParameter(PARA_ALPHA, _alpha);
-  SetParameter(PARA_KMAX, _Kmax);
-  SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
-  SetParameter(PARA_TEMPT, Real{ 0.0 });
+  _para.SetParameter(PARA_RBE_P, _RBE_P);
+  _para.SetParameter(PARA_ALPHA, _alpha);
+  _para.SetParameter(PARA_KMAX, _Kmax);
+  _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
+  _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
 }
 
 void PEOSystem::Init()
@@ -107,10 +107,10 @@ void PEOSystem::InitialCondition()
 {
   MDSystem::InitialCondition();
   //_rho
-  _Volume = GetParameter<Real>(PARA_VOLUME);
+  _Volume = _para.GetParameter<Real>(PARA_VOLUME);
   SetCenterTargetPositions();
-  auto target_position = GetFieldAsArrayHandle<Vec3f>(field::target_position);
-  SetParameter(PARA_RDF_RHO, target_position.GetNumberOfValues() / _Volume);
+  auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
+  _para.SetParameter(PARA_RDF_RHO, target_position.GetNumberOfValues() / _Volume);
 
   PreForce();
   _nosehooverxi = 0.0;
@@ -174,7 +174,7 @@ void PEOSystem::UpdatePosition()
 
   vtkm::cont::ArrayCopy(_position, _old_position);
 
-  auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
+  auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
   //SystemWorklet::UpdatePosition(_dt, _velocity, _locator, _position);
 
@@ -216,10 +216,10 @@ void PEOSystem::UpdateVelocityByTempConType()
 
 void PEOSystem::SetCenterTargetPositions()
 {
-  auto atom_id_center = GetFieldAsArrayHandle<Id>(field::atom_id_center);
-  auto atom_id_target = GetFieldAsArrayHandle<Id>(field::atom_id_target);
-  auto center_position = GetFieldAsArrayHandle<Vec3f>(field::center_position);
-  auto target_position = GetFieldAsArrayHandle<Vec3f>(field::target_position);
+  auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
+  auto atom_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
+  auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
+  auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
 
   Invoker{}(
     MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_center, _position, center_position);
@@ -229,10 +229,10 @@ void PEOSystem::SetCenterTargetPositions()
 
 void PEOSystem::PreForce()
 {
-  _Vlength = GetParameter<Real>(PARA_VLENGTH);
+  _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   _dt = _executioner->Dt();
   // prepare for RBE force
-  auto velocity_type = GetParameter<std::string>(gtest::velocity_type);
+  auto velocity_type = _para.GetParameter<std::string>(gtest::velocity_type);
   auto random = (velocity_type != "TEST") ? true : false;
   RBEPSAMPLE rbe_presolve_psample = { _alpha, _Vlength, _RBE_P };
   rbe_presolve_psample._RBE_random = random;
@@ -304,16 +304,16 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::NearForce()
 vtkm::cont::ArrayHandle<Vec3f> PEOSystem::BondForce()
 {
   // original
-  auto bondlist = GetFieldAsArrayHandle<Id>(field::bond_atom_id);
-  auto bond_type = GetFieldAsArrayHandle<Id>(field::bond_type);
+  auto bondlist = _para.GetFieldAsArrayHandle<Id>(field::bond_atom_id);
+  auto bond_type = _para.GetFieldAsArrayHandle<Id>(field::bond_type);
   vtkm::IdComponent bondlist_num = bondlist.GetNumberOfValues();
   auto&& bondlist_group = vtkm::cont::make_ArrayHandleGroupVec<2>(bondlist);
   auto bond_num = bondlist_group.GetNumberOfValues();
 
 
   // bond_coeffs_k   bond_coeffs_equilibrium
-  auto bond_coeffs_k = GetFieldAsArrayHandle<Real>(field::bond_coeffs_k);
-  auto bond_coeffs_equilibrium = GetFieldAsArrayHandle<Real>(field::bond_coeffs_equilibrium);
+  auto bond_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k);
+  auto bond_coeffs_equilibrium = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_equilibrium);
 
   // forcebond
   vtkm::cont::ArrayHandle<Vec3f> forcebond;
@@ -332,11 +332,11 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::BondForce()
   auto bond_energy_avr =
     vtkm::cont::Algorithm::Reduce(bond_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
     bond_num;
-  SetParameter(PARA_BOND_ENERGY, bond_energy_avr);
+  _para.SetParameter(PARA_BOND_ENERGY, bond_energy_avr);
 
   vtkm::cont::ArrayHandle<Vec3f> reduce_force_bond;
   //reduce bond force
-  auto atom_id = GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   auto atom_id_number = atom_id.GetNumberOfValues();
   auto original_number = bondlist.GetNumberOfValues();
 
@@ -369,15 +369,15 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::BondForce()
 vtkm::cont::ArrayHandle<Vec3f> PEOSystem::AngleForce()
 {
   //angle
-  auto angle_list = GetFieldAsArrayHandle<Id>(field::angle_atom_id);
-  auto angle_type = GetFieldAsArrayHandle<Id>(field::angle_type);
+  auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
+  auto angle_type = _para.GetFieldAsArrayHandle<Id>(field::angle_type);
   vtkm::IdComponent anglelist_num = angle_list.GetNumberOfValues();
   auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
   auto angle_num = anglelist_group.GetNumberOfValues();
 
   // angle_coeffs_k   angle_coeffs_equilibrium
-  auto angle_coeffs_k = GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);
-  auto angle_coeffs_equilibrium = GetFieldAsArrayHandle<Real>(field::angle_coeffs_equilibrium);
+  auto angle_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);
+  auto angle_coeffs_equilibrium = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_equilibrium);
 
   // force_angle
   vtkm::cont::ArrayHandle<Vec3f> force_angle;
@@ -396,11 +396,11 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::AngleForce()
   auto angle_energy_avr =
     vtkm::cont::Algorithm::Reduce(angle_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
     angle_num;
-  SetParameter(PARA_ANGLE_ENERGY, angle_energy_avr);
+  _para.SetParameter(PARA_ANGLE_ENERGY, angle_energy_avr);
 
   vtkm::cont::ArrayHandle<Vec3f> reduce_force_angle;
   //reduce angle force
-  auto atom_id = GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   auto atom_id_number = atom_id.GetNumberOfValues();
   auto original_number = angle_list.GetNumberOfValues();
 
@@ -434,18 +434,18 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::DihedralsForce()
 {
   //std::cout << "start dihedral " << std::endl;
   //dihedrals
-  auto dihedrals_list = GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
-  auto dihedrals_type = GetFieldAsArrayHandle<Id>(field::dihedrals_type);
+  auto dihedrals_list = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
+  auto dihedrals_type = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
   vtkm::IdComponent dihedralslist_num = dihedrals_list.GetNumberOfValues();
   auto&& dihedralslist_group = vtkm::cont::make_ArrayHandleGroupVec<4>(dihedrals_list);
   auto dihedrals_num = dihedralslist_group.GetNumberOfValues();
 
   // dihedrals_coeffs_k   dihedrals_coeffs_sign     dihedrals_coeffs_multiplicity
-  auto dihedrals_coeffs_k = GetFieldAsArrayHandle<Real>(field::dihedrals_coeffs_k);
+  auto dihedrals_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::dihedrals_coeffs_k);
   auto dihedrals_coeffs_sign =
-    GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_sign);
+    _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_sign);
   auto dihedrals_coeffs_multiplicity =
-    GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
+    _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
 
   //std::cout << "dihedrals list [0] = " << dihedrals_list.ReadPortal().Get(0) << std::endl;
 
@@ -473,11 +473,11 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::DihedralsForce()
   auto dihedrals_energy_avr =
     vtkm::cont::Algorithm::Reduce(dihedrals_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
     dihedrals_num;
-  SetParameter(PARA_DIHEDRAL_ENERGY, dihedrals_energy_avr);
+  _para.SetParameter(PARA_DIHEDRAL_ENERGY, dihedrals_energy_avr);
 
   vtkm::cont::ArrayHandle<Vec3f> reduce_force_dihedrals;
   //reduce dihedrals force
-  auto atom_id = GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   auto atom_id_number = atom_id.GetNumberOfValues();
   auto original_number = dihedrals_list.GetNumberOfValues();
 
@@ -511,9 +511,9 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::DihedralsForce()
 
 vtkm::cont::ArrayHandle<Vec3f> PEOSystem::SpecialCoulForce()
 {
-  auto vLength = GetParameter<Real>(PARA_VLENGTH);
-  auto source_array = GetFieldAsArrayHandle<Id>(field::special_source_array);
-  auto offsets_array = GetFieldAsArrayHandle<Id>(field::special_offsets_array);
+  auto vLength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
+  auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
   auto groupVecArray = vtkm::cont::make_ArrayHandleGroupVecVariable(source_array, offsets_array);
 
   //auto a = _atoms_id.GetNumberOfValues();
@@ -527,9 +527,9 @@ vtkm::cont::ArrayHandle<Vec3f> PEOSystem::SpecialCoulForce()
                                            _locator,
                                            _spec_coul_force);*/
 
-  auto special_offsets = GetFieldAsArrayHandle<Id>(field::special_offsets);
-  auto special_weights = GetFieldAsArrayHandle<Real>(field::special_weights);
-  auto specoal_ids = GetFieldAsArrayHandle<Id>(field::special_ids);
+  auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+  auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
   auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
   auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
 
@@ -602,68 +602,68 @@ void PEOSystem::ComputeTempe()
   Real temperature_kB = _unit_factor._kB;
   _tempT = 0.5 * _tempT_sum / ((3 * n - 3) * temperature_kB / 2.0);
 
-  SetParameter(PARA_TEMPT_SUM, _tempT_sum);
-  SetParameter(PARA_TEMPT, _tempT);
+  _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
+  _para.SetParameter(PARA_TEMPT, _tempT);
 }
 
 void PEOSystem::SetForceFunction()
 {
   InitERF();
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
-  auto alpha = GetParameter<Real>(PARA_ALPHA);
-  auto volume = GetParameter<Real>(PARA_VOLUME);
-  auto vlength = GetParameter<Real>(PARA_VLENGTH);
-  auto Kmax = GetParameter<IdComponent>(PARA_KMAX);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
+  auto volume = _para.GetParameter<Real>(PARA_VOLUME);
+  auto vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
 
   _force_function.SetParameters(cut_off, alpha, volume, vlength, Kmax);
 }
 
 void PEOSystem::SetTopology()
 {
-  auto pts_type = GetFieldAsArrayHandle<Id>(field::pts_type);
-  auto molecule_id = GetFieldAsArrayHandle<Id>(field::molecule_id);
-  auto epsilon = GetFieldAsArrayHandle<Real>(field::epsilon);
-  auto sigma = GetFieldAsArrayHandle<Real>(field::sigma);
+  auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
+  auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
+  auto epsilon = _para.GetFieldAsArrayHandle<Real>(field::epsilon);
+  auto sigma = _para.GetFieldAsArrayHandle<Real>(field::sigma);
 
   _topology.SetAtomsType(pts_type);
   _topology.SetMolecularId(molecule_id);
   _topology.SetEpsAndSigma(epsilon, sigma);
 
-  auto source_array = GetFieldAsArrayHandle<Id>(field::special_source_array);
-  auto offsets_array = GetFieldAsArrayHandle<Id>(field::special_offsets_array);
+  auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
+  auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
   _topology.SetSourceAndOffsets(source_array, offsets_array);
 }
 
 void PEOSystem::InitField()
 {
   MDSystem::InitField();
-  AddField(field::position_flag, ArrayHandle<Id3>{});
-  AddField(field::bond_atom_id, ArrayHandle<Id>{});
-  AddField(field::bond_type, ArrayHandle<Id>{});
-  AddField(field::bond_coeffs_k, ArrayHandle<Real>{});
-  AddField(field::bond_coeffs_equilibrium, ArrayHandle<Real>{});
-  AddField(field::angle_atom_id, ArrayHandle<Id>{});
-  AddField(field::angle_type, ArrayHandle<Id>{});
-  AddField(field::angle_coeffs_k, ArrayHandle<Real>{});
-  AddField(field::angle_coeffs_equilibrium, ArrayHandle<Real>{});
-  AddField(field::atom_id_center, ArrayHandle<Id>{});
-  AddField(field::atom_id_target, ArrayHandle<Id>{});
-  AddField(field::pts_type, ArrayHandle<Id>{});
-  AddField(field::center_position, ArrayHandle<Vec3f>{});
-  AddField(field::target_position, ArrayHandle<Vec3f>{});
-  AddField(field::epsilon, ArrayHandle<Real>{});
-  AddField(field::sigma, ArrayHandle<Real>{});
-  AddField(field::signal_atoms_id, ArrayHandle<Id>{});
-  AddField(field::special_source_array, ArrayHandle<Id>{});
-  AddField(field::special_offsets_array, ArrayHandle<Id>{});
+  _para.AddField(field::position_flag, ArrayHandle<Id3>{});
+  _para.AddField(field::bond_atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::bond_type, ArrayHandle<Id>{});
+  _para.AddField(field::bond_coeffs_k, ArrayHandle<Real>{});
+  _para.AddField(field::bond_coeffs_equilibrium, ArrayHandle<Real>{});
+  _para.AddField(field::angle_atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::angle_type, ArrayHandle<Id>{});
+  _para.AddField(field::angle_coeffs_k, ArrayHandle<Real>{});
+  _para.AddField(field::angle_coeffs_equilibrium, ArrayHandle<Real>{});
+  _para.AddField(field::atom_id_center, ArrayHandle<Id>{});
+  _para.AddField(field::atom_id_target, ArrayHandle<Id>{});
+  _para.AddField(field::pts_type, ArrayHandle<Id>{});
+  _para.AddField(field::center_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::target_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::epsilon, ArrayHandle<Real>{});
+  _para.AddField(field::sigma, ArrayHandle<Real>{});
+  _para.AddField(field::signal_atoms_id, ArrayHandle<Id>{});
+  _para.AddField(field::special_source_array, ArrayHandle<Id>{});
+  _para.AddField(field::special_offsets_array, ArrayHandle<Id>{});
 
-  AddField(field::dihedrals_atom_id, ArrayHandle<Id>{});
-  AddField(field::dihedrals_type, ArrayHandle<Id>{});
-  AddField(field::dihedrals_coeffs_k, ArrayHandle<Real>{});
-  AddField(field::dihedrals_coeffs_sign, ArrayHandle<vtkm::IdComponent>{});
-  AddField(field::dihedrals_coeffs_multiplicity, ArrayHandle<vtkm::IdComponent>{});
+  _para.AddField(field::dihedrals_atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::dihedrals_type, ArrayHandle<Id>{});
+  _para.AddField(field::dihedrals_coeffs_k, ArrayHandle<Real>{});
+  _para.AddField(field::dihedrals_coeffs_sign, ArrayHandle<vtkm::IdComponent>{});
+  _para.AddField(field::dihedrals_coeffs_multiplicity, ArrayHandle<vtkm::IdComponent>{});
 
-  AddField(field::position_flag, ArrayHandle<Id3>{});
+  _para.AddField(field::position_flag, ArrayHandle<Id3>{});
 }
 
 void PEOSystem::TimeIntegration() {}

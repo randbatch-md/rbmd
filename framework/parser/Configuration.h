@@ -40,7 +40,7 @@ public:
     _parameters[name] = value;
   }
 
-private:
+
   template<typename T>
   std::enable_if_t<std::is_pointer<T>::value, T> Get_(const std::string& name) const
   {

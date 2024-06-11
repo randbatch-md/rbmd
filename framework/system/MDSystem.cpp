@@ -59,13 +59,13 @@ void MDSystem::Init()
 void MDSystem::InitialCondition()
 {
   // 物理场初始化
-  _charge = GetFieldAsArrayHandle<Real>(field::charge);
+  _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
   _topology.SetCharge(_charge);
-  _velocity = GetFieldAsArrayHandle<Vec3f>(field::velocity);
-  _mass = GetFieldAsArrayHandle<Real>(field::mass);
+  _velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
+  _mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
 
-  _molecule_id = GetFieldAsArrayHandle<Id>(field::molecule_id);
-  _atoms_id = GetFieldAsArrayHandle<Id>(field::atom_id);
+  _molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
+  _atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
 }
 
 void MDSystem::SetForceFunction() {}
@@ -91,20 +91,20 @@ void MDSystem::InitERF()
 
 void MDSystem::InitField()
 {
-  AddField(field::charge, ArrayHandle<Real>{});
-  AddField(field::velocity, ArrayHandle<Vec3f>{});
-  AddField(field::mass, ArrayHandle<Real>{});
-  AddField(field::molecule_id, ArrayHandle<Id>{});
-  AddField(field::atom_id, ArrayHandle<Id>{});
-  AddField(field::position, ArrayHandle<Vec3f>{});
-  AddField(field::special_offsets, ArrayHandle<Id>{});
-  AddField(field::special_weights, ArrayHandle<Real>{});
-  AddField(field::special_ids, ArrayHandle<Id>{});
+  _para.AddField(field::charge, ArrayHandle<Real>{});
+  _para.AddField(field::velocity, ArrayHandle<Vec3f>{});
+  _para.AddField(field::mass, ArrayHandle<Real>{});
+  _para.AddField(field::molecule_id, ArrayHandle<Id>{});
+  _para.AddField(field::atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::special_offsets, ArrayHandle<Id>{});
+  _para.AddField(field::special_weights, ArrayHandle<Real>{});
+  _para.AddField(field::special_ids, ArrayHandle<Id>{});
 }
 
 void MDSystem::UpdateVerletList() 
 {
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto N = _position.GetNumberOfValues();
   auto verletlist_num = N * N;
 
@@ -135,9 +135,9 @@ void MDSystem::UpdateVerletList()
 
 void MDSystem::ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force)
 {
-  auto rc = GetParameter<Real>(PARA_CUTOFF);
-  auto rs = GetParameter<Real>(PARA_RS);
-  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto N = _position.GetNumberOfValues();
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
@@ -147,7 +147,7 @@ void MDSystem::ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force)
   Id rs_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
   Id rc_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
   Id rcs_num = rc_num - rs_num;
-  Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
+  Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
   Id cutoff_num = rs_num + random_num;
@@ -252,7 +252,7 @@ void MDSystem::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
 {
  
 
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
  
 
   ArrayHandle<Vec2f> new_whole_rhok;
@@ -370,7 +370,7 @@ void  MDSystem::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
 
 void MDSystem::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force)
 {
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto rhok = ComputeChargeStructureFactorEwald(Vlength, Kmax);
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   SystemWorklet::ComputeNewFarElectrostatics(
@@ -383,9 +383,9 @@ void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   vtkm::cont::ArrayHandle<Vec3f> corr_force;
   corr_force.Allocate(N);
 
-  auto rc = GetParameter<Real>(PARA_CUTOFF);
-  auto rs = GetParameter<Real>(PARA_RS);
-  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
@@ -398,7 +398,7 @@ void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   Id rs_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
   Id rc_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
   Id rcs_num = rc_num - rs_num;
-  Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
+  Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
   //std::cout << "rs_num = " << rs_num << " rc_num = " << rc_num << " rcs_num = " << rcs_num
@@ -431,9 +431,9 @@ void MDSystem::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
                                           num_verletlist_group,
                                           offset_verletlist_group);
 
-  auto special_offsets = GetFieldAsArrayHandle<Id>(field::special_offsets);
-  auto special_weights = GetFieldAsArrayHandle<Real>(field::special_weights);
-  auto specoal_ids = GetFieldAsArrayHandle<Id>(field::special_ids);
+  auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+  auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
   auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
   auto weight_group =
     vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
@@ -507,9 +507,9 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   vtkm::cont::ArrayHandle<Vec3f> corr_ljforce;
   corr_ljforce.Allocate(N);
 
-  auto rc = GetParameter<Real>(PARA_CUTOFF);
-  auto rs = GetParameter<Real>(PARA_RS);
-  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
@@ -522,7 +522,7 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   Id rs_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
   Id rc_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
   Id rcs_num = rc_num - rs_num;
-  Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
+  Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
   //Id cutoff_num = rs_num + random_num;
@@ -571,9 +571,9 @@ void MDSystem::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
 
 void MDSystem::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
 {
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto N = _position.GetNumberOfValues();
-  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
   auto verletlist_num = N * max_j_num;
 
@@ -622,9 +622,9 @@ void MDSystem::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
 
 void MDSystem::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
 {
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto N = _position.GetNumberOfValues();
-  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
   auto verletlist_num = N * max_j_num;
 
@@ -656,7 +656,7 @@ void MDSystem::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
 }
 void MDSystem::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 {
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
 
   SystemWorklet::LJForceWithPeriodicBC(
     cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
@@ -665,15 +665,15 @@ void MDSystem::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
 {
   ArrayHandle<Real> fp;
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
-  auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
-  auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
-  auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
   auto N = _position.GetNumberOfValues();
 
-  auto rc = GetParameter<Real>(PARA_CUTOFF);
-  auto rs = GetParameter<Real>(PARA_RS);
-  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   vtkm::cont::ArrayHandle<Vec3f> corr_force;
   corr_force.Allocate(N);
 
@@ -684,7 +684,7 @@ void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
   Id rs_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
   Id rc_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
   Id rcs_num = rc_num - rs_num;
-  Real random_num = GetParameter<Real>(PARA_RANDOM_NUM);
+  Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
   //Id cutoff_num = rs_num + random_num;
@@ -754,14 +754,14 @@ void MDSystem::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
 void MDSystem::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
 {
  ArrayHandle<Real> fp;
- auto Vlength = GetParameter<Real>(PARA_VLENGTH);
- auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
- auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
- auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+ auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+ auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+ auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+ auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
 
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto N = _position.GetNumberOfValues();
-  auto rho_system = GetParameter<Real>(PARA_RHO);
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
   auto verletlist_num = N * max_j_num;
 
@@ -812,12 +812,12 @@ void MDSystem::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
 
 void MDSystem::ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force)
 {
-  auto cut_off = GetParameter<Real>(EAM_PARA_CUTOFF);
-  auto Vlength = GetParameter<Real>(PARA_VLENGTH);
+  auto cut_off = _para.GetParameter<Real>(EAM_PARA_CUTOFF);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
 
-  auto rhor_spline = GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
-  auto frho_spline = GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
-  auto z2r_spline = GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+  auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
 
   ArrayHandle<Real> EAM_rho;
   ArrayHandle<Real> fp;
@@ -844,11 +844,11 @@ void MDSystem::ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force)
 
 void MDSystem::ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce) 
 {
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
 
-  auto special_offsets = GetFieldAsArrayHandle<Id>(field::special_offsets);
-  auto special_weights = GetFieldAsArrayHandle<Real>(field::special_weights);
-  auto specoal_ids = GetFieldAsArrayHandle<Id>(field::special_ids);
+  auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+  auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
   auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
   auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
 

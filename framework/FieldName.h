@@ -53,8 +53,9 @@ namespace gtest
 }
 
 const std::string PARA_CUTOFF = "cut_off";
-const std::string PARA_RS = "rs";
-const std::string PARA_RANDOM_NUM = "random_num";
+const std::string PARA_R_CORE = "r_core";
+const std::string PARA_NEIGHBOR_SAMPLE_NUM = "neighbor_sample_num";
+const std::string PARA_COULOMB_SAMPLE_NUM = "coulomb_sample_num";
 const std::string PARA_VLENGTH = "vLength";
 const std::string PARA_VOLUME = "volume";
 const std::string PARA_BIN_NUMBER = "bin_number";
@@ -81,4 +82,20 @@ const std::string EAM_PARA_RHOMAX = "eam_rhomax";
 const std::string EAM_PARA_NRHO = "eam_nrho";
 const std::string EAM_PARA_DRHO = "eam_drho";
 const std::string EAM_PARA_NR = "eam_nr";
-const std::string EAM_PARA_DR = "eam_dr";const std::string PARA_DIHEDRAL_ENERGY = "dihedral_energy";
+const std::string EAM_PARA_DR = "eam_dr";
+const std::string PARA_DIHEDRAL_ENERGY = "dihedral_energy";
+
+const std::string PARA_ATOM_MAP = "atom_map";
+const std::string PARA_FORCE_FIELD_TYPE = "force_field_type";
+const std::string PARA_POTENTIAL_FILE = "potential_file";
+const std::string PARA_NEIGHBOR_TYPE = "neighbor_type";
+const std::string PARA_FIX_SHAKE = "fix_shake";
+const std::string PARA_COULOMB_TYPE = "coulomb_type";
+const std::string PARA_ENSEMBLE = "ensemble";
+const std::string PARA_TEMPERATURE = "temperature";
+const std::string PARA_PRESSURE = "pressure";
+const std::string PARA_TEMP_CTRL_TYPE = "temp_ctrl_type";
+const std::string PARA_PRESS_CTRL_TYPE = "press_ctrl_type";
+const std::string PARA_TIMESTEP = "timestep";
+const std::string PARA_NUM_STEPS = "num_steps";
+const std::string PARA_READ_FILE = "read_file";

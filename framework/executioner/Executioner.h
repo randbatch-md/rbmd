@@ -2,9 +2,9 @@
 #include "Object.h"
 #include "Types.h"
 #include "Timer.h"
-
+#include "Execution.h"
 class Application;
-class System;
+//class System;
 
 class Executioner : public Object
 {
@@ -33,8 +33,9 @@ private:
 
 protected:
   Application& _app;
-  System& _system;
+  //System& _system;
   Timer& _timer;
+  Execution& _run;
   int _num_steps;
   int _current_step;
   Real _dt, _current_time;

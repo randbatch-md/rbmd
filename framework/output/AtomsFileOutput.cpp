@@ -36,15 +36,15 @@ AtomsFileOutput::AtomsFileOutput(const Configuration& cfg)
                 });
 
   _rdf.AllocateAndFill(radius_num, 0);
-  _system.SetParameter(PARA_CENTER_TYPE, Get<vtkm::IdComponent>("center_type"));
-  _system.SetParameter(PARA_TARGET_TYPE, Get<vtkm::IdComponent>("target_type"));
+  _para.SetParameter(PARA_CENTER_TYPE, Get<vtkm::IdComponent>("center_type"));
+  _para.SetParameter(PARA_TARGET_TYPE, Get<vtkm::IdComponent>("target_type"));
 }
 
 void AtomsFileOutput::Init() 
 {
   if (_comput_RDF)
   {
-    _rdf_rho = _system.GetParameter<Real>(PARA_RDF_RHO);
+    _rdf_rho = _para.GetParameter<Real>(PARA_RDF_RHO);
     FileOutput::Init();
   }
 }
@@ -100,8 +100,8 @@ void AtomsFileOutput::ComputeRDF()
 {
   if (_executioner.CurrentStep() >= _step_lower && _executioner.CurrentStep() < _step_upper)
   {
-    auto center_position = _system.GetFieldAsArrayHandle<Vec3f>(field::center_position);
-    auto target_position = _system.GetFieldAsArrayHandle<Vec3f>(field::target_position);
+    auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
+    auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
     auto num_center_pos = center_position.GetNumberOfValues();
     ContPointLocator locator;
     SetLocator(locator);

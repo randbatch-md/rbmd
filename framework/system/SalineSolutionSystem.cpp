@@ -28,11 +28,11 @@ SalineSolutionSystem::SalineSolutionSystem(const Configuration& cfg)
   , _nearforce_type(Get<std::string>("nearforce_type"))
   , _temp_con_type(Get<std::string>("temp_con_type"))
 {
-  SetParameter(PARA_RBE_P, _RBE_P);
-  SetParameter(PARA_ALPHA, _alpha);
-  SetParameter(PARA_KMAX, _Kmax);
-  SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
-  SetParameter(PARA_TEMPT, Real{ 0.0 });
+  _para.SetParameter(PARA_RBE_P, _RBE_P);
+  _para.SetParameter(PARA_ALPHA, _alpha);
+  _para.SetParameter(PARA_KMAX, _Kmax);
+  _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
+  _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
 }
 
 void SalineSolutionSystem::Init()
@@ -48,10 +48,10 @@ void SalineSolutionSystem::Init()
 void SalineSolutionSystem::InitialCondition()
 {
   MDSystem::InitialCondition();
-  _rho = GetParameter<Real>(PARA_RHO);
+  _rho = _para.GetParameter<Real>(PARA_RHO);
   _nosehooverxi = 0.0;
 
-  SetParameter(PARA_RDF_RHO, _rho / Real{ 2.0 });
+  _para.SetParameter(PARA_RDF_RHO, _rho / Real{ 2.0 });
   SetCharge();
   PreForce();
 }
@@ -85,7 +85,7 @@ void SalineSolutionSystem::UpdateVelocity()
 void SalineSolutionSystem::UpdatePosition()
 {
   //SystemWorklet::UpdatePosition(_dt, _velocity, _locator, _position);
-  auto&& position_flag = GetFieldAsArrayHandle<Id3>(field::position_flag);
+  auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
   SystemWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
@@ -93,10 +93,10 @@ void SalineSolutionSystem::UpdatePosition()
 
 void SalineSolutionSystem::PreForce()
 {
-  _Vlength = GetParameter<Real>(PARA_VLENGTH);
+  _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   _dt = _executioner->Dt();
   // prepare for RBE force
-  auto velocity_type = GetParameter<std::string>(gtest::velocity_type);
+  auto velocity_type = _para.GetParameter<std::string>(gtest::velocity_type);
   auto random = (velocity_type != "TEST") ? true : false;
   RBEPSAMPLE rbe_presolve_psample = { _alpha, _Vlength, _RBE_P };
   rbe_presolve_psample._RBE_random = random;
@@ -114,7 +114,7 @@ void SalineSolutionSystem::PreForce()
 
 void SalineSolutionSystem::SetCharge()
 {
-  _charge = GetFieldAsArrayHandle<Real>(field::charge);
+  _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
   auto n = _position.GetNumberOfValues();
   _charge.Allocate(n);
   _charge.Fill(-1.0, 0);
@@ -193,7 +193,7 @@ void SalineSolutionSystem::TempConTypeForce()
     Real gamma = 100.0;
     //Maybe gamma = 50 is a good choice for dt = 2e-3. The choice of gamma depends on the value of dt.
     //In another words, gamma * dt can not be too small.
-    //auto&& velocity = GetFieldAsArrayHandle<Vec3f>(field::velocity);
+    //auto&& velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
     SystemWorklet::UnderdampedLangevin(_gaussian, kBT, gamma, _dt, mass, _velocity, _all_force);
   }
 }
@@ -208,8 +208,8 @@ void SalineSolutionSystem::ComputeTempe()
   _tempT_sum =
     vtkm::cont::Algorithm::Reduce(sq_velocity, vtkm::TypeTraits<Real>::ZeroInitialization());
   _tempT = 0.5 * _tempT_sum / (3 * n / 2.0);
-  SetParameter(PARA_TEMPT_SUM, _tempT_sum);
-  SetParameter(PARA_TEMPT, _tempT);
+  _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
+  _para.SetParameter(PARA_TEMPT, _tempT);
 }
 
 void SalineSolutionSystem::UpdateVelocityByTempConType()
@@ -269,12 +269,12 @@ void SalineSolutionSystem::PostSolve()
 void SalineSolutionSystem::InitField()
 {
   MDSystem::InitField();
-  AddField(field::pts_type , ArrayHandle<Id>{});
-  AddField(field::position_flag, ArrayHandle<Id3>{});
-  AddField(field::center_position, ArrayHandle<Vec3f>{});
-  AddField(field::target_position, ArrayHandle<Vec3f>{});
-  AddField(field::epsilon, ArrayHandle<Real>{});
-  AddField(field::sigma, ArrayHandle<Real>{});
+  _para.AddField(field::pts_type , ArrayHandle<Id>{});
+  _para.AddField(field::position_flag, ArrayHandle<Id3>{});
+  _para.AddField(field::center_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::target_position, ArrayHandle<Vec3f>{});
+  _para.AddField(field::epsilon, ArrayHandle<Real>{});
+  _para.AddField(field::sigma, ArrayHandle<Real>{});
 }
 
 void SalineSolutionSystem::SetCenterTargetPositions()
@@ -296,10 +296,10 @@ void SalineSolutionSystem::SetCenterTargetPositions()
     write_prot_target.Set(i, read_prot_target.Get(i + (num_pos / 2)));
   }
 
-  auto center_position = GetFieldAsArrayHandle<Vec3f>(field::center_position);
+  auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
   vtkm::cont::ArrayCopy(center_position_temp, center_position);
 
-  auto target_position = GetFieldAsArrayHandle<Vec3f>(field::target_position);
+  auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
   vtkm::cont::ArrayCopy(target_position_temp, target_position);
 }
 
@@ -308,21 +308,21 @@ void SalineSolutionSystem::TimeIntegration() {}
 void SalineSolutionSystem::SetForceFunction()
 {
   InitERF();
-  auto cut_off = GetParameter<Real>(PARA_CUTOFF);
-  auto alpha = GetParameter<Real>(PARA_ALPHA);
-  auto volume = GetParameter<Real>(PARA_VOLUME);
-  auto vlength = GetParameter<Real>(PARA_VLENGTH);
-  auto Kmax = GetParameter<IdComponent>(PARA_KMAX);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
+  auto volume = _para.GetParameter<Real>(PARA_VOLUME);
+  auto vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
 
   _force_function.SetParameters(cut_off, alpha, volume, vlength, Kmax);
 }
 
 void SalineSolutionSystem::SetTopology()
 {
-  auto pts_type = GetFieldAsArrayHandle<Id>(field::pts_type);
-  auto molecule_id = GetFieldAsArrayHandle<Id>(field::molecule_id);
-  auto epsilon = GetFieldAsArrayHandle<Real>(field::epsilon);
-  auto sigma = GetFieldAsArrayHandle<Real>(field::sigma);
+  auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
+  auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
+  auto epsilon = _para.GetFieldAsArrayHandle<Real>(field::epsilon);
+  auto sigma = _para.GetFieldAsArrayHandle<Real>(field::sigma);
   _topology.SetAtomsType(pts_type);
   _topology.SetMolecularId(molecule_id);
   _topology.SetEpsAndSigma(epsilon, sigma);
