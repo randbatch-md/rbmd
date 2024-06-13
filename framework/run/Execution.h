@@ -13,11 +13,18 @@ public:
     , _para(*(_app.GetParameter())){};
 
   ~Execution() = default;
-
+  void Run() 
+  { Init();
+  };
   virtual void Init(){};
   virtual void Execute() = 0;
   virtual void SetParameters(){};
   auto& GetTimer() { return this->_timer; }
+
+
+
+
+
 
 protected:
   Application& _app;

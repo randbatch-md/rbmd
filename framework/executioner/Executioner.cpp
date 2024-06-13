@@ -9,13 +9,14 @@
 Executioner::Executioner(const Configuration& cfg)
   : Object(cfg)
   , _app(*(Get<Application*>("_app")))
+  , _para(*(_app.GetParameter()))
   //, _system(*(_app.GetSystem()))
   , _run(*(_app.GetRun()))
   , _timer(_run.GetTimer())
-  , _dt(Get<Real>("dt"))
+  , _dt(_para.GetParameter<Real>(PARA_TIMESTEP))
   , _start_time(0)
   , _current_time(0)
-  , _num_steps(Get<int>("num_steps"))
+  , _num_steps(_para.GetParameter<Real>(PARA_NUM_STEPS))
   , _end_time(std::numeric_limits<Real>::max())
 {
   _current_step = 0;
@@ -28,10 +29,10 @@ void Executioner::Init()
   //_system.Init();
   _run.Init();
 
-  for (auto& output : _app.GetOutputWarehouse())
-  {
-    output->Init();
-  }
+  //for (auto& output : _app.GetOutputWarehouse())
+  //{
+  //  output->Init();
+  //}
 }
 
 void Executioner::Execute()
@@ -42,7 +43,7 @@ void Executioner::Execute()
   {
     Timer time;
     time.Start();
-    PreStep();
+    //PreStep();
     TakeStep();
     PostStep();
   }

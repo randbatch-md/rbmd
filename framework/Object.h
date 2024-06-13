@@ -20,6 +20,13 @@ public:
     return _cfg.Get<T>(name);
   }
 
+  //添加用来做判断
+  template<typename T>
+  T GetJudge(const std::string& name) const
+  {
+    return _cfg.GetJudge<T>(name);
+  }
+
   template<typename T>
   T Get(const std::string& name, const T& value) const
   {
@@ -30,6 +37,13 @@ public:
   std::vector<T> GetVectorValue(const std::string& name)
   {
     return _cfg.GetVectorValue<T>(name);
+  }
+
+  //添加用来做判断
+  template<typename T>
+  std::vector<T> GetVectorValueJudge(const std::string& name)
+  {
+    return _cfg.GetVectorValueJudge<T>(name);
   }
 
 protected:

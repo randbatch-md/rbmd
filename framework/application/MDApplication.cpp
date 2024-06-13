@@ -1,10 +1,5 @@
 ﻿
 #include "MDApplication.h"
-//#include "AddOutputAction.h"
-//#include "CreateExecutionerAction.h"
-//#include "CreateSystemAction.h"
-//#include "SetupDeviceAction.h"
-//#include "CreateInitConditionAction.h"
 #include "Executioner.h"
 #include "CommandLine.h"
 #include "ModelFileInitCondition.h"
@@ -16,6 +11,7 @@
 #include "ExecutionNPT.h"
 #include "ExecutionNVE.h"
 #include "ExecutionNVT.h"
+#include "H2OSystem.h"
 MDApplication::MDApplication(int argc, char** argv)
   : Application(argc, argv)
 {
@@ -23,6 +19,8 @@ MDApplication::MDApplication(int argc, char** argv)
   _parser = std::make_shared<JsonParser>(_ifile);
   _cfg = std::make_shared<Configuration>();
   _parameter = std::make_shared<Para>();   // 这里要提前将app中的Para生成好，后面才会存在一个para中；
+  _parameter->SetParameter(PARA_FAR_FORCE, false);
+  _parameter->SetParameter(PARA_DIHEDRALS_FORCE, false);
 }
 
 void MDApplication::PrintLogo()
@@ -38,7 +36,7 @@ void MDApplication::Run()
   ParseCLI();
   CreateCommandom();
   //CreateActions();
-  SetupDevice();
+  //SetupDevice();
 
   RunExecutioner();
 }
@@ -66,8 +64,9 @@ void MDApplication::CreateActions()
 void MDApplication::CreateCommandom()
 {
   // 初始化配置文件节点
-  InitConfigurationCommandom();
   HyperParametersCommandom();
+  InitConfigurationCommandom();
+  //HyperParametersCommandom();
   ExecutionCommandom();
   OutputsCommandom();
 }
@@ -140,11 +139,16 @@ void MDApplication::HyperParametersCommandom()
     {
       _hyper_parameters = std::make_shared<Coulomb>(cfg);
       _hyper_parameters->Execute();
+      _parameter->SetParameter(PARA_FAR_FORCE, true);
     }
     else if (parameter == "extend")
     {
       _hyper_parameters = std::make_shared<Extend>(cfg);
       _hyper_parameters->Execute();
+
+      if (!_parameter->GetParameter<std::vector<int>>(PARA_SPECIAL_BONDS).empty())
+        _parameter->SetParameter(PARA_DIHEDRALS_FORCE, true);   
+      auto b = _parameter->GetParameter<bool>(PARA_DIHEDRALS_FORCE);  
     }
     else
       std::cout << "hyper_parameters is wrong" << std::endl;
@@ -170,13 +174,20 @@ void MDApplication::ExecutionCommandom()
   }
   else if (ensemble == "NVT")
   {
+    //_run = std::make_shared<ExecutionTest>(cfg);
     _run = std::make_shared<ExecutionNVT>(cfg);
+  }
+  else if (ensemble == "TEST")
+  {
+    //_run = std::make_shared<ExecutionTest>(cfg);
   }
   else
   {
     std::cout << "Json File Error:the ensemble of execution is unknown" << std::endl;
     exit(0);
   }
+  //_system = std::make_shared<H2OSystem>(cfg);
+  _executioner = std::make_shared<Executioner>(cfg);
 
   // // Execution中还有2个二级标题（temperature 和 pressure）暂时改为了数组
   // std::vector<std::string> executions;

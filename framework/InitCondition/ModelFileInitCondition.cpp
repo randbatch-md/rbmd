@@ -12,8 +12,7 @@
 
 //RegisterObject(ModelFileInitCondition);
 ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
-  : MeshFreeFileInitCondition(cfg), 
-    _special_bonds(GetVectorValue<Real>("special_bonds"))
+  : MeshFreeFileInitCondition(cfg)
 {
   group_id_init.insert(std::make_pair("wat", MolecularType::H20));
   group_id_init.insert(std::make_pair("nacl", MolecularType::NACL));
@@ -77,11 +76,15 @@ void ModelFileInitCondition::InitField()
   _para.AddField(field::target_position, ArrayHandle<Vec3f>{});
   _para.AddField(field::epsilon, ArrayHandle<Real>{});
   _para.AddField(field::sigma, ArrayHandle<Real>{});
-  _para.AddField(field::dihedrals_atom_id, ArrayHandle<Id>{});
-  _para.AddField(field::dihedrals_type, ArrayHandle<Id>{});
   _para.AddField(field::signal_atoms_id, ArrayHandle<Id>{});
   _para.AddField(field::special_source_array, ArrayHandle<Id>{});
   _para.AddField(field::special_offsets_array, ArrayHandle<Id>{});
+
+  _para.AddField(field::dihedrals_atom_id, ArrayHandle<Id>{});
+  _para.AddField(field::dihedrals_type, ArrayHandle<Id>{});
+  _para.AddField(field::dihedrals_coeffs_k, ArrayHandle<Real>{});
+  _para.AddField(field::dihedrals_coeffs_sign, ArrayHandle<vtkm::IdComponent>{});
+  _para.AddField(field::dihedrals_coeffs_multiplicity, ArrayHandle<vtkm::IdComponent>{});
 }
 
 void ModelFileInitCondition::Header(std::ifstream& file)
@@ -756,14 +759,14 @@ void ModelFileInitCondition::SetAtomsField()
 
   auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
-
+ // 注意：暂时注释!!!!!!!!!!!!!!!!!!!!!!!!!配合out使用！！！！！！！！！！！！！！！！！！！！！！
   // Init Center_Target Position
-  auto center_type = _para.GetParameter<IdComponent>(PARA_CENTER_TYPE);
+  auto center_type = 0; //_para.GetParameter<IdComponent>(PARA_CENTER_TYPE);
   auto atoms_center = _atoms_map[center_type];
   auto atoms_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_center), atoms_id_center);
-
-  auto target_type = _para.GetParameter<IdComponent>(PARA_TARGET_TYPE);
+ 
+  auto target_type = 0; // _para.GetParameter<IdComponent>(PARA_TARGET_TYPE);
   auto atoms_target = _atoms_map[target_type];
   auto atoms_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_target), atoms_id_target);
@@ -799,7 +802,11 @@ void ModelFileInitCondition::SetBondField()
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bond_coeffs_equilibrium_temp),
                         bond_coeffs_equilibrium);
 
-  SetSpecialBonds();
+  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+  {
+    _special_bonds = _para.GetParameter<std::vector<int>>(PARA_SPECIAL_BONDS);
+    SetSpecialBonds();
+  }
 }
 
 void ModelFileInitCondition::SetSpecialBonds() 

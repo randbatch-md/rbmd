@@ -75,6 +75,17 @@ void LJInitCondition::SetParameters()
   _para.SetParameter(PARA_RANGE, range);
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
 
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  //auto xLength = _para.GetParameter<Real>(PARA_VLENGTH);
+  //auto yLength = xLength;
+  //auto zLength = xLength;
+  auto bin_number = Id3{
+    static_cast<int>(xLength / cut_off),
+    static_cast<int>(yLength / cut_off),
+    static_cast<int>(zLength / cut_off),
+  };
+  _para.SetParameter(PARA_BIN_NUMBER, bin_number);
+
   // 注意：这里要放到后面填充！！！！！因为cut_off暂时不知道；
   // auto cut_off = GetParameter<Real>(PARA_CUTOFF);
   // auto bin_number = Id3{

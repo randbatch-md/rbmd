@@ -3,7 +3,7 @@
 //#include "Register.h"
 #include <vtkm/cont/RuntimeDeviceTracker.h>
 #include "InitGlobal.h"
-#include "SetupDeviceAction.h"
+//#include "SetupDeviceAction.h"
 
 Application::Application(int argc, char** argv)
 {

@@ -68,10 +68,32 @@ public:
     console::Error(name, "不存在");
   }
 
+  // 添加用来数据判断
+  template<typename T>
+  std::enable_if_t<!std::is_pointer<T>::value, T> Get_Judge(const std::string& name) const
+  {
+    if (HaveInJsonNode(name))
+    {
+      Json::Value* json_node = linb::any_cast<Json::Value*>(_parameters.at("_json_node"));
+      return (*json_node)[name].as<T>();
+    }
+    else
+    {
+      return "null";
+    }
+  }
+
   template<typename T>
   T Get(const std::string& name) const
   {
     return Get_<T>(name);
+  }
+
+  // 添加用来数据判断
+  template<typename T>
+  T GetJudge(const std::string& name) const
+  {
+    return Get_Judge<T>(name);
   }
 
   template<typename T>
@@ -113,6 +135,30 @@ public:
     }
 
     console::Error(name, "不存在");
+  }
+
+  // 添加用来数据判断
+  template<typename T>
+  std::vector<T> GetVectorValueJudge(const std::string& name) const
+  {
+    if (HaveInJsonNode(name))
+    {
+      Json::Value* json_node = linb::any_cast<Json::Value*>(_parameters.at("_json_node"));
+      auto& node = (*json_node)[name];
+      if (node.isArray())
+      {
+        std::vector<T> value;
+        for (auto i = 0; i < node.size(); ++i)
+        {
+          value.push_back(node[i].as<T>());
+        }
+        return value;
+      }
+    }
+    else
+    {
+      return std::vector<T>();
+    }
   }
 
   bool Have(const std::string& name) const;

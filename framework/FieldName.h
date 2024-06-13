@@ -99,3 +99,7 @@ const std::string PARA_PRESS_CTRL_TYPE = "press_ctrl_type";
 const std::string PARA_TIMESTEP = "timestep";
 const std::string PARA_NUM_STEPS = "num_steps";
 const std::string PARA_READ_FILE = "read_file";
+
+const std::string PARA_FAR_FORCE = "far_force";
+const std::string PARA_DIHEDRALS_FORCE = "dihedrals_force";
+const std::string PARA_SPECIAL_BONDS = "special_bonds";
