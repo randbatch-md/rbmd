@@ -79,4 +79,5 @@ protected:
   ContPointLocator _locator;
 
   ContStaticTable _static_table;
+  std::string _init_way;
 };

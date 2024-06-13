@@ -110,20 +110,30 @@ void ExecutionNVT::ComputeAllForce()
 {
   // FarNearLJforce
   //RunWorklet::SumFarNearLJForce(EleNewForce(), EleNearForce(), LJForce(), _all_force); //RBE + LJ
-  RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force); //RBE + LJ
-  // special coul
-  Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
-
-  //all force with bondforce
-  Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
-
-  //all force with angleforce
-  Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
-
-  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
   {
-    //all force with dihedral+force
-    Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
+    RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force); //RBE + LJ
+  }
+  else
+  {
+    NearForceLJ();
+  }
+
+  if (_init_way != "inbuild")
+  { 
+    Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
+    
+    //all force with bondforce
+    Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
+    
+    //all force with angleforce
+    Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
+    
+    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+    {
+      //all force with dihedral+force
+      Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
+    }
   }
 }
 
@@ -160,7 +170,7 @@ void ExecutionNVT::UpdatePosition()
 
   vtkm::cont::ArrayCopy(_position, _old_position);
 
-  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null")
+  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild")
   {
     auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
     RunWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
@@ -176,7 +186,7 @@ void ExecutionNVT::UpdatePosition()
 
 void ExecutionNVT::UpdateVelocityByTempConType()
 {
-    // tauT 和 dt_divide_taut 与 temperature[3] 相关 目前暂定统一为一个常量
+    // ！注意：tauT 和 dt_divide_taut 与 temperature[3] 相关 目前暂定统一为一个常量
   _temp_con_type = _para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE);
   if (_temp_con_type == "NOSE_HOOVER")
   {
@@ -204,7 +214,7 @@ void ExecutionNVT::UpdateVelocityByTempConType()
     //The selection of dt_divide_taut determines the temperature equilibrium time.
     
     //Real dt_divide_taut = 0.02;
-    Real dt_divide_taut = 0.1;
+    Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ 默认是这个？？？？？？
     Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
     RunWorklet::UpdateVelocityRescale(coeff_Berendsen, _velocity);
   }
@@ -212,16 +222,42 @@ void ExecutionNVT::UpdateVelocityByTempConType()
 
 void ExecutionNVT::SetCenterTargetPositions()
 {
-  auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
-  auto atom_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
-  auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
-  auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
+  if (_init_way == "inbuild")
+  {
+    auto num_pos = _position.GetNumberOfValues();
+    vtkm::cont::ArrayHandle<vtkm::Vec3f> center_position_temp;
+    center_position_temp.Allocate(num_pos / 2);
+    auto&& write_prot_center = center_position_temp.WritePortal();
+    auto&& read_prot_center = _position.ReadPortal();
 
-  Invoker{}(
-    MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_center, _position, center_position);
-  Invoker{}(
-    MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_target, _position, target_position);
-}
+    vtkm::cont::ArrayHandle<vtkm::Vec3f> target_position_temp;
+    target_position_temp.Allocate(num_pos / 2);
+    auto&& write_prot_target = target_position_temp.WritePortal();
+    auto&& read_prot_target = _position.ReadPortal();
+
+    for (int i = 0; i < num_pos / 2; i++)
+    {
+      write_prot_center.Set(i, read_prot_center.Get(i));
+      write_prot_target.Set(i, read_prot_target.Get(i + (num_pos / 2)));
+    }
+
+    auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
+    vtkm::cont::ArrayCopy(center_position_temp, center_position);
+
+    auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
+    vtkm::cont::ArrayCopy(target_position_temp, target_position);
+  }
+  else
+  {
+    auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
+    auto atom_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
+    auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
+    auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
+
+    Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_center, _position, center_position);
+    Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_target, _position, target_position);
+  }
+ }
 
 void ExecutionNVT::PreForce()
 {
@@ -296,6 +332,24 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForce()
     RunWorklet::SumFarNearForce(EleNearForce(), LJForce(), _nearforce);
   }
   return _nearforce;
+}
+
+vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
+{
+  _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
+  if (_nearforce_type == "RBL")
+  {
+    ComputeRBLLJForce(_all_force);
+  }
+  else if (_nearforce_type == "VERLETLIST")
+  {
+    ComputeVerletlistLJForce(_all_force);
+  }
+  else if (_nearforce_type == "ORIGINAL")
+  {
+    ComputeOriginalLJForce(_all_force);
+  }
+  return _all_force;
 }
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
@@ -601,8 +655,6 @@ void ExecutionNVT::ComputeTempe()
   //When shake is called, dof_shake = n(number of atoms of water); otherwise, dof_shake = 0
   // 3 is the extra dof
   ///////////////////////////////////////////////////////////////////////
-  /*IdComponent dof_shake = _use_shake ? n : 0;
-  auto field = _use_shake ? 3 : 0;*/
   auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
   Real temperature_kB = _unit_factor._kB;
   if (shake == "null")
@@ -613,9 +665,13 @@ void ExecutionNVT::ComputeTempe()
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n ) * temperature_kB / 2.0);
   }
-  else
+  else if (shake == "true")
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - n - 3) * temperature_kB / 2.0);
+  }
+  else
+  {
+    _tempT = 0.5 * _tempT_sum / (3 * n / 2.0);
   }
   _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   _para.SetParameter(PARA_TEMPT, _tempT);
@@ -644,9 +700,12 @@ void ExecutionNVT::SetTopology()
   _topology.SetMolecularId(molecule_id);
   _topology.SetEpsAndSigma(epsilon, sigma);
 
-  auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
-  auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
-  _topology.SetSourceAndOffsets(source_array, offsets_array);
+  if (_init_way != "inbuild")
+  {
+    auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
+    auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
+    _topology.SetSourceAndOffsets(source_array, offsets_array);
+  }
 }
 
 void ExecutionNVT::InitParameters()
@@ -657,6 +716,7 @@ void ExecutionNVT::InitParameters()
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
   _alpha = _para.GetParameter<Real>(PARA_ALPHA);
+  _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
 }
 
 //void ExecutionNVT::InitField()

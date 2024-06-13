@@ -90,7 +90,8 @@ void MDApplication::InitConfigurationCommandom()
       //cfg.Add<Json::Value*>("_json_node", &init_child_node);
       _init_condition = std::make_shared<ModelFileInitCondition>(cfg);
       _init_condition->Execute();
-      //_init_condition->InitParameter();
+      _parameter->SetParameter(PARA_INIT_WAY, (std::string)"read_data");   
+
 
       //_parameters = std::make_shared<ReadData>(cfg);
       //_parameters->Execute();
@@ -102,6 +103,9 @@ void MDApplication::InitConfigurationCommandom()
       //cfg.Add<Application*>("_app", this);
       _init_condition = std::make_shared<LJInitCondition>(cfg); // 调用一次这个就可以初始化
       _init_condition->Execute(); // 这里是初始化了各个参数；
+      _parameter->SetParameter(PARA_INIT_WAY, (std::string) "inbuild");      
+      auto _init_way = _parameter->GetParameter<std::string>(PARA_INIT_WAY);
+
 
       //_init_condition->InitParameter();
       //_init_condition->Execute();
@@ -148,7 +152,6 @@ void MDApplication::HyperParametersCommandom()
 
       if (!_parameter->GetParameter<std::vector<int>>(PARA_SPECIAL_BONDS).empty())
         _parameter->SetParameter(PARA_DIHEDRALS_FORCE, true);   
-      auto b = _parameter->GetParameter<bool>(PARA_DIHEDRALS_FORCE);  
     }
     else
       std::cout << "hyper_parameters is wrong" << std::endl;
@@ -186,7 +189,6 @@ void MDApplication::ExecutionCommandom()
     std::cout << "Json File Error:the ensemble of execution is unknown" << std::endl;
     exit(0);
   }
-  //_system = std::make_shared<H2OSystem>(cfg);
   _executioner = std::make_shared<Executioner>(cfg);
 
   // // Execution中还有2个二级标题（temperature 和 pressure）暂时改为了数组

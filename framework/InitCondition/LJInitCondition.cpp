@@ -74,7 +74,7 @@ void LJInitCondition::SetParameters()
   _para.SetParameter(PARA_RHO, num_pos / (xLength * yLength * zLength));
   _para.SetParameter(PARA_RANGE, range);
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
-
+  _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   //auto xLength = _para.GetParameter<Real>(PARA_VLENGTH);
   //auto yLength = xLength;

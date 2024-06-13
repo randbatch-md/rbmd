@@ -19,6 +19,8 @@ private:
   vtkm::cont::ArrayHandle<Vec3f> LJForce();
   vtkm::cont::ArrayHandle<Vec3f> EleNearForce();
   vtkm::cont::ArrayHandle<Vec3f> NearForce(); // NearForce: EleNearForce and LJforce
+  vtkm::cont::ArrayHandle<Vec3f> NearForceLJ(); // NearForce: EleNearForce and LJforce
+
   vtkm::cont::ArrayHandle<Vec3f> BondForce();
   vtkm::cont::ArrayHandle<Vec3f> AngleForce();
   vtkm::cont::ArrayHandle<Vec3f> DihedralsForce();

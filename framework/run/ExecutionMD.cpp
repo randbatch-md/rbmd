@@ -91,7 +91,7 @@ ExecutionMD::ExecutionMD(const Configuration& cfg)
 void ExecutionMD::Init()
 {
   _position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
-  InitPointLocator();
+  InitPointLocator(); 
   SetForceFunction();
   SetTopology();
 
@@ -130,8 +130,21 @@ void ExecutionMD::SetParameters()
 void ExecutionMD::InitialCondition()
 {
   // 物理场初始化
-  _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
-  _topology.SetCharge(_charge);
+  if (_init_way == "inbuild")
+  {
+    _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+    auto n = _position.GetNumberOfValues();
+    _charge.Allocate(n);
+    _charge.Fill(-1.0, 0);
+    _charge.Fill(1.0, n / 2);
+    _topology.SetCharge(_charge);
+  }
+  else
+  {
+    _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+    _topology.SetCharge(_charge);
+  }
+
   _velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
   _mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
 

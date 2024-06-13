@@ -103,3 +103,5 @@ const std::string PARA_READ_FILE = "read_file";
 const std::string PARA_FAR_FORCE = "far_force";
 const std::string PARA_DIHEDRALS_FORCE = "dihedrals_force";
 const std::string PARA_SPECIAL_BONDS = "special_bonds";
+
+const std::string PARA_INIT_WAY = "init_way";
