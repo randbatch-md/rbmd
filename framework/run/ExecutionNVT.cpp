@@ -20,7 +20,8 @@
 #include <vtkm/worklet/WorkletMapField.h>
 #include <vtkm/worklet/WorkletReduceByKey.h>
 
-//RegisterObject(ExecutionNVT);
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 template<typename T>
 void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
@@ -43,6 +44,13 @@ ExecutionNVT::ExecutionNVT(const Configuration& cfg)
 
 void ExecutionNVT::Init()
 {
+  if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  {
+    _potential_file.open(_para.GetParameter<std::string>(PARA_POTENTIAL_FILE));
+    ReadPotentialFile(_potential_file);
+    InitStyle();
+  }
+
   ExecutionMD::Init();
 
   InitialCondition();
@@ -114,6 +122,10 @@ void ExecutionNVT::ComputeAllForce()
   {
     RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force); //RBE + LJ
   }
+  else if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  {
+    NearForceEAM();
+  }
   else
   {
     NearForceLJ();
@@ -170,7 +182,8 @@ void ExecutionNVT::UpdatePosition()
 
   vtkm::cont::ArrayCopy(_position, _old_position);
 
-  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild")
+  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild" ||
+      _para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
   {
     auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
     RunWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
@@ -348,6 +361,23 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   else if (_nearforce_type == "ORIGINAL")
   {
     ComputeOriginalLJForce(_all_force);
+  }
+  return _all_force;
+}
+
+vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceEAM()
+{
+  if (_nearforce_type == "RBL")
+  {
+    ComputeRBLEAMForce(_all_force);
+  }
+  else if (_nearforce_type == "VERLETLIST")
+  {
+    ComputeVerletlistEAMForce(_all_force);
+  }
+  else if (_nearforce_type == "ORIGINAL")
+  {
+    ComputeOriginalEAMForce(_all_force);
   }
   return _all_force;
 }
@@ -661,7 +691,7 @@ void ExecutionNVT::ComputeTempe()
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - 3) * temperature_kB / 2.0);
   }
-  else if (shake == "false")
+  else if (shake == "false" || _para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n ) * temperature_kB / 2.0);
   }
@@ -811,4 +841,226 @@ void ExecutionNVT::ConstraintB()
 
 
   vtkm::cont::ArrayCopy(_old_velocity, _velocity);
+}
+
+void ExecutionNVT::ReadPotentialFile(std::ifstream& input_file)
+{
+  // 检查文件是否打开成功
+  if (!input_file.is_open())
+  {
+    std::cerr << "Unable to open the file." << std::endl;
+  }
+
+  // 跳过前两行
+  for (int i = 0; i < 2; ++i)
+  {
+    input_file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+
+  // 开始读取第三行的值
+  input_file >> file.nrho >> file.drho >> file.nr >> file.dr >> file.cut_off;
+
+  //
+  file.frho.resize(file.nrho + 1);
+  file.zr.resize(file.nr + 1);
+  file.rhor.resize(file.nrho + 1);
+
+  // 读取并保存 frho 数组
+
+  for (int i = 0; i < file.nrho; ++i)
+  {
+    input_file >> file.frho[i];
+  }
+
+  // 读取并保存 zr 数组
+
+  for (int i = 0; i < file.nr; ++i)
+  {
+    input_file >> file.zr[i];
+  }
+
+  // 读取并保存 rhor 数组
+
+  for (int i = 0; i < file.nrho; ++i)
+  {
+    input_file >> file.rhor[i];
+  }
+
+  // 关闭文件
+  input_file.close();
+}
+
+void ExecutionNVT::AllocateEAM() {}
+
+void ExecutionNVT::file2array()
+{
+  Id i, j, k, m, n;
+  Real sixth = 1.0 / 6.0;
+  // auto ntypes = _header._num_atoms_type;
+
+  Real rmax;
+  dr = drho = rmax = rhomax = 0.0;
+
+  dr = MAX(dr, file.dr);
+  drho = MAX(drho, file.drho);
+  rmax = MAX(rmax, (file.nr - 1) * file.dr);
+  rhomax = MAX(rhomax, (file.nrho - 1) * file.drho);
+
+  // set nr,nrho from cutoff and spacings
+  // 0.5 is for round-off in divide
+
+  nr = static_cast<int>(rmax / dr + 0.5);
+  nrho = static_cast<int>(rhomax / drho + 0.5);
+
+  // ------------------------------------------------------------------
+  // setup frho arrays
+  // ------------------------------------------------------------------
+  frho.resize(nrho + 1);
+
+  Real r, p, cof1, cof2, cof3, cof4;
+  for (m = 1; m <= nrho; m++)
+  {
+    r = (m - 1) * drho;
+    p = r / file.drho + 1.0;
+    k = static_cast<int>(p);
+    k = MIN(k, file.nrho - 2);
+    k = MAX(k, 2);
+    p -= k;
+    p = MIN(p, 2.0);
+    cof1 = -sixth * p * (p - 1.0) * (p - 2.0);
+    cof2 = 0.5 * (p * p - 1.0) * (p - 2.0);
+    cof3 = -0.5 * p * (p + 1.0) * (p - 2.0);
+    cof4 = sixth * p * (p * p - 1.0);
+    frho[m] = cof1 * file.frho[k - 1] + cof2 * file.frho[k] + cof3 * file.frho[k + 1] +
+      cof4 * file.frho[k + 2];
+  }
+
+  // ------------------------------------------------------------------
+  // setup rhor arrays
+  // ------------------------------------------------------------------
+  rhor.resize(nrho + 1);
+  for (m = 1; m <= nr; m++)
+  {
+    r = (m - 1) * dr;
+    p = r / file.dr + 1.0;
+    k = static_cast<int>(p);
+    k = MIN(k, file.nr - 2);
+    k = MAX(k, 2);
+    p -= k;
+    p = MIN(p, 2.0);
+    auto cof1 = -sixth * p * (p - 1.0) * (p - 2.0);
+    auto cof2 = 0.5 * (p * p - 1.0) * (p - 2.0);
+    auto cof3 = -0.5 * p * (p + 1.0) * (p - 2.0);
+    auto cof4 = sixth * p * (p * p - 1.0);
+    rhor[m] = cof1 * file.rhor[k - 1] + cof2 * file.rhor[k] + cof3 * file.rhor[k + 1] +
+      cof4 * file.rhor[k + 2];
+  }
+
+  // ------------------------------------------------------------------
+  // setup z2r arrays
+  // ------------------------------------------------------------------
+  z2r.resize(nr + 1);
+
+  double zri;
+  for (m = 1; m <= nr; m++)
+  {
+    r = (m - 1) * dr;
+
+    p = r / file.dr + 1.0;
+    k = static_cast<int>(p);
+    k = MIN(k, file.nr - 2);
+    k = MAX(k, 2);
+    p -= k;
+    p = MIN(p, 2.0);
+    cof1 = -sixth * p * (p - 1.0) * (p - 2.0);
+    cof2 = 0.5 * (p * p - 1.0) * (p - 2.0);
+    cof3 = -0.5 * p * (p + 1.0) * (p - 2.0);
+    cof4 = sixth * p * (p * p - 1.0);
+    zri = cof1 * file.zr[k - 1] + cof2 * file.zr[k] + cof3 * file.zr[k + 1] + cof4 * file.zr[k + 2];
+
+    z2r[m] = 27.2 * 0.529 * zri * zri;
+  }
+}
+
+void ExecutionNVT::interpolate(Id n, Real delta, std::vector<Real>& f, std::vector<Vec7f>& spline)
+{
+  for (int m = 1; m <= n; m++)
+  {
+    spline[m][6] = f[m];
+  }
+
+  spline[1][5] = spline[2][6] -
+    spline[1][6]; //f'(x) = (f(x + h) - f(x)) / h    [5] 为一阶导数的系数， 能量表达式的系数
+  spline[2][5] = 0.5 * (spline[3][6] - spline[1][6]);
+  spline[n - 1][5] = 0.5 * (spline[n][6] - spline[n - 2][6]);
+  spline[n][5] = spline[n][6] - spline[n - 1][6];
+
+  for (int m = 3; m <= n - 2; m++)
+  {
+    spline[m][5] =
+      ((spline[m - 2][6] - spline[m + 2][6]) + 8.0 * (spline[m + 1][6] - spline[m - 1][6])) /
+      12.0; //使用更远的样本点以获得更准确的估计
+  }
+
+  for (int m = 1; m <= n - 1; m++)
+  {
+    spline[m][4] = 3.0 * (spline[m + 1][6] - spline[m][6]) - 2.0 * spline[m][5] -
+      spline[m + 1][5]; //[4] 为二阶导数的系数
+    spline[m][3] = spline[m][5] + spline[m + 1][5] -
+      2.0 * (spline[m + 1][6] - spline[m][6]); // [3]为三阶导数的系数
+  }
+
+  spline[n][4] = 0.0;
+  spline[n][3] = 0.0; //最后一个样本点处的二阶和三阶导数的系数为零,
+    //为了使插值曲线在两端更平滑，可以将边界处的高阶导数系数设置为零。
+    //这是因为样条插值通常在内部样本点上使用高阶多项式插值，而在边界处使用较低阶的多项式以确保平滑性。
+
+  for (int m = 1; m <= n; m++)
+  {
+    spline[m][2] = spline[m][5] / delta;       //二次导数的系数。   力表达式的系数
+    spline[m][1] = 2.0 * spline[m][4] / delta; //一次导数的系数
+    spline[m][0] = 3.0 * spline[m][3] / delta; //零次导数（即函数值）的系数。
+  }
+}
+
+void ExecutionNVT::array2spline()
+{
+  frho_spline.resize(nrho + 1);
+  rhor_spline.resize(nrho + 1);
+  z2r_spline.resize(nr + 1);
+
+  interpolate(nrho, drho, frho, frho_spline);
+  interpolate(nr, dr, rhor, rhor_spline);
+  interpolate(nr, dr, z2r, z2r_spline);
+}
+
+void ExecutionNVT::SetEAM()
+{
+  _para.SetParameter(EAM_PARA_CUTOFF, file.cut_off);
+  _para.SetParameter(EAM_PARA_RHOMAX, rhomax);
+  _para.SetParameter(EAM_PARA_NRHO, nrho);
+  _para.SetParameter(EAM_PARA_DRHO, drho);
+  _para.SetParameter(EAM_PARA_NR, nr);
+  _para.SetParameter(EAM_PARA_DR, dr);
+  //
+
+  _para.AddField(field::rhor_spline, ArrayHandle<Vec7f>{});
+  auto rhor_spline_get = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle<Vec7f>(rhor_spline), rhor_spline_get);
+
+  _para.AddField(field::frho_spline, ArrayHandle<Vec7f>{});
+  auto frho_spline_get = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle<Vec7f>(frho_spline), frho_spline_get);
+
+  _para.AddField(field::z2r_spline, ArrayHandle<Vec7f>{});
+  auto z2r_spline_get = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle<Vec7f>(z2r_spline), z2r_spline_get);
+}
+
+void ExecutionNVT::InitStyle()
+{
+  AllocateEAM();
+  file2array();
+  array2spline();
+  SetEAM();
 }

@@ -132,11 +132,28 @@ void ExecutionMD::InitialCondition()
   // 物理场初始化
   if (_init_way == "inbuild")
   {
+    if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+    {
+      _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+      auto n = _position.GetNumberOfValues();
+      _charge.Allocate(n);
+      _charge.Fill(-1.0, 0);
+      _charge.Fill(1.0, n / 2);
+      _topology.SetCharge(_charge);
+    }
+    else
+    {
+      _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+      auto n = _position.GetNumberOfValues();
+      _charge.AllocateAndFill(n, 0);
+      _topology.SetCharge(_charge);
+    }
+  }
+  else if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  {
     _charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
     auto n = _position.GetNumberOfValues();
-    _charge.Allocate(n);
-    _charge.Fill(-1.0, 0);
-    _charge.Fill(1.0, n / 2);
+    _charge.AllocateAndFill(n, 0);
     _topology.SetCharge(_charge);
   }
   else

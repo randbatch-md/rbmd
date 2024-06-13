@@ -105,3 +105,4 @@ const std::string PARA_DIHEDRALS_FORCE = "dihedrals_force";
 const std::string PARA_SPECIAL_BONDS = "special_bonds";
 
 const std::string PARA_INIT_WAY = "init_way";
+const std::string PARA_FILE_TYPE = "file_type";
