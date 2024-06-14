@@ -7,12 +7,14 @@
 LJInitCondition::LJInitCondition(const Configuration& cfg)
   : MeshFreeCondition(cfg)
 {
+  InitField();
+  SetParameters();
 }
 
 void LJInitCondition::Execute() 
 {
-  InitField();
-  SetParameters();
+  //InitField();
+  //SetParameters();
   AddMoleculeInfo();
   UpdateField();
  // auto step = 0;

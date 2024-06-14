@@ -61,7 +61,15 @@ void ExecutionNVT::Init()
 void ExecutionNVT::PreSolve()
 {
   _locator.SetPosition(_position);
-  PreForce();
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  {
+    PreForce();
+  }
+  else
+  {
+    std::shared_ptr<Executioner>& executioner = _app.GetExecutioner();
+    _dt = executioner->Dt();
+  }
 }
 
 void ExecutionNVT::Solve()
@@ -104,7 +112,10 @@ void ExecutionNVT::InitialCondition()
   auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
   _para.SetParameter(PARA_RDF_RHO, target_position.GetNumberOfValues() / _Volume);
 
-  PreForce();
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  {
+    PreForce();
+  }
   _nosehooverxi = 0.0;
 }
 
@@ -141,7 +152,8 @@ void ExecutionNVT::ComputeAllForce()
     //all force with angleforce
     Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
     
-    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
+        _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
     {
       //all force with dihedral+force
       Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
@@ -687,9 +699,9 @@ void ExecutionNVT::ComputeTempe()
   ///////////////////////////////////////////////////////////////////////
   auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
   Real temperature_kB = _unit_factor._kB;
-  if (shake == "null")
+  if (_init_way == "inbuild") 
   {
-    _tempT = 0.5 * _tempT_sum / ((3 * n - 3) * temperature_kB / 2.0);
+    _tempT = 0.5 * _tempT_sum / (3 * n / 2.0);
   }
   else if (shake == "false" || _para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
   {
@@ -699,9 +711,9 @@ void ExecutionNVT::ComputeTempe()
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - n - 3) * temperature_kB / 2.0);
   }
-  else
+  else//(if(shake == "null"))
   {
-    _tempT = 0.5 * _tempT_sum / (3 * n / 2.0);
+    _tempT = 0.5 * _tempT_sum / ((3 * n - 3) * temperature_kB / 2.0);    
   }
   _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   _para.SetParameter(PARA_TEMPT, _tempT);
@@ -711,12 +723,10 @@ void ExecutionNVT::SetForceFunction()
 {
   InitERF();
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-  auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
   auto volume = _para.GetParameter<Real>(PARA_VOLUME);
   auto vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-  auto Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
 
-  _force_function.SetParameters(cut_off, alpha, volume, vlength, Kmax);
+  _force_function.SetParameters(cut_off, _alpha, volume, vlength, _Kmax);
 }
 
 void ExecutionNVT::SetTopology()
@@ -741,11 +751,15 @@ void ExecutionNVT::SetTopology()
 void ExecutionNVT::InitParameters()
 {
   ExecutionMD::InitParameters();
-  _RBE_P = _para.GetParameter<IdComponent>(PARA_COULOMB_SAMPLE_NUM);
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  {
+    _RBE_P = _para.GetParameter<IdComponent>(PARA_COULOMB_SAMPLE_NUM);
+    _alpha = _para.GetParameter<Real>(PARA_ALPHA);
+    _Kmax = _para.GetParameter<Real>(PARA_KMAX);
+  }
   _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
-  _alpha = _para.GetParameter<Real>(PARA_ALPHA);
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
 }
 

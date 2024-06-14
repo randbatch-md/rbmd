@@ -16,13 +16,14 @@ ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
 {
   group_id_init.insert(std::make_pair("wat", MolecularType::H20));
   group_id_init.insert(std::make_pair("nacl", MolecularType::NACL));
+  SetParameters();
 }
 
 void ModelFileInitCondition::Execute() 
 {
   try
   {
-    SetParameters();
+    //SetParameters();
     InitField();
     ReadDataFile(_file);
     _file.close();
@@ -55,6 +56,8 @@ void ModelFileInitCondition::SetParameters()
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
   _para.SetParameter(ATOM_STYLE, Get<std::string>("atom_style"));
   _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
+  _para.SetParameter(PARA_FILE_DIHEDRALS, false);
+  _para.SetParameter(PARA_FILE_ANGLES, false);
 }
 
 void ModelFileInitCondition::InitField()
@@ -222,10 +225,12 @@ void ModelFileInitCondition::Parser(std::ifstream& file)
       else if (line.find("Angles") != std::string::npos)
       {
         Angles(file, line);
+        _para.SetParameter(PARA_FILE_ANGLES, true);
       }
       else if (line.find("Dihedrals") != std::string::npos)
       {
         Dihedrals(file, line);
+        _para.SetParameter(PARA_FILE_DIHEDRALS, true);
       }
       else if (line.find("Velocities") != std::string::npos)
       {

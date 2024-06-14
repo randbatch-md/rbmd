@@ -106,3 +106,6 @@ const std::string PARA_SPECIAL_BONDS = "special_bonds";
 
 const std::string PARA_INIT_WAY = "init_way";
 const std::string PARA_FILE_TYPE = "file_type";
+
+const std::string PARA_FILE_DIHEDRALS = "file_dihedrals";
+const std::string PARA_FILE_ANGLES = "file_angles";
