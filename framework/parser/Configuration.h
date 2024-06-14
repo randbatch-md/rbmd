@@ -137,6 +137,45 @@ public:
     console::Error(name, "不存在");
   }
 
+  template<typename T>
+  std::vector<std::vector<T>> GetVectorOfVectorsValue(const std::string& name) const
+  {
+    if (HaveInJsonNode(name))
+    {
+      Json::Value* json_node = linb::any_cast<Json::Value*>(_parameters.at("_json_node"));
+      auto& node = (*json_node)[name];
+      if (node.isArray())
+      {
+        std::vector<std::vector<T>> value;
+        for (auto i = 0; i < node.size(); ++i)
+        {
+          if (node[i].isArray())
+          {
+            std::vector<T> innerValue;
+            for (auto j = 0; j < node[i].size(); ++j)
+            {
+              innerValue.push_back(node[i][j].as<T>());
+            }
+            value.push_back(innerValue);
+          }
+          else
+          {
+            console::Error(name, "内部元素不是数组");
+            return {}; // 返回空的 vector
+          }
+        }
+        return value;
+      }
+      else
+      {
+        console::Error(name, "不是数组");
+      }
+    }
+
+    console::Error(name, "不存在");
+    return {}; // 返回空的 vector
+  }
+
   // 添加用来数据判断
   template<typename T>
   std::vector<T> GetVectorValueJudge(const std::string& name) const

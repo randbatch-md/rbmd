@@ -10,7 +10,7 @@
 
 AtomsFileOutput::AtomsFileOutput(const Configuration& cfg)
   : FileOutput(cfg)
-  , _RDF_file(_file_base + ".csv")
+  , _RDF_file("rdf.rbmd")
   , _radius(Get<Real>("radius"))
   , _min_radius(Get<Real>("min_radius"))
   , _dr(Get<Real>("dr"))

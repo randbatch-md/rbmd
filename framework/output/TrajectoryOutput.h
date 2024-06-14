@@ -17,7 +17,6 @@ protected:
 
 private:
   int _interval;
-  bool _outpute_file;
 
   vtkm::IdComponent _atom_num;
   std::ofstream _trajectory_file;

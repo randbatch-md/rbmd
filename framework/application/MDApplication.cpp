@@ -11,7 +11,14 @@
 #include "ExecutionNPT.h"
 #include "ExecutionNVE.h"
 #include "ExecutionNVT.h"
+
 #include "H2OSystem.h"
+#include "ThermoOutput.h"
+#include "TempOutput.h"
+#include "RDFOutput.h"
+#include "MSDOutput.h"
+#include "VACFOutput.h"
+#include "TrajectoryOutput.h"
 MDApplication::MDApplication(int argc, char** argv)
   : Application(argc, argv)
 {
@@ -43,6 +50,7 @@ void MDApplication::Run()
 
 void MDApplication::RunExecutioner()
 {
+  _init_condition->Execute();
   _executioner->Init();
   _executioner->Execute();
 }
@@ -89,7 +97,7 @@ void MDApplication::InitConfigurationCommandom()
       //cfg.Add<Application*>("_app", this);
       //cfg.Add<Json::Value*>("_json_node", &init_child_node);
       _init_condition = std::make_shared<ModelFileInitCondition>(cfg);
-      _init_condition->Execute();
+      //_init_condition->Execute();
       _parameter->SetParameter(PARA_INIT_WAY, (std::string)"read_data");   
 
 
@@ -102,7 +110,7 @@ void MDApplication::InitConfigurationCommandom()
       //cfg.Add<Json::Value*>("_json_node", &init_child_node);
       //cfg.Add<Application*>("_app", this);
       _init_condition = std::make_shared<LJInitCondition>(cfg); // 调用一次这个就可以初始化
-      _init_condition->Execute(); // 这里是初始化了各个参数；
+      //_init_condition->Execute(); // 这里是初始化了各个参数；
       _parameter->SetParameter(PARA_INIT_WAY, (std::string) "inbuild");      
       auto _init_way = _parameter->GetParameter<std::string>(PARA_INIT_WAY);
 
@@ -214,22 +222,38 @@ void MDApplication::OutputsCommandom()
     Configuration cfg;
     auto output_string = output.c_str();
     auto& output_child_node = output_node[output_string];
-    //_cfg->Add<Json::Value*>(output_string, &output_child_node);
-    if (output_string == "file_output")
-    {
-      // output 三级标题
-      auto fileout_node = output_node["file_output"];
-      std::vector<std::string> fileouts;
-      fileouts = fileout_node.getMemberNames();
-      for (const auto& fileout : fileouts)
-      {
-        Configuration cfg;
-        auto fileout_string = fileout.c_str();
-        auto& fileout_child_node = fileout_node[fileout_string];
-        //_cfg->Add<Json::Value*>(fileout_string, &fileout_child_node);
-        cfg.Add<Json::Value*>("_json_node", &fileout_child_node);
-      }
-    }
+    cfg.Add<Application*>("_app", this);
     cfg.Add<Json::Value*>("_json_node", &output_child_node);
+    std::cout << output_string << std::endl;
+    if (output == "thermo_out")
+    {
+        _Output = std::make_shared<ThermoOutput>(cfg);
+        _owh.push_back(std::make_shared<ThermoOutput>(cfg));
+        _Output = std::make_shared<TempOutput>(cfg);
+        _owh.push_back(std::make_shared<TempOutput>(cfg));
+
+    }
+    else if (output == "rdf_out")
+    {
+        _Output = std::make_shared<RDFOutput>(cfg);
+       _owh.push_back(std::make_shared<RDFOutput>(cfg));
+    }
+    else if (output == "msd_out")
+    {
+        _Output = std::make_shared<MSDOutput>(cfg);
+        _owh.push_back(std::make_shared<MSDOutput>(cfg));
+    }
+    else if (output == "vacf_out")
+    {
+        _Output = std::make_shared<VACFOutput>(cfg);
+        _owh.push_back(std::make_shared<VACFOutput>(cfg));
+    }
+    else if (output == "trajectory_out")
+    {
+        _Output = std::make_shared<TrajectoryOutput>(cfg);
+        _owh.push_back(std::make_shared<TrajectoryOutput>(cfg));
+    }
+    else
+        std::cout << "outputs is wrong" << std::endl;
   }
 }

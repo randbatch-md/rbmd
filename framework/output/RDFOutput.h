@@ -3,11 +3,11 @@
 #include "FileOutput.h"
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 
-class MoleculesFileOutput : public FileOutput
+class RDFOutput : public FileOutput
 {
 public:
-  MoleculesFileOutput(const Configuration& cfg);
-  virtual ~MoleculesFileOutput(){};
+  RDFOutput(const Configuration& cfg);
+  virtual ~RDFOutput(){};
 
   void Init() override;
   void Execute() override;
@@ -17,17 +17,12 @@ protected:
   bool ShouldOutput() override;
 
 private:
-  bool _binary = false;
-  bool _comput_RDF;
-  bool _outpute_file;
-
   vtkm::IdComponent _step_lower;
   vtkm::IdComponent _step_upper;
   const Real _radius;
   const Real _min_radius;
   const Real _dr;
-  const vtkm::IdComponent _center_type;
-  const vtkm::IdComponent _target_type;
+  const std::vector<std::vector<int>> _atoms_pair;
   vtkm::IdComponent _statistics_rdf_steps;
 
   std::ofstream _RDF_file;

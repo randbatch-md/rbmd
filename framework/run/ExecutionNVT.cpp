@@ -141,7 +141,8 @@ void ExecutionNVT::ComputeAllForce()
     //all force with angleforce
     Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
     
-    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
+        _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
     {
       //all force with dihedral+force
       Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);

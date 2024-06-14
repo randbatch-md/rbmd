@@ -19,8 +19,6 @@ protected:
 protected:
   System& _system;
   Executioner& _executioner;
-  std::string _file_base;
   int _interval;
-  bool _out_initial;
 };
 

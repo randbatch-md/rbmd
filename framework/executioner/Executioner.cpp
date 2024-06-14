@@ -29,10 +29,10 @@ void Executioner::Init()
   //_system.Init();
   _run.Init();
 
-  //for (auto& output : _app.GetOutputWarehouse())
-  //{
-  //  output->Init();
-  //}
+  for (auto& output : _app.GetOutputWarehouse())
+  {
+    output->Init();
+  }
 }
 
 void Executioner::Execute()
@@ -43,7 +43,7 @@ void Executioner::Execute()
   {
     Timer time;
     time.Start();
-    //PreStep();
+    PreStep();
     TakeStep();
     PostStep();
   }

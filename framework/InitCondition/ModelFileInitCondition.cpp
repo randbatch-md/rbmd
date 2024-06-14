@@ -16,13 +16,14 @@ ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
 {
   group_id_init.insert(std::make_pair("wat", MolecularType::H20));
   group_id_init.insert(std::make_pair("nacl", MolecularType::NACL));
+  SetParameters();
 }
 
 void ModelFileInitCondition::Execute() 
 {
   try
   {
-    SetParameters();
+    //SetParameters();
     InitField();
     ReadDataFile(_file);
     _file.close();
@@ -55,6 +56,8 @@ void ModelFileInitCondition::SetParameters()
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
   _para.SetParameter(ATOM_STYLE, Get<std::string>("atom_style"));
   _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
+  _para.SetParameter(PARA_FILE_DIHEDRALS, false);
+  _para.SetParameter(PARA_FILE_ANGLES, false);
 }
 
 void ModelFileInitCondition::InitField()
@@ -222,10 +225,12 @@ void ModelFileInitCondition::Parser(std::ifstream& file)
       else if (line.find("Angles") != std::string::npos)
       {
         Angles(file, line);
+        _para.SetParameter(PARA_FILE_ANGLES, true);
       }
       else if (line.find("Dihedrals") != std::string::npos)
       {
         Dihedrals(file, line);
+        _para.SetParameter(PARA_FILE_DIHEDRALS, true);
       }
       else if (line.find("Velocities") != std::string::npos)
       {
@@ -761,12 +766,12 @@ void ModelFileInitCondition::SetAtomsField()
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
  // 注意：暂时注释!!!!!!!!!!!!!!!!!!!!!!!!!配合out使用！！！！！！！！！！！！！！！！！！！！！！
   // Init Center_Target Position
-  auto center_type = 0; //_para.GetParameter<IdComponent>(PARA_CENTER_TYPE);
+  auto center_type = _para.GetParameter<IdComponent>(PARA_CENTER_TYPE);
   auto atoms_center = _atoms_map[center_type];
   auto atoms_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_center), atoms_id_center);
- 
-  auto target_type = 0; // _para.GetParameter<IdComponent>(PARA_TARGET_TYPE);
+  
+  auto target_type = _para.GetParameter<IdComponent>(PARA_TARGET_TYPE);
   auto atoms_target = _atoms_map[target_type];
   auto atoms_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_target), atoms_id_target);

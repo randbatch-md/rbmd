@@ -20,7 +20,7 @@ const std::string HEADER_CUMULATIVE_TIME_NAME = "CUMULATIVE_TIME";
 AtomsTableOutput::AtomsTableOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
   , _binary(Get<bool>("binary", false))
-  , _file(_name + ".csv")
+  , _file("SystemState.csv")
   , _interval(Get<int>("interval", 1))
   , _out_initial(Get<bool>("out_initial", false))
   , _output_file(Get<bool>("output_file"))

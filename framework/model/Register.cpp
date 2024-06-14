@@ -5,8 +5,8 @@
 #include "ModelFileInitCondition.h"
 #include "AtomsFileOutput.h"
 #include "AtomsTableOutput.h"
-#include "MoleculesFileOutput.h"
-#include "MoleculesTableOutput.h"
+#include "RDFOutput.h"
+#include "ThermoOutput.h"
 #include "TempOutput.h"
 #include "MSDOutput.h"
 #include "Progress.h"
@@ -28,8 +28,8 @@ void RegisterObjectGlobal()
   RegisterObject(AtomsFileOutput);
   RegisterObject(AtomsTableOutput);
   RegisterObject(ConsoleOutput);
-  RegisterObject(MoleculesFileOutput);
-  RegisterObject(MoleculesTableOutput);
+  RegisterObject(RDFOutput);
+  RegisterObject(ThermoOutput);
   RegisterObject(TempOutput);
   RegisterObject(MSDOutput);
   RegisterObject(TrajectoryOutput);

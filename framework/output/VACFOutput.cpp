@@ -11,13 +11,9 @@
 
 VACFOutput::VACFOutput(const Configuration& cfg)
   : FileOutput(cfg)
-  , _binary(Get<bool>("binary", false))
   , _interval(Get<int>("interval", 1))
   , _executioner(*(_app.GetExecutioner()))
-  , _out_initial(Get<bool>("out_initial", false))
-  , _VACF_file(_file_base + ".csv")
-  , _comput_VACF(Get<bool>("compute"))
-  , _output_file(Get<bool>("output_file"))
+  , _VACF_file("vacf.rbmd")
   , _start_step(Get<IdComponent>("start_step"))
   , _end_step(Get<IdComponent>("end_step"))
 {
@@ -34,49 +30,46 @@ void VACFOutput::Init()
 
 void VACFOutput::Execute() 
 {
-  if (_comput_VACF)
+  if (_executioner.CurrentStep() == _start_step)
   {
-    if (_executioner.CurrentStep() == _start_step)
+    //_original_position.DeepCopyFrom(_position);
+    //auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
+
+    //_VACF_value_ave = {0,0,0,0};
+
+    _original_velocity.DeepCopyFrom(_velocity);
+  }
+
+  if (_executioner.CurrentStep() >= _start_step && _executioner.CurrentStep() <= _end_step)
+  {
+    ExecuteMSD();
+  }
+
+
+  if (ShouldOutput())
+  {
+    if (_executioner.CurrentStep() == 1)
     {
-      //_original_position.DeepCopyFrom(_position);
-      //auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
-
-      //_VACF_value_ave = {0,0,0,0};
-
-      _original_velocity.DeepCopyFrom(_velocity);
+      _VACF_file << "Time"
+                 << " , "
+                 << "VACFx"
+                 << " , "
+                 << "VACFy"
+                 << " , "
+                 << "VACFz"
+                 << " , "
+                 << "VACF_total" << std::endl;
     }
-
-    if (_executioner.CurrentStep() >= _start_step && _executioner.CurrentStep() <= _end_step)
+    try
     {
-        ExecuteMSD();
+      _VACF_file << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
+                 << _VACF_value_ave[0] << " , " << _VACF_value_ave[1] << " , " << _VACF_value_ave[2]
+                 << " , " << _VACF_value_ave[3] << std::endl;
     }
-    
-
-    if (ShouldOutput() && _output_file)
+    catch (const std::exception& e)
     {
-      if (_executioner.CurrentStep() ==  1)
-      {
-        _VACF_file << "Step"
-                   << " , "
-                   << "VACFx"
-                   << " , "
-                   << "VACFy"
-                   << " , "
-                   << "VACFz"
-                   << " , "
-                   << "VACF" 
-                   << std::endl;
-      }
-      try
-      {
-        _VACF_file << _executioner.CurrentStep() << " , " << _VACF_value_ave[0] << " , "
-                  << _VACF_value_ave[1] << " , " << _VACF_value_ave[2] << " , " << _VACF_value_ave[3] << std::endl;
-      }
-      catch (const std::exception& e)
-      {
-        _VACF_file.close();
-        console::Error(e.what());
-      }
+      _VACF_file.close();
+      console::Error(e.what());
     }
   }
 }

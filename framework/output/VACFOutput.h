@@ -17,12 +17,8 @@ public:
 
 protected:
   int _interval;
-  bool _binary = false;
   Executioner& _executioner;
-  bool _out_initial;
   std::ofstream _VACF_file;
-  bool _comput_VACF;
-  bool _output_file;
 
   ArrayHandle<Id3> temp_position_flag;
   vtkm::cont::ArrayHandle<vtkm::Vec3f> _original_position;

@@ -57,7 +57,7 @@ void TestH2OSystem::H2OSystemFormater(const std::string& type,
 
     [Outputs]
     [./TableOutput]
-      type = MoleculesTableOutput
+      type = ThermoOutput
       interval = 1
       binary = false
       out_initial = false
@@ -67,7 +67,7 @@ void TestH2OSystem::H2OSystemFormater(const std::string& type,
     [../]
 
     [./FileOutput]
-      type = MoleculesFileOutput
+      type = RDFOutput
       interval = 10
       binary = false
       out_initial = false

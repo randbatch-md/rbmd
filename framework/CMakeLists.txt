@@ -60,9 +60,9 @@ system/H2OSystem.cpp
 system/NaClSystem.cpp
 system/EAMSystem.cpp
 system/PEOSystem.cpp
-output/MoleculesTableOutput.cpp
+output/ThermoOutput.cpp
 output/TempOutput.cpp
-output/MoleculesFileOutput.cpp
+output/RDFOutput.cpp
 output/AtomsTableOutput.cpp
 output/AtomsFileOutput.cpp
 #system/MolecularSystem.cpp

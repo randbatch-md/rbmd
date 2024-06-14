@@ -169,6 +169,7 @@ protected:
   std::shared_ptr<Object> _obj;
   std::shared_ptr<Configuration> _cfg;
   std::shared_ptr<HyperParameters> _hyper_parameters;
+  std::shared_ptr<Output> _Output;
 
 
 

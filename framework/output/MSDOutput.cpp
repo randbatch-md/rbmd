@@ -11,13 +11,9 @@
 
 MSDOutput::MSDOutput(const Configuration& cfg)
   : FileOutput(cfg)
-  , _binary(Get<bool>("binary", false))
   , _interval(Get<int>("interval", 1))
   , _executioner(*(_app.GetExecutioner()))
-  , _out_initial(Get<bool>("out_initial", false))
-  , _MSD_file(_file_base + ".csv")
-  , _comput_MSD(Get<bool>("compute"))
-  , _output_file(Get<bool>("output_file"))
+  , _MSD_file("msd.rbmd")
   , _start_step(Get<IdComponent>("start_step"))
   , _end_step(Get<IdComponent>("end_step"))
 {
@@ -30,58 +26,53 @@ void MSDOutput::Init()
   temp_position_flag.AllocateAndFill(_position.GetNumberOfValues(), 0);
   _temp_MSD_position.Allocate(_position.GetNumberOfValues());
  
-  if (_comput_MSD)
-  {
-    _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-  }
+  _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
 }
 
 void MSDOutput::Execute() 
 {
-  if (_comput_MSD)
+  if (_executioner.CurrentStep() == _start_step)
   {
-    if (_executioner.CurrentStep() == _start_step)
-    {
-      _original_position.DeepCopyFrom(_position);
-      _MSD_position.DeepCopyFrom(_position);
-      _temp_MSD_position.DeepCopyFrom(_position);
-      auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
+    _original_position.DeepCopyFrom(_position);
+    _MSD_position.DeepCopyFrom(_position);
+    _temp_MSD_position.DeepCopyFrom(_position);
+    auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
 
-      _MSD_value_ave = {0,0,0,0};
+    _MSD_value_ave = { 0, 0, 0, 0 };
+  }
+
+  if (_executioner.CurrentStep() >= _start_step && _executioner.CurrentStep() <= _end_step)
+  {
+    ExecuteMSD();
+  }
+
+
+  if (ShouldOutput())
+  {
+    if (_executioner.CurrentStep() == 1)
+    {
+      _MSD_file << "Time"
+                << " , "
+                << "MSD_x"
+                << " , "
+                << "MSD_y"
+                << " , "
+                << "MSD_z"
+                << " , "
+                << "MSD_total"
+                << " , "
+                << "MSD_total" << std::endl;
     }
-
-    if (_executioner.CurrentStep() >= _start_step && _executioner.CurrentStep() <= _end_step)
+    try
     {
-        ExecuteMSD();
+      _MSD_file << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
+                << _MSD_value_ave[0] << " , " << _MSD_value_ave[1] << " , " << _MSD_value_ave[2]
+                << " , " << _MSD_value_ave[3] << vtkm::Sqrt(_MSD_value_ave[3]) << std::endl;
     }
-    
-
-    if (ShouldOutput() && _output_file)
+    catch (const std::exception& e)
     {
-      if (_executioner.CurrentStep() ==  1)
-      {
-        _MSD_file << "Step"
-              << " , "
-              << "MSDx"
-              << " , "
-              << "MSDy"
-              << " , "
-              << "MSDz"
-              << " , "
-              << "MSD"
-              << std::endl;
-      }
-      try
-      {
-        _MSD_file << _executioner.CurrentStep() << " , " << _MSD_value_ave[0] << " , "
-                  << _MSD_value_ave[1] << " , " << _MSD_value_ave[2] << " , " << _MSD_value_ave[3] << std::endl;
-
-      }
-      catch (const std::exception& e)
-      {
-        _MSD_file.close();
-        console::Error(e.what());
-      }
+      _MSD_file.close();
+      console::Error(e.what());
     }
   }
 }

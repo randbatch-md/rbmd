@@ -39,6 +39,12 @@ public:
     return _cfg.GetVectorValue<T>(name);
   }
 
+  template<typename T>
+  std::vector<std::vector<T>> GetVectorOfVectorsValue(const std::string& name)
+  {
+    return _cfg.GetVectorOfVectorsValue<T>(name);
+  }
+
   //添加用来做判断
   template<typename T>
   std::vector<T> GetVectorValueJudge(const std::string& name)

@@ -16,12 +16,8 @@ const std::string HEADER_KBT_NAME = "KBT";
 
 TempOutput::TempOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
-  , _binary(Get<bool>("binary", false))
-  , _file(_name + ".csv")
+  , _file("temperature.rbmd")
   , _interval(Get<int>("interval", 1))
-  , _out_initial(Get<bool>("out_initial", false))
-  , _output_file(Get<bool>("output_file"))
-  , _compute(Get<bool>("compute"))
   , _temperature(0.0)
 {
 }
@@ -33,31 +29,21 @@ TempOutput::~TempOutput()
 
 void TempOutput::Init()
 {
-  if (_compute) //_output_screen &&
-  {
-    ConsoleOutput::Init();
-    AddHeader(HEADER_KBT_NAME);
-
-  }
+  ConsoleOutput::Init();
+  AddHeader(HEADER_KBT_NAME);
 }
 
 void TempOutput::Execute()
 {
-  if (_compute)
-  {
-    _temperature = _para.GetParameter<Real>(PARA_TEMPT);
-
-    WriteToFile();
-  }
+  _temperature = _para.GetParameter<Real>(PARA_TEMPT);
+  WriteToFile();
 
 }
 
 bool TempOutput::ShouldOutput()
 {
   auto current_step = _executioner->CurrentStep();
-  if (current_step == 0)
-    return _out_initial;
-  else if (current_step == _executioner->NumStep())
+  if (current_step == _executioner->NumStep())
     return true;
   else
     return current_step % _interval == 0;
@@ -66,18 +52,19 @@ bool TempOutput::ShouldOutput()
 
 void TempOutput::WriteToFile()
 {
-  if (ShouldOutput() && _output_file)
+  if (ShouldOutput())
   {
     if (_executioner->CurrentStep() == 1)
     {
-      _file << "Step"
+      _file << "Time"
             << ", "
-            << "temperature" 
+            << "Temperature" 
             << std::endl;
     }
     try
     {
-      _file << _executioner->CurrentStep() << ", " << _temperature << std::endl;
+      _file << _executioner->CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << ", "
+            << _temperature << std::endl;
     }
     catch (const std::exception& e)
     {

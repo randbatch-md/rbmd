@@ -11,11 +11,11 @@ enum STATUS
   TEMPERATURE
 };
 
-class MoleculesTableOutput : public ConsoleOutput
+class ThermoOutput : public ConsoleOutput
 {
 public:
-  MoleculesTableOutput(const Configuration& cfg);
-  virtual ~MoleculesTableOutput();
+  ThermoOutput(const Configuration& cfg);
+  virtual ~ThermoOutput();
 
   void Init() override;
   void Execute() override;
@@ -38,10 +38,6 @@ private:
   IdComponent _Kmax;
 
   int _interval;
-  bool _out_initial;
-  bool _binary = false;
-  bool _output_file;
-  bool _compute;
   Real _spec_far_ele_potential_energy_avr;
   Real _cut_off;
   Real _Vlength;

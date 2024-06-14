@@ -1,5 +1,5 @@
 ﻿#include "Executioner.h"
-#include "MoleculesTableOutput.h"
+#include "ThermoOutput.h"
 #include <vtkm/cont/Algorithm.h>
 #include "Application.h"
 #include "ConsoleOutput.h"
@@ -21,19 +21,11 @@ const std::string HEADER_KBT_NAME = "KBT";
 const std::string HEADER_CUMULATIVE_TIME_NAME = "CUMULATIVE_TIME";
 const std::string HEADER_DIHEDRAL_ENERGY_NAME = "DIHEDRAL_ENERGY";
 
-//RegisterObject(MoleculesTableOutput);
-
-
-
-
-MoleculesTableOutput::MoleculesTableOutput(const Configuration& cfg)
+//RegisterObject(ThermoOutput);
+ThermoOutput::ThermoOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
-  , _binary(Get<bool>("binary", false))
-  , _file(_name + ".csv")
+  , _file("energy.rbmd")
   , _interval(Get<int>("interval", 1))
-  , _out_initial(Get<bool>("out_initial", false))
-  , _output_file(Get<bool>("output_file"))
-  , _compute(Get<bool>("compute"))
   , _system_state("SystemState.csv")
   , _cut_off(0.0)
   , _Vlength(0.0)
@@ -49,83 +41,74 @@ MoleculesTableOutput::MoleculesTableOutput(const Configuration& cfg)
 
 }
 
-MoleculesTableOutput::~MoleculesTableOutput()
+ThermoOutput::~ThermoOutput()
 {
   _file.close();
   _system_state.close();
 }
 
-void MoleculesTableOutput::Init()
+void ThermoOutput::Init()
 {
-  if ( _compute)  //_output_screen &&
-  {
-    ConsoleOutput::Init();
-    AddHeader(HEADER_POTENTIAL_ENERGY_NAME);
-    AddHeader(HEADER_RESIDUAL_NAME);
-    AddHeader(HEADER_KBT_NAME);
-    AddHeader(HEADER_KINETIC_ENERGY_NAME);
-    AddHeader(HEADER_NON_BOND_ENERGY_NAME);
-    AddHeader(HEADER_TOTAL_ENERGY_NAME);
-    AddHeader(HEADER_BOND_ENERGY_NAME);
-    AddHeader(HEADER_ANGLE_ENERGY_NAME);
-    AddHeader(HEADER_CUMULATIVE_TIME_NAME);
-    AddHeader(HEADER_DIHEDRAL_ENERGY_NAME);
+  ConsoleOutput::Init();
+  AddHeader(HEADER_POTENTIAL_ENERGY_NAME);
+  AddHeader(HEADER_RESIDUAL_NAME);
+  AddHeader(HEADER_KBT_NAME);
+  AddHeader(HEADER_KINETIC_ENERGY_NAME);
+  AddHeader(HEADER_NON_BOND_ENERGY_NAME);
+  AddHeader(HEADER_TOTAL_ENERGY_NAME);
+  AddHeader(HEADER_BOND_ENERGY_NAME);
+  AddHeader(HEADER_ANGLE_ENERGY_NAME);
+  AddHeader(HEADER_CUMULATIVE_TIME_NAME);
+  AddHeader(HEADER_DIHEDRAL_ENERGY_NAME);
 
-    _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-    _volume = _para.GetParameter<Real>(PARA_VOLUME);
-    _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
-    _alpha = _para.GetParameter<Real>(PARA_ALPHA);
-    _rho = _para.GetParameter<Real>(PARA_RHO);
-  }
+  _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  _volume = _para.GetParameter<Real>(PARA_VOLUME);
+  _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+  _alpha = _para.GetParameter<Real>(PARA_ALPHA);
+  _rho = _para.GetParameter<Real>(PARA_RHO);
 }
 
-void MoleculesTableOutput::Execute()
+void ThermoOutput::Execute()
 {
-  if (_compute)
+  if (_para.HaveParameter(PARA_BOND_ENERGY))
   {
-    if (_para.HaveParameter(PARA_BOND_ENERGY))
-    {
-      _bond_energy = _para.GetParameter<Real>(PARA_BOND_ENERGY);
-      
-    }
-    if (_para.HaveParameter(PARA_ANGLE_ENERGY))
-    {
-      _angle_energy = _para.GetParameter<Real>(PARA_ANGLE_ENERGY);
-    }
-    if (_para.HaveParameter(PARA_DIHEDRAL_ENERGY))
-    {
-      _dihedrals_energy = _para.GetParameter<Real>(PARA_DIHEDRAL_ENERGY);
-    }
-    _tempT_sum = _para.GetParameter<Real>(PARA_TEMPT_SUM);
-    _tempT = _para.GetParameter<Real>(PARA_TEMPT);
-
-    ComputePotentialEnergy();
-
-    Residual();
-
-    AddDataToTable();
-
-    WriteToFile();
-
-    StatisticalStatus();
+    _bond_energy = _para.GetParameter<Real>(PARA_BOND_ENERGY);
   }
+  if (_para.HaveParameter(PARA_ANGLE_ENERGY))
+  {
+    _angle_energy = _para.GetParameter<Real>(PARA_ANGLE_ENERGY);
+  }
+  if (_para.HaveParameter(PARA_DIHEDRAL_ENERGY))
+  {
+    _dihedrals_energy = _para.GetParameter<Real>(PARA_DIHEDRAL_ENERGY);
+  }
+  _tempT_sum = _para.GetParameter<Real>(PARA_TEMPT_SUM);
+  _tempT = _para.GetParameter<Real>(PARA_TEMPT);
+
+  ComputePotentialEnergy();
+
+  Residual();
+
+  AddDataToTable();
+
+  WriteToFile();
+
+  StatisticalStatus();
   ConsoleOutput::Execute();
   PostData();
 }
 
-bool MoleculesTableOutput::ShouldOutput()
+bool ThermoOutput::ShouldOutput()
 {
   auto current_step = _executioner->CurrentStep();
-  if (current_step == 0)
-    return _out_initial;
-  else if (current_step == _executioner->NumStep())
+  if (current_step == _executioner->NumStep())
     return true;
   else
     return current_step % _interval == 0;
 }
 
-void MoleculesTableOutput::ComputePotentialEnergy()
+void ThermoOutput::ComputePotentialEnergy()
 { 
   ArrayHandle<Real> lj_potential_energy;
   auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
@@ -233,7 +216,7 @@ void MoleculesTableOutput::ComputePotentialEnergy()
   _temperature = _tempT;
 }
 
-void MoleculesTableOutput::SpecialFarCoulEnergy()
+void ThermoOutput::SpecialFarCoulEnergy()
 {
   auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   auto N = position.GetNumberOfValues();
@@ -274,7 +257,7 @@ void MoleculesTableOutput::SpecialFarCoulEnergy()
     0.5 * _spec_far_ele_potential_energy_avr * unit_factor._qqr2e;
 }
 
-void MoleculesTableOutput::Residual()
+void ThermoOutput::Residual()
 {
   if (_executioner->CurrentStep() <= 0)
   {
@@ -287,7 +270,7 @@ void MoleculesTableOutput::Residual()
   _potential_energy_avr_old = _potential_energy_avr;
 }
 
-void MoleculesTableOutput::AddDataToTable()
+void ThermoOutput::AddDataToTable()
 {
   if (_output_screen)
   {
@@ -304,9 +287,9 @@ void MoleculesTableOutput::AddDataToTable()
   }
 }
 
-void MoleculesTableOutput::WriteToFile()
+void ThermoOutput::WriteToFile()
 {
-  if (ShouldOutput()&&_output_file)
+  if (ShouldOutput())
   {
     if (_executioner->CurrentStep() == 1)
     {
@@ -314,17 +297,17 @@ void MoleculesTableOutput::WriteToFile()
             << " , "
             << "Time"
             << " , "
-            << "potentialLJEnergyAvr"        // lj energy
+            << "VanderWaalsEnergy"        // lj energy
             << " , "
-            << "potentialNearEleEnergyAvr"   // add near energy
+            << "NearCoulombicEnergy"   // add near energy
             << " , "                         //
-            << "PotentialFarEleEnergyAvr"    // add far energy
+            << "FarCoulombicEnergy"    // add far energy
             << " , "                         //
             << "Residual" 
             << ", "
   //          << "kBT"                         // the value of kBT  in file of MoleculesTempOutput.csv
   //          << ", "
-            << "KinteicEnergy"
+            << "KinticEnergy"
             << ", "
             << "PotentialEnergy"
             << ", "
@@ -370,7 +353,7 @@ void MoleculesTableOutput::WriteToFile()
   }
 }
 
-void MoleculesTableOutput::StatisticalStatus()
+void ThermoOutput::StatisticalStatus()
 {
   if (_executioner->CurrentStep() >= 1)
   {
@@ -381,7 +364,7 @@ void MoleculesTableOutput::StatisticalStatus()
   }
 }
 
-void MoleculesTableOutput::PostData() 
+void ThermoOutput::PostData() 
 {
   auto current_step = _executioner->CurrentStep();
   if (current_step == 1)
@@ -410,7 +393,7 @@ void MoleculesTableOutput::PostData()
   }
 }
 
-void MoleculesTableOutput::PostExecute() 
+void ThermoOutput::PostExecute() 
 {
   try
   {

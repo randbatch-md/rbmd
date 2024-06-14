@@ -22,10 +22,7 @@ private:
   std::ofstream _file;
 
   int _interval;
-  bool _out_initial;
-  bool _binary = false;
   bool _output_file;
-  bool _compute;
 
   Real _temperature;
 
