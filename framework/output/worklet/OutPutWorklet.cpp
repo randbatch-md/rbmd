@@ -505,6 +505,20 @@ namespace OutPut
       Real _rho;
     };
 
+    struct GetPositionByTypeWorklet : vtkm::worklet::WorkletMapField
+    {
+      using ControlSignature = void(FieldIn atom_id, WholeArrayIn whole_pts, FieldOut pts_by_type);
+      using ExecutionSignature = void(_1, _2, _3);
+    
+      template<typename WholePtsType, typename PtsType, typename IdType>
+      VTKM_EXEC void operator()(const IdType& atom_id,
+                                const WholePtsType& whole_pts,
+                                PtsType& pts_by_type) const
+      {
+        pts_by_type = whole_pts.Get(atom_id);
+      }
+    };
+
     struct ComputerKineticEnergyWorklet : vtkm::worklet::WorkletMapField
     {
       using ControlSignature = void(FieldIn velocity, FieldIn mass, FieldOut sq_velocity);
@@ -789,6 +803,13 @@ namespace OutPut
                             molecule_id,
                             locator,
                             rdf);
+    }
+
+     void GetPositionByType(const vtkm::cont::ArrayHandle<Id>& atom_id,
+                           const vtkm::cont::ArrayHandle<Vec3f>& whole_pts,
+                           vtkm::cont::ArrayHandle<Vec3f>& pts_by_type)
+    {
+       vtkm::cont::Invoker{}(GetPositionByTypeWorklet{}, atom_id, whole_pts, pts_by_type);
     }
 
     // Statistical Kinetic energy

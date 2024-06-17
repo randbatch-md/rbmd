@@ -29,7 +29,7 @@ private:
   vtkm::cont::Timer _rdfTimer;
 
   std::vector<Real> _vRadius;
-  vtkm::cont::ArrayHandle<Real> _rdf;
+  std::vector<vtkm::cont::ArrayHandle<Real>> _rdf;
   vtkm::cont::ArrayHandle<Real> rdf;
 
   Real _rdf_rho;

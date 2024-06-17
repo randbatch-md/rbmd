@@ -19,6 +19,9 @@ namespace field
 	const std::string target_position = "target_position";
 	const std::string atom_id_center = "atom_id_center";
 	const std::string atom_id_target = "atom_id_target";
+	const std::string atom_pair_id = "atom_pair_id";
+	const std::string atom_pair_position = "atom_pair_position";
+    const std::string atoms_pair_type_offsets = "atoms_pair_type_offsets";
 	const std::string position_flag = "position_flag";
 	const std::string bond_atom_id = "bond_atom_id";
 	const std::string bond_type = "bond_type";
@@ -73,6 +76,8 @@ const std::string PARA_TEMPT = "temp_t";
 const std::string PARA_RBE_P = "rbeP";
 const std::string PARA_CENTER_TYPE = "center_type";
 const std::string PARA_TARGET_TYPE = "target_type";
+const std::string PARA_ATOMS_PAIR_TYPE = "atoms_pair_type";
+
 
 const std::string PARA_LOCATOR = "locator";
 const std::string NTYPES = "num_atom_ntypes";
