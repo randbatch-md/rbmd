@@ -52,18 +52,17 @@ bool TempOutput::ShouldOutput()
 
 void TempOutput::WriteToFile()
 {
+  if (_executioner->CurrentStep() == 0)
+  {
+    _file << "Step"
+          << ", "
+          << "Temperature" << std::endl;
+  }
   if (ShouldOutput())
   {
-    if (_executioner->CurrentStep() == 1)
-    {
-      _file << "Time"
-            << ", "
-            << "Temperature" 
-            << std::endl;
-    }
     try
     {
-      _file << _executioner->CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << ", "
+      _file << _executioner->CurrentStep() << ", "
             << _temperature << std::endl;
     }
     catch (const std::exception& e)

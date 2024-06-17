@@ -46,26 +46,29 @@ void MSDOutput::Execute()
     ExecuteMSD();
   }
 
+  if (_executioner.CurrentStep() == 0)
+  {
+    _MSD_file << "Step"
+              << " , "
+              << "Time"
+              << " , "
+              << "MSD_x"
+              << " , "
+              << "MSD_y"
+              << " , "
+              << "MSD_z"
+              << " , "
+              << "MSD_total"
+              << " , "
+              << "MSD_total" << std::endl;
+  }
 
   if (ShouldOutput())
   {
-    if (_executioner.CurrentStep() == 1)
-    {
-      _MSD_file << "Time"
-                << " , "
-                << "MSD_x"
-                << " , "
-                << "MSD_y"
-                << " , "
-                << "MSD_z"
-                << " , "
-                << "MSD_total"
-                << " , "
-                << "MSD_total" << std::endl;
-    }
     try
     {
-      _MSD_file << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
+      _MSD_file << _executioner.CurrentStep() << " , "
+                << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
                 << _MSD_value_ave[0] << " , " << _MSD_value_ave[1] << " , " << _MSD_value_ave[2]
                 << " , " << _MSD_value_ave[3] << vtkm::Sqrt(_MSD_value_ave[3]) << std::endl;
     }

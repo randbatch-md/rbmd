@@ -18,25 +18,29 @@ void TrajectoryOutput::Init()
 
 void TrajectoryOutput::Execute()
 {
+  if (_executioner.CurrentStep() == 0)
+  {
+    auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
+    vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+    _trajectory_file << "ITEM: TIMESTEP" << std::endl
+                     << _executioner.CurrentStep() << std::endl
+                     << "ITEM: NUMBER OF ATOMS" << std::endl
+                     << position.GetNumberOfValues() << std::endl
+                     << "ITEM: BOX BOUNDS pp pp pp" << std::endl
+                     << range[0].Min << " " << range[0].Max << std::endl
+                     << range[1].Min << " " << range[1].Max << std::endl
+                     << range[2].Min << " " << range[2].Max << std::endl
+                     << "ITEM: ATOMS id type x y z" << std::endl;
+  }
+  
   if (ShouldOutput())
   {
     try
     {
       auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
       auto portal_pos = position.ReadPortal();
-      vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
       auto atom_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
       auto portal_atomtype = atom_type.ReadPortal();
-      int a = _executioner.CurrentStep();
-      _trajectory_file << "ITEM: TIMESTEP" << std::endl
-                       << _executioner.CurrentStep() << std::endl
-                       << "ITEM: NUMBER OF ATOMS" << std::endl
-                       << position.GetNumberOfValues() << std::endl
-                       << "ITEM: BOX BOUNDS pp pp pp" << std::endl
-                       << range[0].Min << " " << range[0].Max << std::endl
-                       << range[1].Min << " " << range[1].Max << std::endl
-                       << range[2].Min << " " << range[2].Max << std::endl
-                       << "ITEM: ATOMS id type x y z" << std::endl;
       for (auto i = 0; i < position.GetNumberOfValues(); ++i)
       {
         _trajectory_file << i + 1 << " " << portal_atomtype.Get(i) + 1 << " "

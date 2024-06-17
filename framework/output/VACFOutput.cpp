@@ -45,24 +45,27 @@ void VACFOutput::Execute()
     ExecuteMSD();
   }
 
+   if (_executioner.CurrentStep() == 0)
+   {
+       _VACF_file << "Step"
+                  << " , "
+                  << "Time"
+                  << " , "
+                  << "VACFx"
+                  << " , "
+                  << "VACFy"
+                  << " , "
+                  << "VACFz"
+                  << " , "
+                  << "VACF_total" << std::endl;
+    }
 
   if (ShouldOutput())
   {
-    if (_executioner.CurrentStep() == 1)
-    {
-      _VACF_file << "Time"
-                 << " , "
-                 << "VACFx"
-                 << " , "
-                 << "VACFy"
-                 << " , "
-                 << "VACFz"
-                 << " , "
-                 << "VACF_total" << std::endl;
-    }
     try
     {
-      _VACF_file << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
+      _VACF_file << _executioner.CurrentStep()
+                 << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
                  << _VACF_value_ave[0] << " , " << _VACF_value_ave[1] << " , " << _VACF_value_ave[2]
                  << " , " << _VACF_value_ave[3] << std::endl;
     }

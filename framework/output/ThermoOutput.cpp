@@ -289,43 +289,43 @@ void ThermoOutput::AddDataToTable()
 
 void ThermoOutput::WriteToFile()
 {
+  if (_executioner->CurrentStep() == 0)
+  {
+    _file
+      << "Step"
+      << " , "
+      << "Time"
+      << " , "
+      << "VanderWaalsEnergy" // lj energy
+      << " , "
+      << "NearCoulombicEnergy" // add near energy
+      << " , "                 //
+      << "FarCoulombicEnergy"  // add far energy
+      << " , "                 //
+      << "Residual"
+      << ", "
+      //          << "kBT"                         // the value of kBT  in file of MoleculesTempOutput.csv
+      //          << ", "
+      << "KinticEnergy"
+      << ", "
+      << "PotentialEnergy"
+      << ", "
+      << "NonBonEnergy"
+      << ", "
+      << "TotalEnergy"
+      << ", "
+      << "BondEnergy"
+      << ", "
+      << "AngleEnergy"
+      << ", "
+      << "DihedralEnergy"
+      << ", "
+      << "CumulativeTime"
+      << ", "
+      << "SpecialEnergy" << std::endl;
+  }
   if (ShouldOutput())
   {
-    if (_executioner->CurrentStep() == 1)
-    {
-      _file << "Step"
-            << " , "
-            << "Time"
-            << " , "
-            << "VanderWaalsEnergy"        // lj energy
-            << " , "
-            << "NearCoulombicEnergy"   // add near energy
-            << " , "                         //
-            << "FarCoulombicEnergy"    // add far energy
-            << " , "                         //
-            << "Residual" 
-            << ", "
-  //          << "kBT"                         // the value of kBT  in file of MoleculesTempOutput.csv
-  //          << ", "
-            << "KinticEnergy"
-            << ", "
-            << "PotentialEnergy"
-            << ", "
-            << "NonBonEnergy"
-            << ", "
-            << "TotalEnergy"
-            << ", "
-            << "BondEnergy"
-            << ", "
-            << "AngleEnergy"
-            << ", "
-            << "DihedralEnergy"
-            << ", "
-            << "CumulativeTime"
-            << ", "
-            << "SpecialEnergy"
-            << std::endl;
-    }
     try
     {
       _file << _executioner->CurrentStep() << " , " 
