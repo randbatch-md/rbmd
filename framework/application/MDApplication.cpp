@@ -112,8 +112,6 @@ void MDApplication::InitConfigurationCommandom()
       _init_condition = std::make_shared<LJInitCondition>(cfg); // 调用一次这个就可以初始化
       //_init_condition->Execute(); // 这里是初始化了各个参数；
       _parameter->SetParameter(PARA_INIT_WAY, (std::string) "inbuild");      
-      auto _init_way = _parameter->GetParameter<std::string>(PARA_INIT_WAY);
-
 
       //_init_condition->InitParameter();
       //_init_condition->Execute();
