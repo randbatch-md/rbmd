@@ -64,7 +64,7 @@ void VACFOutput::Execute()
   {
     try
     {
-      _VACF_file << _executioner.CurrentStep()
+      _VACF_file << _executioner.CurrentStep() << " , "
                  << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
                  << _VACF_value_ave[0] << " , " << _VACF_value_ave[1] << " , " << _VACF_value_ave[2]
                  << " , " << _VACF_value_ave[3] << std::endl;

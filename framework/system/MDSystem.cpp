@@ -5,7 +5,7 @@
 #include <vtkm/cont/Algorithm.h>
 #include <vtkm/cont/ArrayHandleGroupVec.h>
 #include "Executioner.h"
-#include "ERFTable.h"
+//#include "ERFTable.h"
 #include <vtkm/worklet/Keys.h>
 #include <vtkm/cont/ArrayHandleConstant.h>
 //#include <vtkm/exec/ParallelExecutor.h>
@@ -76,16 +76,16 @@ void MDSystem::InitERF()
 {
   if (_use_erf == true)
   {     
-     _static_table.SetTableIndex1(vtkm::cont::make_ArrayHandle(erf_index_leq2_v));
-     _static_table.SetTableIndex2(vtkm::cont::make_ArrayHandle(erf_index_geq2_v));
-     _static_table.SetTableRij1(vtkm::cont::make_ArrayHandle(erf_dis_leq2_v));
-     _static_table.SetTableRij2(vtkm::cont::make_ArrayHandle(erf_dis_geq2_v));
-     _static_table.SetTabledRij1(vtkm::cont::make_ArrayHandle(erf_dis_dif_leq2_v));
-     _static_table.SetTabledRij2(vtkm::cont::make_ArrayHandle(erf_dis_dif_geq2_v));
-     _static_table.SetTableFunctionRij1(vtkm::cont::make_ArrayHandle(erf_gnear_leq2_v));
-     _static_table.SetTableFunctionRij2(vtkm::cont::make_ArrayHandle(erf_gnear_geq2_v));
-     _static_table.SetTabledFunctionRij1(vtkm::cont::make_ArrayHandle(erf_gnear_der_leq2_v));
-     _static_table.SetTabledFunctionRij2(vtkm::cont::make_ArrayHandle(erf_gnear_der_geq2_v));
+     //_static_table.SetTableIndex1(vtkm::cont::make_ArrayHandle(erf_index_leq2_v));
+     //_static_table.SetTableIndex2(vtkm::cont::make_ArrayHandle(erf_index_geq2_v));
+     //_static_table.SetTableRij1(vtkm::cont::make_ArrayHandle(erf_dis_leq2_v));
+     //_static_table.SetTableRij2(vtkm::cont::make_ArrayHandle(erf_dis_geq2_v));
+     //_static_table.SetTabledRij1(vtkm::cont::make_ArrayHandle(erf_dis_dif_leq2_v));
+     //_static_table.SetTabledRij2(vtkm::cont::make_ArrayHandle(erf_dis_dif_geq2_v));
+     //_static_table.SetTableFunctionRij1(vtkm::cont::make_ArrayHandle(erf_gnear_leq2_v));
+     //_static_table.SetTableFunctionRij2(vtkm::cont::make_ArrayHandle(erf_gnear_geq2_v));
+     //_static_table.SetTabledFunctionRij1(vtkm::cont::make_ArrayHandle(erf_gnear_der_leq2_v));
+     //_static_table.SetTabledFunctionRij2(vtkm::cont::make_ArrayHandle(erf_gnear_der_geq2_v));
   }
 }
 
