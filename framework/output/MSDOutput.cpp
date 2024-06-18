@@ -58,7 +58,9 @@ void MSDOutput::Execute()
               << " "
               << "MSD_z"
               << " "
-              << "MSD_total" << std::endl;
+              << "MSD_total"
+              << " "
+              << "sqrt(MSD_total) " << std::endl;
   }
 
   if (ShouldOutput())
@@ -67,8 +69,8 @@ void MSDOutput::Execute()
     {
       _MSD_file << _executioner.CurrentStep() << " "
                 << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " "
-                << _MSD_value_ave[0] << " " << _MSD_value_ave[1] << " " << _MSD_value_ave[2]
-                << " " << _MSD_value_ave[3] << vtkm::Sqrt(_MSD_value_ave[3]) << std::endl;
+                << _MSD_value_ave[0] << " " << _MSD_value_ave[1] << " " << _MSD_value_ave[2] << " "
+                << _MSD_value_ave[3] << " " << vtkm::Sqrt(_MSD_value_ave[3]) << std::endl;
     }
     catch (const std::exception& e)
     {

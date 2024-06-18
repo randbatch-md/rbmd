@@ -44,13 +44,22 @@ RDFOutput::RDFOutput(const Configuration& cfg)
       if (atoms_pair_type.size() == 0)
       {
         atoms_pair_type.push_back(type);
+        vtkm::cont::ArrayHandle<Real> rdf_pair;
+        rdf_pair.AllocateAndFill(_vRadius.size(), 0);
+        _rdf.push_back(rdf_pair);
+
       }
       else
       {
         while (i < atoms_pair_type.size())
         {
           if (type != atoms_pair_type[i] && i == atoms_pair_type.size() - 1)
+          {
             atoms_pair_type.push_back(type);
+            vtkm::cont::ArrayHandle<Real> rdf_pair;
+            rdf_pair.AllocateAndFill(_vRadius.size(), 0);
+            _rdf.push_back(rdf_pair);
+          }
           else
             i++;
         }
@@ -153,26 +162,16 @@ void RDFOutput::ComputeRDF()
     {
       auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
       auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
-      auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
-      auto atom_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
-    
       vtkm::cont::ArrayHandle<Real> rdf_pair;
       rdf_pair.AllocateAndFill(_vRadius.size(), 0);
       auto num_center_pos = center_position.GetNumberOfValues();
       ContPointLocator locator;
       SetLocator(locator);
-      locator.SetPosition(target_position, atom_id_target);
 
+      locator.SetPosition(target_position);
       auto radius = vtkm::cont::make_ArrayHandle(_vRadius);
-      OutPut::ComputeRDF(num_center_pos,
-                         _rdf_rho,
-                         radius,
-                         center_position,
-                         position,
-                         atom_id_center,
-                         molecule_id,
-                         locator,
-                         rdf_pair);
+      OutPut::atoms::ComputeRDF(
+        num_center_pos, _rdf_rho, radius, center_position, target_position, locator, rdf_pair);
       _rdf.push_back(rdf_pair);
     }
     else
@@ -238,8 +237,7 @@ void RDFOutput::ComputeRDF()
                            atom_id_center,
                            molecule_id,
                            locator,
-                           rdf_pair);
-        _rdf.push_back(rdf_pair);
+                           _rdf[i]);
       }
     }
     }
