@@ -54,19 +54,26 @@ void ThermoOutput::Init()
   AddHeader(HEADER_RESIDUAL_NAME);
   AddHeader(HEADER_KBT_NAME);
   AddHeader(HEADER_KINETIC_ENERGY_NAME);
-  AddHeader(HEADER_NON_BOND_ENERGY_NAME);
   AddHeader(HEADER_TOTAL_ENERGY_NAME);
-  AddHeader(HEADER_BOND_ENERGY_NAME);
-  AddHeader(HEADER_ANGLE_ENERGY_NAME);
   AddHeader(HEADER_CUMULATIVE_TIME_NAME);
-  AddHeader(HEADER_DIHEDRAL_ENERGY_NAME);
+  
+  if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
+  {
+    AddHeader(HEADER_NON_BOND_ENERGY_NAME);
+    AddHeader(HEADER_BOND_ENERGY_NAME);
+    AddHeader(HEADER_ANGLE_ENERGY_NAME);
+    AddHeader(HEADER_DIHEDRAL_ENERGY_NAME);
+  }
 
   _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   _volume = _para.GetParameter<Real>(PARA_VOLUME);
   _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-  _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
-  _alpha = _para.GetParameter<Real>(PARA_ALPHA);
   _rho = _para.GetParameter<Real>(PARA_RHO);
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  {
+    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+    _alpha = _para.GetParameter<Real>(PARA_ALPHA);
+  }
 }
 
 void ThermoOutput::Execute()
@@ -86,7 +93,14 @@ void ThermoOutput::Execute()
   _tempT_sum = _para.GetParameter<Real>(PARA_TEMPT_SUM);
   _tempT = _para.GetParameter<Real>(PARA_TEMPT);
 
-  ComputePotentialEnergy();
+  if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  {
+    ComputeEAMPotentialEnergy();
+  }
+  else
+  {
+    ComputePotentialEnergy();
+  }
 
   Residual();
 
@@ -113,7 +127,7 @@ void ThermoOutput::ComputePotentialEnergy()
   ArrayHandle<Real> lj_potential_energy;
   auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
-
+  
   ContForceFunction force_function;
 
   ContTopology topology;
@@ -122,17 +136,28 @@ void ThermoOutput::ComputePotentialEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
-  //OutPut::ComputePotentialEnergy( _cut_off, atoms_id, locator, topology, force_function, lj_potential_energy);
+  if (_para.GetParameter<std::string>(PARA_INIT_WAY) == "inbuild")
+  {
+    OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy);  
+  }
+  else
+  {
+    auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+    auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+    auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+    auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+    auto weight_group =
+      vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
 
-  auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
-  auto special_weights =  _para.GetFieldAsArrayHandle<Real>(field::special_weights);
-  auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
-  auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
-  auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
-
-  OutPut::ComputeSpecialBondsLJPotential(
-    _cut_off, atoms_id, locator, topology, force_function, ids_group, weight_group, lj_potential_energy);
-
+    OutPut::ComputeSpecialBondsLJPotential(_cut_off,
+                                           atoms_id,
+                                           locator,
+                                           topology,
+                                           force_function,
+                                           ids_group,
+                                           weight_group,
+                                           lj_potential_energy);
+  }
   auto lj_potential_energy_total =
     vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
   _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
@@ -163,49 +188,56 @@ void ThermoOutput::ComputePotentialEnergy()
 
   _spec_far_ele_potential_energy_avr = 0.0;
 
-  SpecialFarCoulEnergy();
+  if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
+  {
+    SpecialFarCoulEnergy();
+  }
 
   _near_ele_potential_energy_avr = _near_ele_potential_energy_avr - _spec_far_ele_potential_energy_avr;
 
-  Real Volume = vtkm::Pow(_Vlength, 3);
-  ArrayHandle<Real> Density_Real;
-  ArrayHandle<Real> Density_Image;
-  Real far_ele_potential_energy_total = 0.0;
-  for (Id i = -_Kmax; i <= _Kmax; i++)
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
   {
-    for (Id j = -_Kmax; j <= _Kmax; j++)
+    Real Volume = vtkm::Pow(_Vlength, 3);
+    ArrayHandle<Real> Density_Real;
+    ArrayHandle<Real> Density_Image;
+    Real far_ele_potential_energy_total = 0.0;
+    for (Id i = -_Kmax; i <= _Kmax; i++)
     {
-      for (Id k = -_Kmax; k <= _Kmax; k++)
+      for (Id j = -_Kmax; j <= _Kmax; j++)
       {
-        if (!(i == 0 && j == 0 && k == 0))
+        for (Id k = -_Kmax; k <= _Kmax; k++)
         {
-          Vec3f K = { Real(i), Real(j), Real(k) };
-          K = 2 * vtkm::Pi() * K / _Vlength;
-          Real Range_K = vtkm::Magnitude(K);
-          OutPut::ComputeDensity(
-            K, position, charge, Density_Real, Density_Image);
-          Real Value_Re = vtkm::cont::Algorithm::Reduce(
-            Density_Real, vtkm::TypeTraits<Real>::ZeroInitialization());
-          Real Value_Im = vtkm::cont::Algorithm::Reduce(
-            Density_Image, vtkm::TypeTraits<Real>::ZeroInitialization());
-          Real Range_density2 = vtkm::Pow(Value_Re, 2) + vtkm::Pow(Value_Im, 2);
+          if (!(i == 0 && j == 0 && k == 0))
+          {
+            Vec3f K = { Real(i), Real(j), Real(k) };
+            K = 2 * vtkm::Pi() * K / _Vlength;
+            Real Range_K = vtkm::Magnitude(K);
+            OutPut::ComputeDensity(K, position, charge, Density_Real, Density_Image);
+            Real Value_Re = vtkm::cont::Algorithm::Reduce(
+              Density_Real, vtkm::TypeTraits<Real>::ZeroInitialization());
+            Real Value_Im = vtkm::cont::Algorithm::Reduce(
+              Density_Image, vtkm::TypeTraits<Real>::ZeroInitialization());
+            Real Range_density2 = vtkm::Pow(Value_Re, 2) + vtkm::Pow(Value_Im, 2);
 
-          far_ele_potential_energy_total +=
-            vtkm::Exp(-Range_K * Range_K / (4 * _alpha)) * Range_density2 /
-            (Range_K * Range_K);
+            far_ele_potential_energy_total +=
+              vtkm::Exp(-Range_K * Range_K / (4 * _alpha)) * Range_density2 / (Range_K * Range_K);
+          }
         }
       }
     }
-  }
 
-  far_ele_potential_energy_total = far_ele_potential_energy_total * (2 * vtkm::Pi() / Volume);
-  _far_ele_potential_energy_avr = far_ele_potential_energy_total / N;
-  _far_ele_potential_energy_avr = _far_ele_potential_energy_avr * unit_factor._qqr2e;
+    far_ele_potential_energy_total = far_ele_potential_energy_total * (2 * vtkm::Pi() / Volume);
+    _far_ele_potential_energy_avr = far_ele_potential_energy_total / N;
+    _far_ele_potential_energy_avr = _far_ele_potential_energy_avr * unit_factor._qqr2e;
 
-  _far_ele_potential_energy_avr = _far_ele_potential_energy_avr + _self_potential_energy_avr;
-
-  _potential_energy_avr = _lj_potential_energy_avr + _far_ele_potential_energy_avr +
+    _far_ele_potential_energy_avr = _far_ele_potential_energy_avr + _self_potential_energy_avr;
+    _potential_energy_avr = _lj_potential_energy_avr + _far_ele_potential_energy_avr +
     _near_ele_potential_energy_avr;
+  }
+  else
+  {
+    _potential_energy_avr = _lj_potential_energy_avr + _near_ele_potential_energy_avr;
+  }
 
   _potential_energy = _potential_energy_avr + _bond_energy + _angle_energy;
 
@@ -276,14 +308,18 @@ void ThermoOutput::AddDataToTable()
   {
     AddData(HEADER_POTENTIAL_ENERGY_NAME, _potential_energy);
     AddData(HEADER_RESIDUAL_NAME, _residual);
-    AddData(HEADER_NON_BOND_ENERGY_NAME, _potential_energy_avr);
     AddData(HEADER_TOTAL_ENERGY_NAME, _total_energy);
     AddData(HEADER_KINETIC_ENERGY_NAME, _kinteic_energy);
     AddData(HEADER_KBT_NAME, _tempT);
-    AddData(HEADER_BOND_ENERGY_NAME, _bond_energy);
-    AddData(HEADER_ANGLE_ENERGY_NAME, _angle_energy);
     AddData(HEADER_CUMULATIVE_TIME_NAME, _cumulative_time + _timer.GetElapsedTime());
-    AddData(HEADER_DIHEDRAL_ENERGY_NAME, _dihedrals_energy);
+    if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
+    {
+      AddData(HEADER_NON_BOND_ENERGY_NAME, _potential_energy_avr);
+      AddData(HEADER_BOND_ENERGY_NAME, _bond_energy);
+      AddData(HEADER_ANGLE_ENERGY_NAME, _angle_energy);
+      AddData(HEADER_DIHEDRAL_ENERGY_NAME, _dihedrals_energy); 
+    }
+    
   }
 }
 
@@ -291,59 +327,62 @@ void ThermoOutput::WriteToFile()
 {
   if (_executioner->CurrentStep() == 0)
   {
-    _file
-      << "Step"
-      << " "
-      << "Time"
-      << " "
-      << "VanderWaalsEnergy" // lj energy
-      << " "
-      << "NearCoulombicEnergy" // add near energy
-      << " "                 //
-      << "FarCoulombicEnergy"  // add far energy
-      << " "                 //
-      << "Residual"
-      << " "
-      //          << "kBT"                         // the value of kBT  in file of MoleculesTempOutput.csv
-      //          << ", "
-      << "KinticEnergy"
-      << " "
-      << "PotentialEnergy"
-      << " "
-      << "NonBonEnergy"
-      << " "
-      << "TotalEnergy"
-      << " "
-      << "BondEnergy"
-      << " "
-      << "AngleEnergy"
-      << " "
-      << "DihedralEnergy"
-      << " "
-      << "CumulativeTime"
-      << " "
-      << "SpecialEnergy" << std::endl;
+    _file << "Step"
+          << " "
+          << "Time"
+          << " "
+          << "VanderWaalsEnergy" // lj energy
+          << " "
+          << "NearCoulombicEnergy" // add near energy
+          << " "                   //
+          << "FarCoulombicEnergy"  // add far energy
+          << " "                   //
+          << "Residual"
+          << " "
+          << "KinticEnergy"
+          << " "
+          << "PotentialEnergy"
+          << " "
+          << "TotalEnergy"
+          << " "
+          << "CumulativeTime";
+    if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
+    {
+      _file << "NonBonEnergy"
+            << " "
+            << "BondEnergy"
+            << " "
+            << "AngleEnergy"
+            << " "
+            << "DihedralEnergy"
+            << " "
+            << "SpecialEnergy" ;
+    }
+    _file << std::endl;
   }
   if (ShouldOutput())
   {
     try
     {
-      _file << _executioner->CurrentStep() << " " 
+        _file << _executioner->CurrentStep() << " " 
             << _time<< " "
             << _lj_potential_energy_avr << " "
             << _near_ele_potential_energy_avr << " "
             << _far_ele_potential_energy_avr << " " 
             << _residual << " "
-   //         << _tempT  << ", "
             << _kinteic_energy << " "
             << _potential_energy << " "
-            << _potential_energy_avr << " "
             << _total_energy << " "
-            << _bond_energy << " "
-            << _angle_energy << " " << _dihedrals_energy << " "
-            << _cumulative_time + _timer.GetElapsedTime() << " "
-            << _spec_far_ele_potential_energy_avr 
-            << std::endl;
+            << _cumulative_time + _timer.GetElapsedTime() << " ";
+      if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
+        {
+        _file << _potential_energy_avr << " "
+              << _bond_energy << " "
+              << _angle_energy << " " << _dihedrals_energy << " "
+              << _spec_far_ele_potential_energy_avr;
+        }
+        _file << std::endl;
+      
     }
     catch (const std::exception& e)
     {
@@ -351,6 +390,71 @@ void ThermoOutput::WriteToFile()
       console::Error(e.what());
     }
   }
+}
+
+void ThermoOutput::ComputeEAMPotentialEnergy()
+{
+  auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+  auto N = atoms_id.GetNumberOfValues();
+  //
+  auto cut_off = _para.GetParameter<Real>(EAM_PARA_CUTOFF);
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+
+  auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
+  auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
+  auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
+
+  //
+  ContForceFunction force_function;
+  SetForceFunction(force_function);
+
+  ContTopology topology;
+  SetTopology(topology);
+
+  ContPointLocator locator;
+  SetLocator(locator);
+
+  //1:compute EAM_rho;
+  ArrayHandle<Real> EAM_rho;
+  OutPut::EAM_rho(
+    cut_off, Vlength, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
+
+  //2: embedding_energy_atom
+  ArrayHandle<Real> embedding_energy_atom;
+  OutPut::EAM_EmbeddingEnergy(
+    atoms_id, EAM_rho, frho_spline, locator, topology, force_function, embedding_energy_atom);
+
+  auto embedding_energy_total = vtkm::cont::Algorithm::Reduce(
+    embedding_energy_atom, vtkm::TypeTraits<Real>::ZeroInitialization());
+
+  //3: pair_energy_atom
+  ArrayHandle<Real> pair_energy_atom;
+  OutPut::EAM_PairEnergy(
+    cut_off, Vlength, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
+
+  auto pair_energy_atom_total =
+    vtkm::cont::Algorithm::Reduce(pair_energy_atom, vtkm::TypeTraits<Real>::ZeroInitialization());
+
+  //4:_potential_energy = embedding_energy_total +  pair_energy_atom_total
+  _potential_energy = (embedding_energy_total + pair_energy_atom_total) / N; // ;
+
+  //5._kinteic_energy
+  _kinteic_energy = _tempT_sum / N * 0.5;
+
+  _total_energy = _potential_energy + _kinteic_energy;
+
+  //6:temperature
+  _temperature = _tempT;
+
+  //7.all_potential_atom
+
+  //ArrayHandle<Real> all_potential_atom;
+  //OutPut::SumEAM_Pe_Atom(embedding_energy_atom, pair_energy_atom, all_potential_atom);
+
+  //for (Id i = 0; i < all_potential_atom.GetNumberOfValues(); i++)
+  //{
+  //  std::cout << "id" << i << "，all_potential_atom= " << all_potential_atom.ReadPortal().Get(i) << std::endl;
+  //}
 }
 
 void ThermoOutput::StatisticalStatus()

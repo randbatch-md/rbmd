@@ -27,6 +27,7 @@ private:
   void WriteToFile();
   bool ShouldOutput();
   void StatisticalStatus();
+  void ComputeEAMPotentialEnergy();
 
   void PostData();
   void PostExecute();
