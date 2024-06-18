@@ -97,14 +97,16 @@ void ExecutionMD::Init()
 
   vtkm::cont::Timer timer;
   timer.Start();
-  auto N = _position.GetNumberOfValues();
-  _rhok_Re.AllocateAndFill(_RBE_P * N, 0.0);
-  _rhok_Im.AllocateAndFill(_RBE_P * N, 0.0);
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  {
+    auto N = _position.GetNumberOfValues();
+    _rhok_Re.AllocateAndFill(_RBE_P * N, 0.0);
+    _rhok_Im.AllocateAndFill(_RBE_P * N, 0.0);
 
-  vtkm::cont::ArrayHandleIndex indexArray(N * _RBE_P);
-  vtkm::cont::Invoker{}(SetIndex{ N }, indexArray, _psamplekey);
-  std::cout << "init rhok: " << timer.GetElapsedTime() << std::endl;
-
+    vtkm::cont::ArrayHandleIndex indexArray(N * _RBE_P);
+    vtkm::cont::Invoker{}(SetIndex{ N }, indexArray, _psamplekey);
+    std::cout << "init rhok: " << timer.GetElapsedTime() << std::endl;
+  }
   _EleNearPairtimer_counting = 0.0;
 }
 
