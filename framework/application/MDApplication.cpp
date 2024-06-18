@@ -228,30 +228,30 @@ void MDApplication::OutputsCommandom()
     if (output == "thermo_out")
     {
         _Output = std::make_shared<ThermoOutput>(cfg);
-        _owh.push_back(std::make_shared<ThermoOutput>(cfg));
+        _owh.push_back(_Output);
         _Output = std::make_shared<TempOutput>(cfg);
-        _owh.push_back(std::make_shared<TempOutput>(cfg));
+        _owh.push_back(_Output);
 
     }
     else if (output == "rdf_out")
     {
         _Output = std::make_shared<RDFOutput>(cfg);
-       _owh.push_back(std::make_shared<RDFOutput>(cfg));
+       _owh.push_back(_Output);
     }
     else if (output == "msd_out")
     {
         _Output = std::make_shared<MSDOutput>(cfg);
-        _owh.push_back(std::make_shared<MSDOutput>(cfg));
+        _owh.push_back(_Output);
     }
     else if (output == "vacf_out")
     {
         _Output = std::make_shared<VACFOutput>(cfg);
-        _owh.push_back(std::make_shared<VACFOutput>(cfg));
+        _owh.push_back(_Output);
     }
     else if (output == "trajectory_out")
     {
         _Output = std::make_shared<TrajectoryOutput>(cfg);
-        _owh.push_back(std::make_shared<TrajectoryOutput>(cfg));
+        _owh.push_back(_Output);
     }
     else
         std::cout << "outputs is wrong" << std::endl;

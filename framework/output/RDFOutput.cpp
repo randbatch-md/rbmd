@@ -149,28 +149,34 @@ void RDFOutput::ComputeRDF()
     std::map<Id, ArrayHandle<Id>> atom_pair_id;
     auto atom_pair_type = _para.GetParameter<std::vector<int>>(PARA_ATOMS_PAIR_TYPE);
     auto rdf_id = _para.GetFieldAsArrayHandle<Id>(field::atom_pair_id);
+    auto rdf_position = _para.GetFieldAsArrayHandle<Vec3f>(field::atom_pair_position);
     auto atoms_pair_type_offsets = _para.GetFieldAsArrayHandle<Id>(field::atoms_pair_type_offsets);
-    auto vecArrayHandle = vtkm::cont::make_ArrayHandleGroupVecVariable(rdf_id, atoms_pair_type_offsets);
-
-    auto type = vecArrayHandle.GetNumberOfValues();
-    auto read_protol = vecArrayHandle.GetPortalControl();
+    auto id_vec_arrayhandle = vtkm::cont::make_ArrayHandleGroupVecVariable(rdf_id, atoms_pair_type_offsets);
+    auto position_vec_arrayhandle =
+      vtkm::cont::make_ArrayHandleGroupVecVariable(rdf_position, atoms_pair_type_offsets);
+    auto type = id_vec_arrayhandle.GetNumberOfValues();
+    auto id_read_protol = id_vec_arrayhandle.GetPortalControl();
+    auto position_read_protol = id_vec_arrayhandle.GetPortalControl();
 
     for (int i = 0; i < type; ++i)
     {
-      auto id_Vec = read_protol.Get(i);
-      std::vector<vtkm::Id> vecData(id_Vec.GetNumberOfComponents());
-      for (vtkm::IdComponent j = 0; j < id_Vec.GetNumberOfComponents(); ++j)
+      auto id_vec = id_read_protol.Get(i);
+      auto position_Vec = position_read_protol.Get(i);
+      std::vector<vtkm::Id> id_data(id_vec.GetNumberOfComponents());
+      std::vector<Vec3f> position_data(position_Vec.GetNumberOfComponents());
+      for (vtkm::IdComponent j = 0; j < id_vec.GetNumberOfComponents(); ++j)
       {
-        vecData[j] = id_Vec[j];
+        id_data[j] = id_vec[j];
+        position_data[j] = position_Vec[j].Get();
       }
-
       vtkm::cont::ArrayHandle<Id> id_array;
-      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(vecData) ,id_array);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(id_data), id_array);
       vtkm::cont::ArrayHandle<Vec3f> atom_type_position;
-      atom_type_position.Allocate(id_Vec.GetNumberOfComponents());
+      atom_type_position.Allocate(id_vec.GetNumberOfComponents());
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(position_data), atom_type_position);
       atom_pair_position[atom_pair_type[i]]= atom_type_position;
       atom_pair_id[atom_pair_type[i]]=id_array;
-      OutPut::GetPositionByType(id_array, position, atom_type_position);
+      //OutPut::GetPositionByType(id_array, position, atom_type_position);
     }
 
     for (int i = 0; i < _atoms_pair.size();i++)
@@ -192,7 +198,7 @@ void RDFOutput::ComputeRDF()
       //PrintArrayhandle(atom_id_center);
       //PrintArrayhandle(atom_id_target);
 
-
+      _rdf_rho = target_position.GetNumberOfValues() / _para.GetParameter<Real>(PARA_VOLUME);
       auto radius = vtkm::cont::make_ArrayHandle(_vRadius);
       OutPut::ComputeRDF(num_center_pos,
                          _rdf_rho,

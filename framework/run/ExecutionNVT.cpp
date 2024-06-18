@@ -263,13 +263,23 @@ void ExecutionNVT::SetCenterTargetPositions()
   }
   else
   {
-    auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
+    /*auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
     auto atom_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
     auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
     auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
 
     Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_center, _position, center_position);
-    Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_target, _position, target_position);
+    Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_target, _position, target_position);*/
+    //std::map<Id, ArrayHandle<Vec3f>> atom_pair_position;
+    //std::map<Id, ArrayHandle<Id>> atom_pair_id;
+    //auto atom_pair_type = _para.GetParameter<std::vector<int>>(PARA_ATOMS_PAIR_TYPE);
+    auto rdf_id = _para.GetFieldAsArrayHandle<Id>(field::atom_pair_id);
+    auto atoms_pair_type_offsets = _para.GetFieldAsArrayHandle<Id>(field::atoms_pair_type_offsets);
+    vtkm::cont::ArrayHandle<Vec3f> atom_type_position;
+    atom_type_position.Allocate(rdf_id.GetNumberOfValues());
+    Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, rdf_id, _position, atom_type_position);
+    auto atom_pair_position = _para.GetFieldAsArrayHandle<Vec3f>(field::atom_pair_position);
+    vtkm::cont::ArrayCopy(atom_type_position, atom_pair_position);
   }
  }
 
