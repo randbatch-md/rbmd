@@ -755,7 +755,7 @@ void ExecutionNVT::InitParameters()
   {
     _RBE_P = _para.GetParameter<IdComponent>(PARA_COULOMB_SAMPLE_NUM);
     _alpha = _para.GetParameter<Real>(PARA_ALPHA);
-    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX); 
   }
   _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
