@@ -51,7 +51,7 @@ void RDFOutput::Execute()
   {
     try
     {
-      _RDF_file << "Radius,RDF" << std::endl;
+      _RDF_file << "Radius RDF" << std::endl;
       auto r_num = _vRadius.size();
       auto rdf_Protol = _rdf.ReadPortal();
       for (auto i = 0; i < r_num; ++i)
@@ -61,11 +61,11 @@ void RDFOutput::Execute()
         Real rdf = (RDF / (_step_upper - _step_lower - 1));
         if (std::isnan(rdf))
         {
-          _RDF_file << r << "," << std::endl;
+          _RDF_file << r << " " << std::endl;
         }
         else
         {
-          _RDF_file << r << "," << rdf << std::endl;
+          _RDF_file << r << " " << rdf << std::endl;
         }
       }
       _RDF_file.close();

@@ -48,15 +48,15 @@ void VACFOutput::Execute()
    if (_executioner.CurrentStep() == 0)
    {
        _VACF_file << "Step"
-                  << " , "
+                  << " "
                   << "Time"
-                  << " , "
+                  << " "
                   << "VACFx"
-                  << " , "
+                  << " "
                   << "VACFy"
-                  << " , "
+                  << " "
                   << "VACFz"
-                  << " , "
+                  << " "
                   << "VACF_total" << std::endl;
     }
 
@@ -64,10 +64,10 @@ void VACFOutput::Execute()
   {
     try
     {
-      _VACF_file << _executioner.CurrentStep() << " , "
-                 << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " , "
-                 << _VACF_value_ave[0] << " , " << _VACF_value_ave[1] << " , " << _VACF_value_ave[2]
-                 << " , " << _VACF_value_ave[3] << std::endl;
+      _VACF_file << _executioner.CurrentStep() << " "
+                 << _executioner.CurrentStep() * _para.GetParameter<Real>(PARA_TIMESTEP) << " "
+                 << _VACF_value_ave[0] << " " << _VACF_value_ave[1] << " " << _VACF_value_ave[2]
+                 << " " << _VACF_value_ave[3] << std::endl;
     }
     catch (const std::exception& e)
     {
