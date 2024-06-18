@@ -41,7 +41,7 @@ output/Progress.cpp
 model/FormatTable.cpp
 #model/Register.cpp
 
-system/System.cpp
+#system/System.cpp
 InitCondition/MeshFreeCondition.cpp
 InitCondition/ModelFileInitCondition.cpp
 InitCondition/MeshFreeFileInitCondition.cpp
@@ -52,14 +52,14 @@ hyperparameters/Neighbor.cpp
 )
 
 set(device_src
-system/MadelungSystem.cpp
-system/LennardJonesSystem.cpp
-system/MeshFreeSystem.cpp
-system/SalineSolutionSystem.cpp # Remove the "<vtkm/cont/Algorithm.h>" to move out of Devie_src
-system/H2OSystem.cpp
-system/NaClSystem.cpp
-system/EAMSystem.cpp
-system/PEOSystem.cpp
+#system/MadelungSystem.cpp
+#system/LennardJonesSystem.cpp
+#system/MeshFreeSystem.cpp
+#system/SalineSolutionSystem.cpp # Remove the "<vtkm/cont/Algorithm.h>" to move out of Devie_src
+#system/H2OSystem.cpp
+#system/NaClSystem.cpp
+#system/EAMSystem.cpp
+#system/PEOSystem.cpp
 output/ThermoOutput.cpp
 output/TempOutput.cpp
 output/RDFOutput.cpp
@@ -71,7 +71,7 @@ output/MSDOutput.cpp
 output/VACFOutput.cpp
 output/worklet/OutPutWorklet.cpp
 output/TrajectoryOutput.cpp
-system/MDSystem.cpp
+#system/MDSystem.cpp
 system/worklet/SystemWorklet.cpp
 
 InitCondition/LJInitCondition.cpp

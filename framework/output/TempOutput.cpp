@@ -55,14 +55,14 @@ void TempOutput::WriteToFile()
   if (_executioner->CurrentStep() == 0)
   {
     _file << "Step"
-          << ", "
+          << " "
           << "Temperature" << std::endl;
   }
   if (ShouldOutput())
   {
     try
     {
-      _file << _executioner->CurrentStep() << ", "
+      _file << _executioner->CurrentStep() << " "
             << _temperature << std::endl;
     }
     catch (const std::exception& e)

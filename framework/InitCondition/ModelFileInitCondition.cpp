@@ -778,39 +778,45 @@ void ModelFileInitCondition::SetAtomsField()
 
   auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_type), pts_type);
- // 注意：暂时注释!!!!!!!!!!!!!!!!!!!!!!!!!配合out使用！！！！！！！！！！！！！！！！！！！！！！
-  // Init Center_Target Position
-  //auto center_type = _para.GetParameter<IdComponent>(PARA_CENTER_TYPE);
-  //auto atoms_center = _atoms_map[center_type];
-  //auto atoms_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
-  //vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_center), atoms_id_center);
-  //
-  //auto target_type = _para.GetParameter<IdComponent>(PARA_TARGET_TYPE);
-  //auto atoms_target = _atoms_map[target_type];
-  //auto atoms_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
-  //vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_target), atoms_id_target);
 
-  auto atom_pair_type = _para.GetParameter<std::vector<int>>(PARA_ATOMS_PAIR_TYPE);
-  std::vector<Id> atom_pair_id_temp;
-  std::vector<Id> offsets;
-  for (int i = 0; i < atom_pair_type.size();i++)
+  auto init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
+  if (init_way == "inbuild")
   {
-    auto atoms_type_id = _atoms_map[atom_pair_type[i]];
-    atom_pair_id_temp.insert(atom_pair_id_temp.end(), atoms_type_id.begin(), atoms_type_id.end());
-    if (i == 0)
-    {
-      offsets.push_back(0);
-    }
-    else
-    {
-      offsets.push_back(offsets[i - 1] + atoms_type_id.size());
-    }
+    auto center_type = _para.GetParameter<IdComponent>(PARA_CENTER_TYPE);
+    auto atoms_center = _atoms_map[center_type];
+    auto atoms_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
+    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_center), atoms_id_center);
+    
+    auto target_type = _para.GetParameter<IdComponent>(PARA_TARGET_TYPE);
+    auto atoms_target = _atoms_map[target_type];
+    auto atoms_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
+    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atoms_target), atoms_id_target);
   }
-  offsets.push_back(atom_pair_id_temp.size());
-  auto atom_pair_id = _para.GetFieldAsArrayHandle<Id>(field::atom_pair_id);
-  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atom_pair_id_temp), atom_pair_id);
-  auto atoms_pair_type_offsets = _para.GetFieldAsArrayHandle<Id>(field::atoms_pair_type_offsets);
-  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(offsets), atoms_pair_type_offsets);
+  else
+  {
+    auto atom_pair_type = _para.GetParameter<std::vector<int>>(PARA_ATOMS_PAIR_TYPE);
+    std::vector<Id> atom_pair_id_temp;
+    std::vector<Id> offsets;
+    for (int i = 0; i < atom_pair_type.size(); i++)
+    {
+      auto atoms_type_id = _atoms_map[atom_pair_type[i]];
+      atom_pair_id_temp.insert(atom_pair_id_temp.end(), atoms_type_id.begin(), atoms_type_id.end());
+      if (i == 0)
+      {
+        offsets.push_back(0);
+      }
+      else
+      {
+        offsets.push_back(offsets[i - 1] + atoms_type_id.size());
+      }
+    }
+    offsets.push_back(atom_pair_id_temp.size());
+    auto atom_pair_id = _para.GetFieldAsArrayHandle<Id>(field::atom_pair_id);
+    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atom_pair_id_temp), atom_pair_id);
+    auto atoms_pair_type_offsets = _para.GetFieldAsArrayHandle<Id>(field::atoms_pair_type_offsets);
+    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(offsets), atoms_pair_type_offsets);
+  }
+  
 
   // init position_flag
   auto position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);

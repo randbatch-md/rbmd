@@ -293,55 +293,55 @@ void ThermoOutput::WriteToFile()
   {
     _file
       << "Step"
-      << " , "
+      << " "
       << "Time"
-      << " , "
+      << " "
       << "VanderWaalsEnergy" // lj energy
-      << " , "
+      << " "
       << "NearCoulombicEnergy" // add near energy
-      << " , "                 //
+      << " "                 //
       << "FarCoulombicEnergy"  // add far energy
-      << " , "                 //
+      << " "                 //
       << "Residual"
-      << ", "
+      << " "
       //          << "kBT"                         // the value of kBT  in file of MoleculesTempOutput.csv
       //          << ", "
       << "KinticEnergy"
-      << ", "
+      << " "
       << "PotentialEnergy"
-      << ", "
+      << " "
       << "NonBonEnergy"
-      << ", "
+      << " "
       << "TotalEnergy"
-      << ", "
+      << " "
       << "BondEnergy"
-      << ", "
+      << " "
       << "AngleEnergy"
-      << ", "
+      << " "
       << "DihedralEnergy"
-      << ", "
+      << " "
       << "CumulativeTime"
-      << ", "
+      << " "
       << "SpecialEnergy" << std::endl;
   }
   if (ShouldOutput())
   {
     try
     {
-      _file << _executioner->CurrentStep() << " , " 
-            << _time<< " , "
-            << _lj_potential_energy_avr << " , "
-            << _near_ele_potential_energy_avr << " , "
-            << _far_ele_potential_energy_avr << " , " 
-            << _residual << ", "
+      _file << _executioner->CurrentStep() << " " 
+            << _time<< " "
+            << _lj_potential_energy_avr << " "
+            << _near_ele_potential_energy_avr << " "
+            << _far_ele_potential_energy_avr << " " 
+            << _residual << " "
    //         << _tempT  << ", "
-            << _kinteic_energy << ", "
-            << _potential_energy << ", "
-            << _potential_energy_avr << ", "
-            << _total_energy << ", "
-            << _bond_energy << ", "
-            << _angle_energy << ", " << _dihedrals_energy << ", "
-            << _cumulative_time + _timer.GetElapsedTime() << ", "
+            << _kinteic_energy << " "
+            << _potential_energy << " "
+            << _potential_energy_avr << " "
+            << _total_energy << " "
+            << _bond_energy << " "
+            << _angle_energy << " " << _dihedrals_energy << " "
+            << _cumulative_time + _timer.GetElapsedTime() << " "
             << _spec_far_ele_potential_energy_avr 
             << std::endl;
     }

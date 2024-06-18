@@ -22,7 +22,7 @@ private:
   const Real _radius;
   const Real _min_radius;
   const Real _dr;
-  const std::vector<std::vector<int>> _atoms_pair;
+  std::vector<std::vector<int>> _atoms_pair;
   vtkm::IdComponent _statistics_rdf_steps;
 
   std::ofstream _RDF_file;
