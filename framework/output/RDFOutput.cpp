@@ -68,6 +68,12 @@ RDFOutput::RDFOutput(const Configuration& cfg)
     }
     _para.SetParameter(PARA_ATOMS_PAIR_TYPE, atoms_pair_type);
   }
+  else
+  {
+    vtkm::cont::ArrayHandle<Real> rdf_pair;
+    rdf_pair.AllocateAndFill(_vRadius.size(), 0);
+    _rdf.push_back(rdf_pair);
+  }
 }
 
 void RDFOutput::Init() 
@@ -162,8 +168,6 @@ void RDFOutput::ComputeRDF()
     {
       auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
       auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
-      vtkm::cont::ArrayHandle<Real> rdf_pair;
-      rdf_pair.AllocateAndFill(_vRadius.size(), 0);
       auto num_center_pos = center_position.GetNumberOfValues();
       ContPointLocator locator;
       SetLocator(locator);
@@ -171,8 +175,7 @@ void RDFOutput::ComputeRDF()
       locator.SetPosition(target_position);
       auto radius = vtkm::cont::make_ArrayHandle(_vRadius);
       OutPut::atoms::ComputeRDF(
-        num_center_pos, _rdf_rho, radius, center_position, target_position, locator, rdf_pair);
-      _rdf.push_back(rdf_pair);
+        num_center_pos, _rdf_rho, radius, center_position, target_position, locator, _rdf[0]);
     }
     else
     {
@@ -219,9 +222,6 @@ void RDFOutput::ComputeRDF()
         auto target_position = atom_pair_position[_atoms_pair[i][1]];
         auto atom_id_center = atom_pair_id[_atoms_pair[i][0]];
         auto atom_id_target = atom_pair_id[_atoms_pair[i][1]];
-        vtkm::cont::ArrayHandle<Real> rdf_pair;
-        rdf_pair.AllocateAndFill(_vRadius.size(), 0);
-
         auto num_center_pos = center_position.GetNumberOfValues();
         ContPointLocator locator;
         SetLocator(locator);
