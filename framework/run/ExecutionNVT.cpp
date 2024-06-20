@@ -23,17 +23,6 @@
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 
-template<typename T>
-void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
-{
-  auto num = arrayHandle.GetNumberOfValues();
-  auto read_protol = arrayHandle.ReadPortal();
-  for (int i = 0; i < num; ++i)
-  {
-    std::cout << read_protol.Get(i) << std::endl;
-  }
-}
-
 ExecutionNVT::ExecutionNVT(const Configuration& cfg)
   : ExecutionMD(cfg)
   , _executioner((_app.GetExecutioner()))

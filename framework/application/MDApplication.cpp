@@ -222,7 +222,6 @@ void MDApplication::OutputsCommandom()
     auto& output_child_node = output_node[output_string];
     cfg.Add<Application*>("_app", this);
     cfg.Add<Json::Value*>("_json_node", &output_child_node);
-    std::cout << output_string << std::endl;
     if (output == "thermo_out")
     {
         _Output = std::make_shared<ThermoOutput>(cfg);

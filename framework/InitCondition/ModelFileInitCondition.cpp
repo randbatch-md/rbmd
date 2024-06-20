@@ -742,17 +742,6 @@ void ModelFileInitCondition::SetMolecularGroup()
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_molecules_id), molecule_id);
 }
 
-template<typename T>
-void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
-{
-  auto num = arrayHandle.GetNumberOfValues();
-  auto read_protol = arrayHandle.ReadPortal();
-  for (int i = 0; i < num; ++i)
-  {
-    std::cout << read_protol.Get(i) << std::endl;
-  }
-}
-
 void ModelFileInitCondition::SetAtomsField() 
 {
   // init Id

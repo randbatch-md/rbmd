@@ -10,16 +10,16 @@
 #include "forceFunction/ContForceFunction.h"
 #include "UnitFactor.h"
 
-const std::string HEADER_POTENTIAL_ENERGY_NAME = "POTENTIAL_ENERGY";
-const std::string HEADER_RESIDUAL_NAME = "RESIDUAL";
-const std::string HEADER_KINETIC_ENERGY_NAME = "KINETIC_ENERGY";
-const std::string HEADER_NON_BOND_ENERGY_NAME = "NON_BOND_ENERGY";
-const std::string HEADER_TOTAL_ENERGY_NAME = "TOTAL_ENERGY";
-const std::string HEADER_BOND_ENERGY_NAME = "BOND_ENERGY";
-const std::string HEADER_ANGLE_ENERGY_NAME = "ANGLE_ENERGY";
+const std::string HEADER_POTENTIAL_ENERGY_NAME = "Potential_Energy";
+const std::string HEADER_RESIDUAL_NAME = "Residual";
+const std::string HEADER_KINETIC_ENERGY_NAME = "Kinetic_Energy";
+const std::string HEADER_NON_BOND_ENERGY_NAME = "Non_Bond_Energy";
+const std::string HEADER_TOTAL_ENERGY_NAME = "Total_Energy";
+const std::string HEADER_BOND_ENERGY_NAME = "Bond_Energy";
+const std::string HEADER_ANGLE_ENERGY_NAME = "Angle_Energy";
 const std::string HEADER_KBT_NAME = "KBT";
-const std::string HEADER_CUMULATIVE_TIME_NAME = "CUMULATIVE_TIME";
-const std::string HEADER_DIHEDRAL_ENERGY_NAME = "DIHEDRAL_ENERGY";
+const std::string HEADER_CUMULATIVE_TIME_NAME = "Cumulative_Time";
+const std::string HEADER_DIHEDRAL_ENERGY_NAME = "Dihedral_Energy";
 
 //RegisterObject(ThermoOutput);
 ThermoOutput::ThermoOutput(const Configuration& cfg)
@@ -348,7 +348,8 @@ void ThermoOutput::WriteToFile()
           << "CumulativeTime";
     if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
     {
-      _file << "NonBonEnergy"
+      _file << " "
+            << "NonBonEnergy"
             << " "
             << "BondEnergy"
             << " "

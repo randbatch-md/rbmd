@@ -146,17 +146,6 @@ bool RDFOutput::ShouldOutput()
   return false;
 }
 
-template<typename T>
-void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
-{
-  auto num = arrayHandle.GetNumberOfValues();
-  auto read_protol = arrayHandle.ReadPortal();
-  for (int i = 0; i < num; ++i)
-  {
-    std::cout << read_protol.Get(i) << std::endl;
-  }
-}
-
 void RDFOutput::ComputeRDF()
 {
   if (_executioner.CurrentStep() >= _step_lower && _executioner.CurrentStep() < _step_upper)

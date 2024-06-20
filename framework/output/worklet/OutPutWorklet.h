@@ -99,9 +99,6 @@ void ComputeSpecialBondsCoul(const Real& Vlength,
                 const vtkm::cont::ArrayHandle<vtkm::Id>& molecule_id,
                 const ContPointLocator& locator,
                 vtkm::cont::ArrayHandle<Real>& rdf);
-void GetPositionByType(const vtkm::cont::ArrayHandle<Id>& atom_id,
-                       const vtkm::cont::ArrayHandle<Vec3f>& whole_pts,
-                       vtkm::cont::ArrayHandle<Vec3f>& pts_by_type);
 
 void ComputerKineticEnergy(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
                            const vtkm::cont::ArrayHandle<Real>& mass,

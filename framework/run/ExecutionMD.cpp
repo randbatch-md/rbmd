@@ -95,8 +95,6 @@ void ExecutionMD::Init()
   SetForceFunction();
   SetTopology();
 
-  vtkm::cont::Timer timer;
-  timer.Start();
   if (_para.GetParameter<bool>(PARA_FAR_FORCE))
   {
     auto N = _position.GetNumberOfValues();
@@ -105,7 +103,6 @@ void ExecutionMD::Init()
 
     vtkm::cont::ArrayHandleIndex indexArray(N * _RBE_P);
     vtkm::cont::Invoker{}(SetIndex{ N }, indexArray, _psamplekey);
-    std::cout << "init rhok: " << timer.GetElapsedTime() << std::endl;
   }
   _EleNearPairtimer_counting = 0.0;
 }
@@ -582,9 +579,6 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
 
   Vec3f corr_value = vtkm::cont::Algorithm::Reduce(corr_force, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrForce(corr_value, corr_force, nearforce);
-  _EleNearPairtimer_counting =
-    _EleNearPairtimer_counting + _EleNearPairtimer.GetElapsedTime();
-  std::cout << "RBL pair time: " << _EleNearPairtimer_counting << std::endl;
 
   //auto N = _position.GetNumberOfValues();
   //vtkm::cont::ArrayHandle<Vec3f> corr_force;
