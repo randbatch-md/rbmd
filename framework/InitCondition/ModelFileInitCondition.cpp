@@ -797,26 +797,23 @@ void ModelFileInitCondition::SetAtomsField()
     auto atom_pair_type = _para.GetParameter<std::vector<int>>(PARA_ATOMS_PAIR_TYPE);
     std::vector<Id> atom_pair_id_temp;
     std::vector<Id> offsets;
+    vtkm::Id total_size = 0;
+
     for (int i = 0; i < atom_pair_type.size(); i++)
     {
       auto atoms_type_id = _atoms_map[atom_pair_type[i]];
       atom_pair_id_temp.insert(atom_pair_id_temp.end(), atoms_type_id.begin(), atoms_type_id.end());
-      if (i == 0)
-      {
-        offsets.push_back(0);
-      }
-      else
-      {
-        offsets.push_back(offsets[i - 1] + atoms_type_id.size());
-      }
+
+      offsets.push_back(total_size);
+      total_size += atoms_type_id.size();
     }
-    offsets.push_back(atom_pair_id_temp.size());
+    offsets.push_back(total_size);
     auto atom_pair_id = _para.GetFieldAsArrayHandle<Id>(field::atom_pair_id);
     vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atom_pair_id_temp), atom_pair_id);
     auto atoms_pair_type_offsets = _para.GetFieldAsArrayHandle<Id>(field::atoms_pair_type_offsets);
     vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(offsets), atoms_pair_type_offsets);
   }
-  
+
 
   // init position_flag
   auto position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);

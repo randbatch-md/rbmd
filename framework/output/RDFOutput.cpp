@@ -193,7 +193,7 @@ void RDFOutput::ComputeRDF()
         vtkm::cont::make_ArrayHandleGroupVecVariable(rdf_position, atoms_pair_type_offsets);
       auto type = id_vec_arrayhandle.GetNumberOfValues();
       auto id_read_protol = id_vec_arrayhandle.GetPortalControl();
-      auto position_read_protol = id_vec_arrayhandle.GetPortalControl();
+      auto position_read_protol = position_vec_arrayhandle.GetPortalControl();
 
       for (int i = 0; i < type; ++i)
       {
