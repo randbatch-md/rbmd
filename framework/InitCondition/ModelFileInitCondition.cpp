@@ -398,7 +398,7 @@ void ModelFileInitCondition::Atoms(std::ifstream& file, std::string& line)
         i++;
       }
     }
-    SetAtomsFieldEAM();
+    SetAtomsField();
   }
   //
   else if (atom_style == "full")
@@ -441,46 +441,6 @@ void ModelFileInitCondition::Atoms(std::ifstream& file, std::string& line)
     }
     SetAtomsField();
   }
-  /*
-  if (_header._num_bound_type!=0)
-  {
-    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
-    {
-      if (!line.empty() && line != "\r")
-      {
-        std::istringstream iss(line);
-        iss >> temp_id >> temp_molecule_id >> temp_type >> _charge[temp_id - 1] >>
-          _position[temp_id - 1][0] >> _position[temp_id - 1][1] >> _position[temp_id - 1][2];
-        _atoms_type[temp_id - 1] = temp_type - 1;
-        _molecular_type[temp_id - 1] = _group_info[temp_type];
-        _atoms_id[temp_id - 1] = temp_id - 1;
-        _molecules_id[temp_id - 1] = temp_molecule_id - 1;
-        MolecularMapInsert(_molecules_id[temp_id - 1], _atoms_id[temp_id - 1]);
-        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
-        AtomstoMolecular(_atoms_id[temp_id - 1], _molecules_id[temp_id - 1]);
-        i++;
-      }
-    }
-    SetMolecularGroup();
-  }
-  else if (_header._num_bound_type == 0)
-  {
-    for (int i = 0; i < _header._num_atoms && getline(file, line); i)
-    {
-      if (!line.empty() && line != "\r")
-      {
-        std::istringstream iss(line);
-        iss >> temp_id >> temp_type >> _charge[temp_id - 1] >>
-        _position[temp_id - 1][0] >> _position[temp_id - 1][1] >> _position[temp_id - 1][2];
-        _atoms_type[temp_id - 1] = temp_type - 1;
-        _atoms_id[temp_id - 1] = temp_id - 1;
-        AtomsMapInsert(_atoms_type[temp_id - 1], _atoms_id[temp_id - 1]);
-        i++;
-      }
-    }
-  }
-  SetAtomsField();
-  */
 
 }
 
@@ -747,6 +707,15 @@ void ModelFileInitCondition::SetAtomsField()
   // init Id
   auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(_atoms_id), atom_id);
+
+  // init molecule_Id for RDF
+  auto atom_style = _para.GetParameter<std::string>(ATOM_STYLE);
+  if (atom_style == "atomic" || atom_style == "charge")
+  {
+    auto molecule_id = _para.GetFieldAsArrayHandle<Id>(field::molecule_id);
+    vtkm::cont::ArrayHandleIndex moleculeIdIndex(_position.size());
+    vtkm::cont::ArrayCopy(moleculeIdIndex, molecule_id);
+  }
 
   // init position
   ArrayHandle<Vec3f> position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
