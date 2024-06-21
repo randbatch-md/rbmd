@@ -142,7 +142,7 @@ void ExecutionNVT::ComputeAllForce()
     NearForceLJ();
   }
 
-  if (_init_way != "inbuild")
+  if (_init_way == "read_data" && _para.GetParameter<std::string>(PARA_FILE_TYPE) != "EAM")
   { 
     Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
     
@@ -389,6 +389,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceEAM()
 {
+  _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
   if (_nearforce_type == "RBL")
   {
     ComputeRBLEAMForce(_all_force);
@@ -732,11 +733,24 @@ void ExecutionNVT::ComputeTempe()
 void ExecutionNVT::SetForceFunction()
 {
   InitERF();
-  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-  auto volume = _para.GetParameter<Real>(PARA_VOLUME);
-  auto vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  {
+    auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+    auto volume = _para.GetParameter<Real>(PARA_VOLUME);
+    auto vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+    _force_function.SetParameters(cut_off, _alpha, volume, vlength, _Kmax);
+  }
 
-  _force_function.SetParameters(cut_off, _alpha, volume, vlength, _Kmax);
+  if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  {
+    auto rhomax = _para.GetParameter<Real>(EAM_PARA_RHOMAX);
+    auto nrho = _para.GetParameter<Id>(EAM_PARA_NRHO);
+    auto drho = _para.GetParameter<Real>(EAM_PARA_DRHO);
+    auto nr = _para.GetParameter<Id>(EAM_PARA_NR);
+    auto dr = _para.GetParameter<Real>(EAM_PARA_DR);
+    _force_function.SetEAMParameters(rhomax, nrho, drho, nr, dr);
+  }
+
 }
 
 void ExecutionNVT::SetTopology()
