@@ -63,6 +63,11 @@ private:
   ArrayHandle<Vec3f> _spec_coul_force;
   Real _dt;
   Real _kbT;
+  Real _Tstart;
+  Real _Tstop;
+  Real _Tperiod;
+  Real _Ttarget;
+
   std::string _farforce_type;
   std::string _nearforce_type;
   std::string _temp_con_type;

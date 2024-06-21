@@ -201,6 +201,18 @@ void ExecutionNVT::UpdatePosition()
 void ExecutionNVT::UpdateVelocityByTempConType()
 {
     // ！注意：tauT 和 dt_divide_taut 与 temperature[3] 相关 目前暂定统一为一个常量
+  auto currentstep = _app.GetExecutioner()->CurrentStep();
+  auto beginstep = 0;
+  auto endstep = _app.GetExecutioner()->NumStep();
+
+  auto delta = currentstep - beginstep;
+  if (delta != 0.0)
+  {
+    delta = delta / (endstep - beginstep);
+  }
+  std::cout << delta << std::endl;
+  _Ttarget = _Tstart + delta * (_Tstop - _Tstart);
+  
   _temp_con_type = _para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE);
   if (_temp_con_type == "NOSE_HOOVER")
   {
@@ -209,15 +221,18 @@ void ExecutionNVT::UpdateVelocityByTempConType()
     //Because the temperature curve is the smoothest of all test simulations.
     //In fact, 5.0 and 10.0 are also optional.
     //As long as the coefficent is not too large, such as larger than 100 * dt.
+
     RunWorklet::UpdateVelocityNoseHoover(
       _dt, _unit_factor._fmt2v, _nosehooverxi, _all_force, _mass, _velocity);
     //Real tauT = 20.0 * _dt;
     Real tauT = vtkm::Pow(10.0, -1) * _dt;
-    _nosehooverxi += 0.5 * _dt * (_tempT / _kbT - 1.0) / tauT;
+    //_nosehooverxi += 0.5 * _dt * (_tempT / _kbT - 1.0) / tauT;
+    _nosehooverxi += 0.5 * _dt * (_tempT / _Ttarget - 1.0) / tauT;
   }
   else if (_temp_con_type == "TEMP_RESCALE")
   {
-    Real coeff_rescale = vtkm::Sqrt(_kbT / _tempT);
+    //Real coeff_rescale = vtkm::Sqrt(_kbT / _tempT);
+    Real coeff_rescale = vtkm::Sqrt(_Ttarget / _tempT);
     RunWorklet::UpdateVelocityRescale(coeff_rescale, _velocity);
   }
   else if (_temp_con_type == "BERENDSEN")
@@ -228,8 +243,9 @@ void ExecutionNVT::UpdateVelocityByTempConType()
     //The selection of dt_divide_taut determines the temperature equilibrium time.
     
     //Real dt_divide_taut = 0.02;
-    Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ 默认是这个？？？？？？
-    Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
+    //Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ 默认是这个？？？？？？
+    //Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
+    Real coeff_Berendsen = vtkm::Sqrt(1.0 + _Tperiod * (_Ttarget / _tempT - 1.0));
     RunWorklet::UpdateVelocityRescale(coeff_Berendsen, _velocity);
   }
 }
@@ -770,7 +786,10 @@ void ExecutionNVT::InitParameters()
     _alpha = _para.GetParameter<Real>(PARA_ALPHA);
     _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX); 
   }
-  _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
+  //_kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
+  _Tstart = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0];
+  _Tstop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[1]; 
+  _Tperiod = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
