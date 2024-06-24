@@ -183,8 +183,7 @@ void ExecutionNVT::UpdatePosition()
 
   vtkm::cont::ArrayCopy(_position, _old_position);
 
-  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild" ||
-      _para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild")
   {
     auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
     RunWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
@@ -227,8 +226,9 @@ void ExecutionNVT::UpdateVelocityByTempConType()
     //Maybe dt_divide_taut = 0.05 is a good choice for dt = 2e-3. 0.005, 0.01, 0.1 is optional.
     //The selection of dt_divide_taut determines the temperature equilibrium time.
     
-    //Real dt_divide_taut = 0.02;
-    Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ 默认是这个？？？？？？
+    //Real dt_divide_taut = 0.02; for PEO
+    //Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ 默认是这个？？？？？？
+    auto dt_divide_taut = _dt / _Tdamp;
     Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
     RunWorklet::UpdateVelocityRescale(coeff_Berendsen, _velocity);
   }
@@ -703,17 +703,13 @@ void ExecutionNVT::ComputeTempe()
   {
     _tempT = 0.5 * _tempT_sum / (3 * n / 2.0);
   }
-  else if (shake == "false" || _para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  else if (shake == "null")
   {
-    _tempT = 0.5 * _tempT_sum / ((3 * n ) * temperature_kB / 2.0);
+    _tempT = 0.5 * _tempT_sum / ((3 * n -3 ) * temperature_kB / 2.0);
   }
   else if (shake == "true")
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - n - 3) * temperature_kB / 2.0);
-  }
-  else//(if(shake == "null"))
-  {
-    _tempT = 0.5 * _tempT_sum / ((3 * n - 3) * temperature_kB / 2.0);    
   }
   _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   _para.SetParameter(PARA_TEMPT, _tempT);
@@ -771,6 +767,7 @@ void ExecutionNVT::InitParameters()
     _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX); 
   }
   _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
+  _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
