@@ -325,6 +325,8 @@ void ExecutionMD::InitParameters()
     _unit_factor._fmt2v = 4.186 * vtkm::Pow(10.0, -4);
     _unit_factor._mvv2e = 1.0 / (4.186 * vtkm::Pow(10.0, -4));
     _unit_factor._qqr2e = 332.06371;
+    _unit_factor._boltz = 0.0019872067;
+    _unit_factor._nktv2p = 68568.415;
   }
   else if (_unit == "LJ")
   {
@@ -332,6 +334,8 @@ void ExecutionMD::InitParameters()
     _unit_factor._fmt2v = 1.0;
     _unit_factor._mvv2e = 1.0;
     _unit_factor._qqr2e = 1.0;
+    _unit_factor._boltz = 1.0;
+    _unit_factor._nktv2p = 1.0;
   }
   else if (_unit == "METAL")
   {
@@ -339,6 +343,8 @@ void ExecutionMD::InitParameters()
     _unit_factor._fmt2v = 1.0 / 1.0364269e-4;
     _unit_factor._mvv2e = 1.0364269e-4;
     _unit_factor._qqr2e = 14.399645;
+    _unit_factor._boltz = 8.617343e-5;
+    _unit_factor._nktv2p = 1.6021765e6;
   }
   _para.SetParameter(PARA_UNIT_FACTOR, _unit_factor);
 }
@@ -973,4 +979,32 @@ void ExecutionMD::InitPointLocator()
   _locator.SetRs(_para.GetParameter<Real>(PARA_R_CORE));
 
   _locator.SetPosition(_position);
+  set_global_box();
+}
+
+void ExecutionMD::set_global_box()
+{
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  prd[0] = xprd = range[0].Max - range[0].Min;
+  prd[1] = yprd = range[1].Max - range[1].Min;
+  prd[2] = zprd = range[2].Max - range[2].Min;
+
+  h[0] = xprd;
+  h[1] = yprd;
+  h[2] = zprd;
+  h[3] = 0;
+  h[4] = 0;
+  h[5] = 0;
+
+  //
+  auto orthogonal = 1;
+  if (orthogonal)
+  {
+    h_inv[0] = 1.0 / h[0];
+    h_inv[1] = 1.0 / h[1];
+    h_inv[2] = 1.0 / h[2];
+    h_inv[3] = 0;
+    h_inv[4] = 0;
+    h_inv[5] = 0;
+  }
 }

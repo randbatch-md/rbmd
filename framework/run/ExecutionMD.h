@@ -53,6 +53,7 @@ protected:
                                                         ArrayHandle<Vec3f>& _psample,
                                                         ArrayHandle<Vec2f>& new_rhok);
   void InitPointLocator();
+  void set_global_box();
 
 protected:
   ArrayHandle<Id> _molecule_id;
@@ -80,4 +81,14 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
+
+    //
+  Vec6f h, h_inv; // shape matrix in Voigt ordering
+
+  // orthogonal box
+
+  Real xprd, yprd, zprd;                // global box dimensions
+  Real xprd_half, yprd_half, zprd_half; // half dimensions
+  Vec3f prd;                            // array form of dimensions
+  Vec3f prd_half;                       // array form of half dimensions
 };

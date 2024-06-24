@@ -88,6 +88,7 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
+  fix_press_berendsen();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -735,6 +736,180 @@ void ExecutionNVT::ComputeTempe()
   _para.SetParameter(PARA_TEMPT, _tempT);
 }
 
+void ExecutionNVT::fix_press_berendsen()
+{
+  bulkmodulus = 10.0;
+  p_start[0] = p_start[1] = p_start[2] = _Pstart;
+  p_stop[0] = p_stop[1] = p_stop[2] = _Pstop;
+  p_period[0] = p_period[1] = p_period[2] = _Pperiod;
+
+  // compute new T,P
+
+  //ComputeTempe();
+  Compute_Pressure_Scalar();
+  Couple();
+
+  auto currentstep = _app.GetExecutioner()->CurrentStep();
+  auto beginstep = 0;
+  auto endstep = _app.GetExecutioner()->NumStep();
+
+  auto delta = currentstep - beginstep;
+  if (delta != 0.0)
+  {
+    delta = delta / (endstep - beginstep);
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
+    dilation[i] =
+      std::pow(1.0 - _dt / p_period[i] * (p_target[i] - p_current[i]) / bulkmodulus, 1.0 / 3.0);
+  }
+
+  //for (int i = 0; i < 3; i++)
+  //{
+  //  std::cout << "i=" << i  << ",dilation=" << dilation[i] << std::endl;
+  //}
+  // remap simulation box and atoms
+  // redo KSpace coeffs since volume has changed
+
+  remap();
+}
+
+void ExecutionNVT::ComputeVirial()
+{
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+
+  RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+
+  //pbc
+  //auto range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //Vec3f Vlength;
+  //for (int i= 0;i<3;++i)
+  //{
+  //  Vlength[i] = range[i].Max - range[i].Min;
+  //}
+  //SystemWorklet::LJVirialPBC(
+  //  cut_off, Vlength, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+
+
+  //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
+  //{
+  //  std::cout << "i=" << i << ",_virial_atom=" << _virial_atom.ReadPortal().Get(i)[0] << ","
+  //            << _virial_atom.ReadPortal().Get(i)[1] << "," << _virial_atom.ReadPortal().Get(i)[2] << ","
+  //            << _virial_atom.ReadPortal().Get(i)[3] << "," << _virial_atom.ReadPortal().Get(i)[4] << ","
+  //            << _virial_atom.ReadPortal().Get(i)[5]
+  //      << std::endl;
+  //}
+
+  //reduce virial_atom
+  virial = { 0, 0, 0, 0, 0, 0 };
+  for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
+  {
+    // 获取当前原子的virial
+    Vec6f vatom = _virial_atom.ReadPortal().Get(i);
+    for (int j = 0; j < 6; ++j)
+    {
+      virial[j] += vatom[j];
+    }
+  }
+  //
+  //for (int i = 0; i < 6; ++i)
+  //{
+  //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
+  //}
+}
+
+void ExecutionNVT::Couple()
+{
+  p_current[0] = p_current[1] = p_current[2] = _pressure_scalar;
+}
+
+void ExecutionNVT::x2lamda(Id n)
+{
+  //
+  Vec3f delta;
+  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  //
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  for (int i = 0; i < n; i++)
+  {
+    delta[0] = _position.ReadPortal().Get(i)[0] - range[0].Min;
+    delta[1] = _position.ReadPortal().Get(i)[1] - range[1].Min;
+    delta[2] = _position.ReadPortal().Get(i)[2] - range[2].Min;
+
+    Vec3f lamda_position = { h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2],
+                             h_inv[1] * delta[1] + h_inv[3] * delta[2],
+                             h_inv[2] * delta[2] };
+
+    _position.WritePortal().Set(i, lamda_position);
+  }
+  //_locator.SetPosition(_position);
+  //for (int i = 0; i < n; i++)
+  //{
+  //  std::cout << "i=" << i << ", lamda_position=" << _position.ReadPortal().Get(i)[0] << ","
+  //            << _position.ReadPortal().Get(i)[1] << "," << _position.ReadPortal().Get(i)[2]
+  //            << std::endl;
+  //}
+}
+
+void ExecutionNVT::lamda2x(Id n)
+{
+  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  Vec3f position_base;
+
+  for (int i = 0; i < n; i++)
+  {
+    position_base[0] = _position.ReadPortal().Get(i)[0];
+    position_base[1] = _position.ReadPortal().Get(i)[1];
+    position_base[2] = _position.ReadPortal().Get(i)[2];
+
+    Vec3f x_position = { h[0] * position_base[0] + h[5] * position_base[1] +
+                           h[4] * position_base[2] + static_cast<vtkm::FloatDefault>(range[0].Min),
+                         h[1] * position_base[1] + h[3] * position_base[2] +
+                           static_cast<vtkm::FloatDefault>(range[1].Min),
+                         h[2] * position_base[2] + static_cast<vtkm::FloatDefault>(range[2].Min) };
+
+    _position.WritePortal().Set(i, x_position);
+  }
+  _locator.SetPosition(_position);
+  //for (int i = 0; i < n; i++)
+  //{
+  //  std::cout << "i=" << i << ", new_position=" <<
+  //            _position.ReadPortal().Get(i)[0] << "," <<
+  //            _position.ReadPortal().Get(i)[1] << ","  << _position.ReadPortal().Get(i)[2]
+  //            << std::endl;
+  //}
+}
+
+void ExecutionNVT::remap()
+{
+  Real oldlo, oldhi, ctr;
+  auto n = _position.GetNumberOfValues();
+
+  // convert pertinent atoms and rigid bodies to lamda coords
+  x2lamda(n);
+
+  // reset global and local box to new size/shape
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  for (int i = 0; i < 3; i++)
+  {
+    oldlo = range[i].Min;
+    oldhi = range[i].Max;
+    ctr = 0.5 * (oldlo + oldhi);
+    range[i].Min = (oldlo - ctr) * dilation[i] + ctr;
+    range[i].Max = (oldhi - ctr) * dilation[i] + ctr;
+  }
+  //
+  _para.SetParameter(PARA_RANGE, range);
+
+  set_global_box();
+
+  // convert pertinent atoms and rigid bodies back to box coords
+
+  lamda2x(n);
+}
+
 void ExecutionNVT::SetForceFunction()
 {
   InitERF();
@@ -790,6 +965,9 @@ void ExecutionNVT::InitParameters()
   _Tstart = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0];
   _Tstop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[1]; 
   _Tperiod = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
+  _Pstart = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[0];
+  _Pstop = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[1];
+  _Pperiod = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[2]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);

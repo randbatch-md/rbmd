@@ -54,6 +54,17 @@ private:
   void SetEAM();
   void InitStyle();
 
+     //
+  void ComputeVirial();
+  void Compute_Pressure_Scalar();
+  void Compute_Temp_Scalar();
+  void Couple();
+  void fix_press_berendsen();
+  void x2lamda(Id n);
+  void lamda2x(Id n);
+  void set_global_box();
+  void remap();
+
 private:
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
@@ -63,11 +74,8 @@ private:
   ArrayHandle<Vec3f> _spec_coul_force;
   Real _dt;
   Real _kbT;
-  Real _Tstart;
-  Real _Tstop;
-  Real _Tperiod;
-  Real _Ttarget;
-
+  Real _Tstart, _Tstop, _Tperiod, _Ttarget;
+  Real _Pstart, _Pstop, _Pperiod, _Ptarget;
   std::string _farforce_type;
   std::string _nearforce_type;
   std::string _temp_con_type;
@@ -131,4 +139,19 @@ private:
   std::vector<Id> numforce;
 
   std::vector<Id> map; // mapping from atom types to elements
+
+    //
+  ArrayHandle<Vec6f> _virial_atom;
+  Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
+  Real _pressure_scalar; // computed global pressure scalar
+
+  //
+  Vec3f p_start, p_stop;
+  Vec3f p_period, p_target;
+
+  Vec3f p_current, dilation;
+  Real bulkmodulus;
+
+
+
 };

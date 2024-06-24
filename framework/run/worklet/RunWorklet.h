@@ -204,6 +204,20 @@ namespace RunWorklet
                                const ContTopology& topology,
                                const ContForceFunction& force_function,
                                vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+    void LJVirial(const Real& cut_off,
+                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                  const ContPointLocator& locator,
+                  const ContTopology& topology,
+                  const ContForceFunction& force_function,
+                  vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
+
+    void LJVirialPBC(const Real& cut_off,
+                     const Vec3f& Vlength,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const ContPointLocator& locator,
+                     const ContTopology& topology,
+                     const ContForceFunction& force_function,
+                     vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
     void SpecicalBondsLJForce(const Real& cut_off,
                               const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                               const ContPointLocator& locator,
