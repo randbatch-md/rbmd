@@ -979,32 +979,4 @@ void ExecutionMD::InitPointLocator()
   _locator.SetRs(_para.GetParameter<Real>(PARA_R_CORE));
 
   _locator.SetPosition(_position);
-  set_global_box();
-}
-
-void ExecutionMD::set_global_box()
-{
-  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  prd[0] = xprd = range[0].Max - range[0].Min;
-  prd[1] = yprd = range[1].Max - range[1].Min;
-  prd[2] = zprd = range[2].Max - range[2].Min;
-
-  h[0] = xprd;
-  h[1] = yprd;
-  h[2] = zprd;
-  h[3] = 0;
-  h[4] = 0;
-  h[5] = 0;
-
-  //
-  auto orthogonal = 1;
-  if (orthogonal)
-  {
-    h_inv[0] = 1.0 / h[0];
-    h_inv[1] = 1.0 / h[1];
-    h_inv[2] = 1.0 / h[2];
-    h_inv[3] = 0;
-    h_inv[4] = 0;
-    h_inv[5] = 0;
-  }
 }

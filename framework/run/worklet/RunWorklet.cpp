@@ -2052,6 +2052,33 @@ namespace RunWorklet
                             LJforce);
     }
 
+         void LJVirial(const Real& cut_off,
+                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                  const ContPointLocator& locator,
+                  const ContTopology& topology,
+                  const ContForceFunction& force_function,
+                  vtkm::cont::ArrayHandle<Vec6f>& lj_virial)
+    {
+      vtkm::cont::Invoker{}(
+        ComputeLJVirialWorklet{ cut_off }, atoms_id, locator, topology, force_function, lj_virial);
+    }
+
+    void LJVirialPBC(const Real& cut_off,
+                     const Vec3f& Vlength,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const ContPointLocator& locator,
+                     const ContTopology& topology,
+                     const ContForceFunction& force_function,
+                     vtkm::cont::ArrayHandle<Vec6f>& lj_virial)
+    {
+      vtkm::cont::Invoker{}(ComputeLJVirialPBCWorklet{ cut_off, Vlength },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            lj_virial);
+    }
+
     void EAMfpVerlet(const Real& cut_off,
                      const Real& Vlength,
                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

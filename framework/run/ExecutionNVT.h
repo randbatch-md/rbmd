@@ -152,6 +152,14 @@ private:
   Vec3f p_current, dilation;
   Real bulkmodulus;
 
+      //
+  Vec6f h, h_inv; // shape matrix in Voigt ordering
 
+  // orthogonal box
+
+  Real xprd, yprd, zprd;                // global box dimensions
+  Real xprd_half, yprd_half, zprd_half; // half dimensions
+  Vec3f prd;                            // array form of dimensions
+  Vec3f prd_half;                       // array form of half dimensions
 
 };

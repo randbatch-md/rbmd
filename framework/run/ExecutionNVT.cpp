@@ -107,6 +107,13 @@ void ExecutionNVT::InitialCondition()
     PreForce();
   }
   _nosehooverxi = 0.0;
+
+  //
+  bulkmodulus = 10.0;
+  p_start[0] = p_start[1] = p_start[2] = _Pstart;
+  p_stop[0] = p_stop[1] = p_stop[2] = _Pstop;
+  p_period[0] = p_period[1] = p_period[2] = _Pperiod;
+  set_global_box();
 }
 
 void ExecutionNVT::ComputeForce()
@@ -201,17 +208,17 @@ void ExecutionNVT::UpdatePosition()
 void ExecutionNVT::UpdateVelocityByTempConType()
 {
     // ！注意：tauT 和 dt_divide_taut 与 temperature[3] 相关 目前暂定统一为一个常量
-  auto currentstep = _app.GetExecutioner()->CurrentStep();
-  auto beginstep = 0;
-  auto endstep = _app.GetExecutioner()->NumStep();
+  //auto currentstep = _app.GetExecutioner()->CurrentStep();
+  //auto beginstep = 0;
+  //auto endstep = _app.GetExecutioner()->NumStep();
 
-  auto delta = currentstep - beginstep;
-  if (delta != 0.0)
-  {
-    delta = delta / (endstep - beginstep);
-  }
-  std::cout << delta << std::endl;
-  _Ttarget = _Tstart + delta * (_Tstop - _Tstart);
+  //auto delta = currentstep - beginstep;
+  //if (delta != 0.0)
+  //{
+  //  delta = delta / (endstep - beginstep);
+  //}
+  //std::cout << delta << std::endl;
+  //_Ttarget = _Tstart + delta * (_Tstop - _Tstart);
   
   _temp_con_type = _para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE);
   if (_temp_con_type == "NOSE_HOOVER")
@@ -226,13 +233,13 @@ void ExecutionNVT::UpdateVelocityByTempConType()
       _dt, _unit_factor._fmt2v, _nosehooverxi, _all_force, _mass, _velocity);
     //Real tauT = 20.0 * _dt;
     Real tauT = vtkm::Pow(10.0, -1) * _dt;
-    //_nosehooverxi += 0.5 * _dt * (_tempT / _kbT - 1.0) / tauT;
-    _nosehooverxi += 0.5 * _dt * (_tempT / _Ttarget - 1.0) / tauT;
+    _nosehooverxi += 0.5 * _dt * (_tempT / _kbT - 1.0) / tauT;
+    //_nosehooverxi += 0.5 * _dt * (_tempT / _Ttarget - 1.0) / tauT;
   }
   else if (_temp_con_type == "TEMP_RESCALE")
   {
-    //Real coeff_rescale = vtkm::Sqrt(_kbT / _tempT);
-    Real coeff_rescale = vtkm::Sqrt(_Ttarget / _tempT);
+    Real coeff_rescale = vtkm::Sqrt(_kbT / _tempT);
+    //Real coeff_rescale = vtkm::Sqrt(_Ttarget / _tempT);
     RunWorklet::UpdateVelocityRescale(coeff_rescale, _velocity);
   }
   else if (_temp_con_type == "BERENDSEN")
@@ -244,8 +251,9 @@ void ExecutionNVT::UpdateVelocityByTempConType()
     
     //Real dt_divide_taut = 0.02;
     //Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ 默认是这个？？？？？？
-    //Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
-    Real coeff_Berendsen = vtkm::Sqrt(1.0 + _Tperiod * (_Ttarget / _tempT - 1.0));
+   Real dt_divide_taut = _dt / _Tperiod;
+   Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
+
     RunWorklet::UpdateVelocityRescale(coeff_Berendsen, _velocity);
   }
 }
@@ -733,11 +741,6 @@ void ExecutionNVT::ComputeTempe()
 
 void ExecutionNVT::fix_press_berendsen()
 {
-  bulkmodulus = 10.0;
-  p_start[0] = p_start[1] = p_start[2] = _Pstart;
-  p_stop[0] = p_stop[1] = p_stop[2] = _Pstop;
-  p_period[0] = p_period[1] = p_period[2] = _Pperiod;
-
   // compute new T,P
 
   //ComputeTempe();
@@ -768,6 +771,32 @@ void ExecutionNVT::fix_press_berendsen()
   // redo KSpace coeffs since volume has changed
 
   remap();
+}
+
+void ExecutionNVT::Compute_Pressure_Scalar()
+{
+  //compute temperature
+  auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
+
+  // compute  virial
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto volume =
+    (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+
+  auto inv_volume = 1.0 / volume;
+  ComputeVirial();
+
+  //compute dof
+  auto n = _position.GetNumberOfValues();
+  auto extra_dof = 3; //dimension =3
+  auto dof = 3 * n - extra_dof;
+
+  //compute pressure_scalar
+  _pressure_scalar = (dof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
+    3.0 * inv_volume * _unit_factor._nktv2p;
+
+  _para.SetParameter(PARA_PRESSURE, _pressure_scalar);
+  std::cout << " pressure=" << _pressure_scalar << std::endl;
 }
 
 void ExecutionNVT::ComputeVirial()
@@ -817,6 +846,33 @@ void ExecutionNVT::ComputeVirial()
 void ExecutionNVT::Couple()
 {
   p_current[0] = p_current[1] = p_current[2] = _pressure_scalar;
+}
+
+void ExecutionNVT::set_global_box()
+{
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  prd[0] = xprd = range[0].Max - range[0].Min;
+  prd[1] = yprd = range[1].Max - range[1].Min;
+  prd[2] = zprd = range[2].Max - range[2].Min;
+
+  h[0] = xprd;
+  h[1] = yprd;
+  h[2] = zprd;
+  h[3] = 0;
+  h[4] = 0;
+  h[5] = 0;
+
+  //
+  auto orthogonal = 1;
+  if (orthogonal)
+  {
+    h_inv[0] = 1.0 / h[0];
+    h_inv[1] = 1.0 / h[1];
+    h_inv[2] = 1.0 / h[2];
+    h_inv[3] = 0;
+    h_inv[4] = 0;
+    h_inv[5] = 0;
+  }
 }
 
 void ExecutionNVT::x2lamda(Id n)
@@ -956,7 +1012,7 @@ void ExecutionNVT::InitParameters()
     _alpha = _para.GetParameter<Real>(PARA_ALPHA);
     _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX); 
   }
-  //_kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
+  _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
   _Tstart = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0];
   _Tstop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[1]; 
   _Tperiod = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
