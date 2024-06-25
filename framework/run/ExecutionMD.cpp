@@ -979,4 +979,5 @@ void ExecutionMD::InitPointLocator()
   _locator.SetRs(_para.GetParameter<Real>(PARA_R_CORE));
 
   _locator.SetPosition(_position);
+
 }
