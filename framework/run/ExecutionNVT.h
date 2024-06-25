@@ -73,7 +73,7 @@ private:
   ArrayHandle<Vec3f> _all_force;
   ArrayHandle<Vec3f> _spec_coul_force;
   Real _dt;
-  Real _kbT;
+  Real _kbT ,_Tdamp;
   Real _Tstart, _Tstop, _Tperiod, _Ttarget;
   Real _Pstart, _Pstop, _Pperiod, _Ptarget;
   std::string _farforce_type;

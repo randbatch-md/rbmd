@@ -184,8 +184,7 @@ void ExecutionNVT::UpdatePosition()
 
   vtkm::cont::ArrayCopy(_position, _old_position);
 
-  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild" ||
-      _para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild")
   {
     auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
     RunWorklet::UpdatePositionFlag(_dt, _velocity, _locator, _position, position_flag);
@@ -720,17 +719,13 @@ void ExecutionNVT::ComputeTempe()
   {
     _tempT = 0.5 * _tempT_sum / (3 * n / 2.0);
   }
-  else if (shake == "false" || _para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
+  else if (shake == "null")
   {
-    _tempT = 0.5 * _tempT_sum / ((3 * n ) * temperature_kB / 2.0);
+    _tempT = 0.5 * _tempT_sum / ((3 * n -3 ) * temperature_kB / 2.0);
   }
   else if (shake == "true")
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - n - 3) * temperature_kB / 2.0);
-  }
-  else//(if(shake == "null"))
-  {
-    _tempT = 0.5 * _tempT_sum / ((3 * n - 3) * temperature_kB / 2.0);    
   }
   _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   _para.SetParameter(PARA_TEMPT, _tempT);
@@ -968,6 +963,7 @@ void ExecutionNVT::InitParameters()
   _Pstart = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[0];
   _Pstop = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[1];
   _Pperiod = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[2]; 
+  _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
