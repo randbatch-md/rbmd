@@ -27,4 +27,8 @@ void Neighbor::SetParameters()
     _para.SetParameter(PARA_R_CORE, Get<Real>("r_core"));
     _para.SetParameter(PARA_NEIGHBOR_SAMPLE_NUM, Get<Real>("neighbor_sample_num"));
   }
+  else
+  {
+    _para.SetParameter(PARA_R_CORE, Get<Real>("cut_off")); //Get<Real>("cut_off"));
+  }
 }

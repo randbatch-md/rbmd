@@ -663,7 +663,7 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
   auto N = _position.GetNumberOfValues();
   auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
-  auto verletlist_num = N * max_j_num;
+  auto verletlist_num = N * N;
 
   ArrayHandle<Id> id_verletlist;
   ArrayHandle<Vec3f> offset_verletlist;
@@ -672,7 +672,7 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
 
   std::vector<Id> temp_vec(N + 1);
   Id inc = 0;
-  std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * max_j_num; });
+  std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * N; });
   vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
 
   auto id_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
@@ -684,28 +684,28 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
   // 默认使用erf
   //if (_use_erf == true)
   //{
-    RunWorklet::NearForceVerletERF(cut_off,
-                                      _atoms_id,
-                                      _locator,
-                                      _topology,
-                                      _force_function,
-                                      _static_table,
-                                      id_verletlist_group,
-                                      num_verletlist,
-                                      offset_verletlist_group,
-                                      nearforce);
+    //RunWorklet::NearForceVerletERF(cut_off,
+    //                                  _atoms_id,
+    //                                  _locator,
+    //                                  _topology,
+    //                                  _force_function,
+    //                                  _static_table,
+    //                                  id_verletlist_group,
+    //                                  num_verletlist,
+    //                                  offset_verletlist_group,
+    //                                  nearforce);
   //}
   //else
   //{
-  //  RunWorklet::NearForceVerlet(cut_off,
-  //                                 _atoms_id,
-  //                                 _locator,
-  //                                 _topology,
-  //                                 _force_function,
-  //                                 id_verletlist_group,
-  //                                 num_verletlist,
-  //                                 offset_verletlist_group,
-  //                                 nearforce);
+    RunWorklet::NearForceVerlet(cut_off,
+                                   _atoms_id,
+                                   _locator,
+                                   _topology,
+                                   _force_function,
+                                   id_verletlist_group,
+                                   num_verletlist,
+                                   offset_verletlist_group,
+                                   nearforce);
   //}
 }
 
@@ -734,14 +734,14 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
   RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::LJForceVerlet(cut_off,
-                               _atoms_id,
-                               _locator,
-                               _topology,
-                               _force_function,
-                               id_verletlist_group,
-                               num_verletlist,
-                               offset_verletlist_group,
-                               ljforce);
+                            _atoms_id,
+                            _locator,
+                            _topology,
+                            _force_function,
+                            id_verletlist_group,
+                            num_verletlist,
+                            offset_verletlist_group,
+                            ljforce);
 }
 void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 {
