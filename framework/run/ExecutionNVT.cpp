@@ -69,7 +69,7 @@ void ExecutionNVT::Solve()
 
   // stage2:
   UpdatePosition();
-  fix_press_berendsen();
+  //fix_press_berendsen();
 
   //New added
   if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
@@ -89,7 +89,7 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  //fix_press_berendsen();
+  fix_press_berendsen();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -110,7 +110,7 @@ void ExecutionNVT::InitialCondition()
   _nosehooverxi = 0.0;
 
   //
-  bulkmodulus = 100.0;
+  //bulkmodulus = 100.0;
   p_start[0] = p_start[1] = p_start[2] = _Pstart;
   p_stop[0] = p_stop[1] = p_stop[2] = _Pstop;
   p_period[0] = p_period[1] = p_period[2] = _Pperiod;
@@ -744,7 +744,7 @@ void ExecutionNVT::fix_press_berendsen()
 {
   // compute new T,P
 
-  ComputeTempe();
+  //cComputeTempe();
   Compute_Pressure_Scalar();
   Couple();
 
@@ -752,28 +752,24 @@ void ExecutionNVT::fix_press_berendsen()
   auto beginstep = 0;
   auto endstep = _app.GetExecutioner()->NumStep();
 
-  auto  delta0 = currentstep - beginstep;
-   
-  //if (delta0 != 0.0)
-  //{
-  //  delta = delta0 / (endstep - beginstep);
-  //}
-  Real delta = static_cast<Real>(delta0) / static_cast<Real>(endstep - beginstep);
+  Real delta = currentstep - beginstep;
+  if (delta != 0.0)
+  {
+    delta = delta / static_cast<Real>(endstep - beginstep);
+  }
   //std::cout << ",delta0=" << delta0 << ",delta=" << delta<<  std::endl;
+  std::cout << ",delta=" << delta << std::endl;
   for (int i = 0; i < 3; i++)
   {
     auto dt_over_period = _dt / p_period[i];
-    auto bulkmodulus_inv = 1.0 / bulkmodulus;
+    auto bulkmodulus_inv = 1.0 / _bulkmodulus;
     p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
-    dilation[i] = std::pow(1.0 - dt_over_period * (p_target[i] - p_current[i]) * bulkmodulus_inv, 1.0 / 3.0);
+    dilation[i] = vtkm::Pow(1.0 - dt_over_period * (p_target[i] - p_current[i]) * bulkmodulus_inv, 1.0/3.0);
   }
 
-  //for (int i = 0; i < 3; i++)
-  //{
-  //  std::cout << "i=" << i << ",p_target=" << p_target[i] << std::endl;
-  //}
+  std::cout << "p_target=" << p_target[0] << ",p_current=" << p_current[0]
+            << ",dilation=" << dilation[0] << std::endl;
 
-  std::cout << ",p_target=" << p_target[0] << ",dilation=" << dilation[0] << std::endl;
   // remap simulation box and atoms
   // redo KSpace coeffs since volume has changed
 
@@ -901,7 +897,7 @@ void ExecutionNVT::x2lamda(Id n)
 
     _position.WritePortal().Set(i, lamda_position);
   }
-  //_locator.SetPosition(_position);
+  _locator.SetPosition(_position);
   //for (int i = 0; i < n; i++)
   //{
   //  std::cout << "i=" << i << ", lamda_position=" << _position.ReadPortal().Get(i)[0] << ","
@@ -930,7 +926,7 @@ void ExecutionNVT::lamda2x(Id n)
 
     _position.WritePortal().Set(i, x_position);
   }
-  //_locator.SetPosition(_position);
+  _locator.SetPosition(_position);
   //for (int i = 0; i < n; i++)
   //{
   //  std::cout << "i=" << i << ", new_position=" <<
@@ -950,6 +946,7 @@ void ExecutionNVT::remap()
 
   // reset global and local box to new size/shape
   vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  std::cout << "0range.Min=" << range[0].Min << ",0range.Max=" << range[0].Max << std::endl;
   for (int i = 0; i < 3; i++)
   {
     oldlo = range[i].Min;
@@ -958,6 +955,7 @@ void ExecutionNVT::remap()
     range[i].Min = (oldlo - ctr) * dilation[i] + ctr;
     range[i].Max = (oldhi - ctr) * dilation[i] + ctr;
   }
+  std::cout << "range.Min=" << range[0].Min << ",range.Max=" << range[0].Max << std::endl;
   //
   _para.SetParameter(PARA_RANGE, range);
 
@@ -966,12 +964,11 @@ void ExecutionNVT::remap()
 
   //for (auto i = 0; i < n; ++i)
   //{
-  //  // Update atom position based on new box size and dilation
-  //  // Example calculation:
   //  _position.ReadPortal().Get(i)[0] = (_position.ReadPortal().Get(i)[0] - ctr) * dilation[0] + ctr;
   //  _position.ReadPortal().Get(i)[1] = (_position.ReadPortal().Get(i)[1] - ctr) * dilation[1] + ctr;
   //  _position.ReadPortal().Get(i)[2] = (_position.ReadPortal().Get(i)[2] - ctr) * dilation[2] + ctr;
   //}
+  //_locator.SetPosition(_position);
 
   // convert pertinent atoms and rigid bodies back to box coords
 
@@ -1035,7 +1032,8 @@ void ExecutionNVT::InitParameters()
   _Tperiod = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
   _Pstart = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[0];
   _Pstop = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[1];
-  _Pperiod = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[2]; 
+  _Pperiod = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[2];
+  _bulkmodulus = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[3];
   _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });

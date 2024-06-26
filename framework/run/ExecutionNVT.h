@@ -75,7 +75,7 @@ private:
   Real _dt;
   Real _kbT ,_Tdamp;
   Real _Tstart, _Tstop, _Tperiod, _Ttarget;
-  Real _Pstart, _Pstop, _Pperiod, _Ptarget;
+  Real _Pstart, _Pstop, _Pperiod, _Ptarget, _bulkmodulus;
   std::string _farforce_type;
   std::string _nearforce_type;
   std::string _temp_con_type;
