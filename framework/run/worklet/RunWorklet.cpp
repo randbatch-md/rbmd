@@ -54,7 +54,7 @@ namespace RunWorklet
                 auto r_ij = p_j - p_i;
                 const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
                 const Real _cut_off_2 = _cut_off * _cut_off;
-                if(dis_2 < _cut_off_2)
+                if ( _cut_off_2 - dis_2 > 0.0001 && dis_2 > 0.0001)
                 {
                   id_verletlist[index] = pts_id_j;
                   offset_verletlist[index] = coord_offset;
