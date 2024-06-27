@@ -69,7 +69,7 @@ void ExecutionNVT::Solve()
 
   // stage2:
   UpdatePosition();
-  //fix_press_berendsen();
+  fix_press_berendsen();
 
   //New added
   if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
@@ -89,7 +89,7 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  fix_press_berendsen();
+  //fix_press_berendsen();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -744,7 +744,7 @@ void ExecutionNVT::fix_press_berendsen()
 {
   // compute new T,P
 
-  //cComputeTempe();
+  ComputeTempe();
   Compute_Pressure_Scalar();
   Couple();
 
