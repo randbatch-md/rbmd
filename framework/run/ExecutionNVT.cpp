@@ -946,7 +946,6 @@ void ExecutionNVT::remap()
 
   // reset global and local box to new size/shape
   vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  std::cout << "0range.Min=" << range[0].Min << ",0range.Max=" << range[0].Max << std::endl;
   for (int i = 0; i < 3; i++)
   {
     oldlo = range[i].Min;
