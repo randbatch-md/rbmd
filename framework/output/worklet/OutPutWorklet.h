@@ -45,7 +45,15 @@ void ComputePotentialEnergy(const Real& cutoff,
                              const ContForceFunction& force_function,
                              vtkm::cont::ArrayHandle<Real>& potential_energy);
 
-void ComputeSpecialBondsLJPotential(const Real& cutoff,
+  void ComputePotentialEnergyPBC(const Real& cutoff,
+                               const Vec3f& Vlength,
+                               const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                               const ContPointLocator& locator,
+                               const ContTopology& topology,
+                               const ContForceFunction& force_function,
+                               vtkm::cont::ArrayHandle<Real>& potential_energy);
+
+ void ComputeSpecialBondsLJPotential(const Real& cutoff,
                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                     const ContPointLocator& locator,
                                     const ContTopology& topology,

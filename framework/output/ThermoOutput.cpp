@@ -138,7 +138,15 @@ void ThermoOutput::ComputePotentialEnergy()
 
   if (_para.GetParameter<std::string>(PARA_INIT_WAY) == "inbuild")
   {
-    OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy);  
+    OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy); 
+      //pbc
+    //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+    //Vec3f Vlength;
+    //for (int i= 0;i<3;++i)
+    //{
+    //  Vlength[i] = range[i].Max - range[i].Min;
+    //}
+    //OutPut::ComputePotentialEnergyPBC(_cut_off, Vlength, atoms_id, locator, topology, force_function, lj_potential_energy); 
   }
   else
   {
