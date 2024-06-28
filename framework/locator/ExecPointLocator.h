@@ -182,6 +182,42 @@ public:
     return vec;
   }
 
+  VTKM_EXEC Vec3f ApplyMinVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _vlength) const
+  {
+    Vec3f vec = p1 - p2;
+    // 处理原子间的距离
+    for (vtkm::Id i = 0; i < 3; ++i)
+    {
+      if (vec[i] < -_vlength[i]* 0.5)
+      {
+        vec[i] += _vlength[i];
+      }
+      else if (vec[i] > _vlength[i] * 0.5)
+      {
+        vec[i] -= _vlength[i];
+      }
+    }
+    return vec;
+  }
+
+  VTKM_EXEC Vec3f ApplyPbcVec(const Vec3f& p,  const Vec3f& _vlength) const
+  {
+    Vec3f px{0,0,0};
+    for (vtkm::Id i = 0; i < 3; ++i)
+    {
+      if (p[i] < 0)
+      {
+        px[i] = p[i] + _vlength[i];
+      }
+      else if (p[i] > _vlength[i])
+      {
+        px[i] = p[i] - _vlength[i];
+      }
+    }
+
+    return px;
+  }
+
   VTKM_EXEC vtkm::Vec3f GetPtsPosition(const Id& atoms_id) const
   {
     return _position.Get(atoms_id);

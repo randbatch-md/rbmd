@@ -192,6 +192,9 @@ void ExecutionNVT::UpdatePosition()
 
   vtkm::cont::ArrayCopy(_position, _old_position);
 
+  //pbc
+  //ApplyPbc();
+
   if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild")
   {
     auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
@@ -806,17 +809,17 @@ void ExecutionNVT::ComputeVirial()
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
 
-  RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  //RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
   //pbc
-  //auto range = GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  //Vec3f Vlength;
-  //for (int i= 0;i<3;++i)
-  //{
-  //  Vlength[i] = range[i].Max - range[i].Min;
-  //}
-  //SystemWorklet::LJVirialPBC(
-  //  cut_off, Vlength, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  Vec3f box;
+  for (int i= 0;i<3;++i)
+  {
+    box[i] = range[i].Max - range[i].Min;
+  }
+  RunWorklet::LJVirialPBC(
+    cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
 
   //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
@@ -876,6 +879,19 @@ void ExecutionNVT::set_global_box()
     h_inv[4] = 0;
     h_inv[5] = 0;
   }
+}
+
+void ExecutionNVT::ApplyPbc()
+{
+  //pbc
+  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  Vec3f box;
+  for (int i = 0; i < 3; ++i)
+  {
+    box[i] = range[i].Max - range[i].Min;
+  }
+  RunWorklet::ApplyPbc(box, _position, _locator);
+
 }
 
 void ExecutionNVT::x2lamda(Id n)

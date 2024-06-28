@@ -64,6 +64,7 @@ private:
   void lamda2x(Id n);
   void set_global_box();
   void remap();
+  void ApplyPbc();
 
 private:
   ArrayHandle<Vec3f> _nearforce;

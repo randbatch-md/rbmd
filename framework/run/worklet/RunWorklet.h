@@ -163,6 +163,18 @@ namespace RunWorklet
                     const CoordOffsetType& offset_verletlist_group,
                     vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce);
 
+    void LJForceRBLPBC(const Id& rs_num,
+                       const Id& pice_num,
+                       const Vec3f& Vlength,
+                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                       const ContPointLocator& locator,
+                       const ContTopology& topology,
+                       const ContForceFunction& force_function,
+                       const GroupVecType& id_verletlist_group,
+                       const GroupNumType& num_verletlist,
+                       const CoordOffsetType& offset_verletlist_group,
+                       vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce);
+
     void EAMfp(const Real& rc,
                const Real& Vlength,
                const Real& rs,
@@ -212,7 +224,7 @@ namespace RunWorklet
                   vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
 
     void LJVirialPBC(const Real& cut_off,
-                     const Vec3f& Vlength,
+                     const Vec3f& box,
                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                      const ContPointLocator& locator,
                      const ContTopology& topology,
@@ -347,4 +359,8 @@ namespace RunWorklet
                                       const ContTopology& topology,
                                       const ContPointLocator& locator,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce);
-}
+
+    void ApplyPbc(const Vec3f& box,
+                  vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                  const ContPointLocator& locator);
+ }

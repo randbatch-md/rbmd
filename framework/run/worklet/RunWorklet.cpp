@@ -582,9 +582,9 @@ namespace RunWorklet
 
     struct ComputeLJVirialPBCWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeLJVirialPBCWorklet(const Real& cut_off, const Vec3f& Vlength)
+      ComputeLJVirialPBCWorklet(const Real& cut_off, const Vec3f& box)
         : _cut_off(cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -616,8 +616,9 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistanceVec(p_i, p_j, _Vlength);
+          // auto r_ij = p_j - p_i;
+          //auto r_ij = locator.MinDistanceVec(pbc_pi, pbc_pj, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
 
           virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
         };
@@ -625,9 +626,8 @@ namespace RunWorklet
         lj_virial = virial;
       }
       Real _cut_off;
-      Vec3f _Vlength;
+      Vec3f _box;
     };
-
 
     struct ComputeSpecialBondsLJWorklet : vtkm::worklet::WorkletMapField
     {
@@ -1350,6 +1350,92 @@ namespace RunWorklet
       Id _pice_num;
     };
 
+    struct ComputeLJForceRBLPBCWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeLJForceRBLPBCWorklet(const Id& rs_num, const Id& pice_num, const Vec3f& Vlength)
+        : _rs_num(rs_num)
+        , _pice_num(pice_num)
+        ,_Vlength(Vlength)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldInOut id_verletlist_group,
+                                    FieldInOut num_verletlist,
+                                    FieldInOut offset_verletlist_group,
+                                    FieldOut corr_ljforce);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+
+      template<typename NeighbourGroupVecType, typename numType, typename CoordOffsetType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const NeighbourGroupVecType& id_verletlist,
+                                const numType& num_verletlist,
+                                const CoordOffsetType& offset_verletlist,
+                                Vec3f& corr_ljforce) const
+      {
+        vtkm::Vec3f rc_force_lj = { 0, 0, 0 };
+        vtkm::Vec3f rcs_force_lj = { 0, 0, 0 };
+
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+        auto rc = locator._cut_off;
+        auto rs = locator._rs;
+        auto charge_pi = topology.GetCharge(atoms_id);
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
+        {
+          auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+          if (molecular_id_i == molecular_id_j)
+            return;
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+         // auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _Vlength);
+
+          if (flag == 1)
+          {
+            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+          }
+          if (flag == 2)
+          {
+            rcs_force_lj += _pice_num *
+              force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+          }
+        };
+
+        auto p_i = locator.GetPtsPosition(atoms_id);
+        for (Id p = 0; p < num_verletlist[0]; p++)
+        {
+          Id id_rs = id_verletlist[p];
+          auto p_j = locator.GetPtsPosition(id_rs) - offset_verletlist[p];
+          function(p_i, p_j, id_rs, 1);
+        }
+
+        for (Id p = 0; p < num_verletlist[1]; p++)
+        {
+          Id id_random = id_verletlist[_rs_num + p];
+          auto p_j = locator.GetPtsPosition(id_random) - offset_verletlist[_rs_num + p];
+          function(p_i, p_j, id_random, 2);
+        }
+
+        // Individual output requirements can be used
+        auto LJforce = rc_force_lj + rcs_force_lj;
+        corr_ljforce = LJforce;
+      }
+      Id _rs_num;
+      Id _pice_num;
+      Vec3f _Vlength;
+    };
+
     struct SumRBLCorrForceWorklet : vtkm::worklet::WorkletMapField
     {
       SumRBLCorrForceWorklet(const vtkm::Vec3f corr_value)
@@ -1895,6 +1981,35 @@ namespace RunWorklet
       Real _dt;
     };
 
+    struct ApplyPbcWorklet : vtkm::worklet::WorkletMapField
+    {
+      ApplyPbcWorklet(const Vec3f& vlength)
+        : _vlength(vlength)
+      {
+      }
+
+      using ControlSignature = void(FieldInOut position, ExecObject locator);
+      using ExecutionSignature = void(_1, _2);
+
+      template<typename CoordType>
+      VTKM_EXEC void operator()(CoordType& position,const ExecPointLocator locator) const
+      {
+        for (vtkm::Id i = 0; i < 3; ++i)
+        {
+          if (position[i]< 0)
+          {
+                position[i] += _vlength[i];
+          }
+          else if (position[i] > _vlength[i])
+          {
+                position[i] -= _vlength[i];
+          }
+        }
+        locator.UpdateOverRangePoint(position);
+      }
+      Vec3f _vlength;
+    };
+
     struct UpdatePositionFlagWorklet : vtkm::worklet::WorkletMapField
     {
       UpdatePositionFlagWorklet(const Real& dt)
@@ -2064,14 +2179,14 @@ namespace RunWorklet
     }
 
     void LJVirialPBC(const Real& cut_off,
-                     const Vec3f& Vlength,
+                     const Vec3f& box,
                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                      const ContPointLocator& locator,
                      const ContTopology& topology,
                      const ContForceFunction& force_function,
                      vtkm::cont::ArrayHandle<Vec6f>& lj_virial)
     {
-      vtkm::cont::Invoker{}(ComputeLJVirialPBCWorklet{ cut_off, Vlength },
+      vtkm::cont::Invoker{}(ComputeLJVirialPBCWorklet{ cut_off, box },
                             atoms_id,
                             locator,
                             topology,
@@ -2277,6 +2392,29 @@ namespace RunWorklet
                      vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce)
      {
       vtkm::cont::Invoker{}(ComputeLJForceRBLWorklet{ rs_num, pice_num },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            id_verletlist_group,
+                            num_verletlist,
+                            offset_verletlist_group,
+                            corr_ljforce);
+     }
+
+     void LJForceRBLPBC(const Id& rs_num,
+                        const Id& pice_num,
+                        const Vec3f& Vlength,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const ContPointLocator& locator,
+                     const ContTopology& topology,
+                     const ContForceFunction& force_function,
+                     const GroupVecType& id_verletlist_group,
+                     const GroupNumType& num_verletlist,
+                     const CoordOffsetType& offset_verletlist_group,
+                     vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce)
+     {
+      vtkm::cont::Invoker{}(ComputeLJForceRBLPBCWorklet{ rs_num, pice_num ,Vlength},
                             atoms_id,
                             locator,
                             topology,
@@ -2553,6 +2691,13 @@ namespace RunWorklet
     {
          vtkm::cont::Invoker{}(
          UpdatePositionWorklet{ dt}, velocity, locator, position);
+    }  
+
+     void ApplyPbc(const Vec3f& box,
+                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                   const ContPointLocator& locator)
+    {
+         vtkm::cont::Invoker{}(ApplyPbcWorklet{ box }, position, locator);
     }  
 
     void UpdatePositionFlag(const Real& dt,
