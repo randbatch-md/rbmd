@@ -121,8 +121,7 @@ public:
     const Real cut_off_2 = cut_off * cut_off;
     const Real rs_2 = rs * rs;
 
-    //if (dis_2 < cut_off_2 && dis_2 > rs_2)
-    if (dis_2 < cut_off_2)
+    if (dis_2 < cut_off_2 && dis_2 > rs_2)
     {
       Real sigma_ij = (sigma_i + sigma_j) / 2;
 

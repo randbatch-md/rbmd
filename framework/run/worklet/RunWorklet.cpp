@@ -572,7 +572,7 @@ namespace RunWorklet
           auto sigma_j = topology.GetSigma(pts_type_j);
           auto r_ij = p_j - p_i;
 
-          virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          virial += 2*force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
         lj_virial = virial;
@@ -619,8 +619,9 @@ namespace RunWorklet
           // auto r_ij = p_j - p_i;
           //auto r_ij = locator.MinDistanceVec(pbc_pi, pbc_pj, _Vlength);
           auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
+          //auto r_ij = locator.ApplyMinVec(p_i, p_j, _box);
 
-          virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          virial += 2*force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
         lj_virial = virial;
@@ -1318,11 +1319,11 @@ namespace RunWorklet
 
           if (flag == 1)
           {
-            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+            rc_force_lj += 2*force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
           }
           if (flag == 2)
           {
-            rcs_force_lj += _pice_num *
+            rcs_force_lj += 2 * _pice_num *
               force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
           }
         };
@@ -1399,15 +1400,16 @@ namespace RunWorklet
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
          // auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistanceVec(p_i, p_j, _Vlength);
+          //auto r_ij = locator.MinDistanceVec(p_i, p_j, _Vlength);
+          auto r_ij = locator.ApplyMinVec(p_i,p_j,_Vlength);
 
           if (flag == 1)
           {
-            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+            rc_force_lj += 2*force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
           }
           if (flag == 2)
           {
-            rcs_force_lj += _pice_num *
+            rcs_force_lj += 2 * _pice_num *
               force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
           }
         };
@@ -2008,6 +2010,25 @@ namespace RunWorklet
         locator.UpdateOverRangePoint(position);
       }
       Vec3f _vlength;
+    };
+
+    struct fix_press_berendsenWorklet : vtkm::worklet::WorkletMapField
+    {
+      fix_press_berendsenWorklet(const Real& scale_factor)
+        : _scale_factor(scale_factor)
+      {
+      }
+
+      using ControlSignature = void(FieldInOut position, ExecObject locator);
+      using ExecutionSignature = void(_1, _2);
+
+      template<typename CoordType>
+      VTKM_EXEC void operator()(CoordType& position, const ExecPointLocator locator) const
+      {
+        position = _scale_factor * position;
+        locator.UpdateOverRangePoint(position);
+      }
+      Real _scale_factor;
     };
 
     struct UpdatePositionFlagWorklet : vtkm::worklet::WorkletMapField
@@ -2698,6 +2719,14 @@ namespace RunWorklet
                    const ContPointLocator& locator)
     {
          vtkm::cont::Invoker{}(ApplyPbcWorklet{ box }, position, locator);
+    }  
+
+     
+     void fix_press_berendsen(const Real& scale_factor,
+                  vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                  const ContPointLocator& locator)
+    {
+         vtkm::cont::Invoker{}(fix_press_berendsenWorklet{ scale_factor }, position, locator);
     }  
 
     void UpdatePositionFlag(const Real& dt,

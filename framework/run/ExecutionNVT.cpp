@@ -748,6 +748,40 @@ void ExecutionNVT::fix_press_berendsen()
   // compute new T,P
 
   //ComputeTempe();
+  //Compute_Pressure_Scalar();
+ // Couple();
+
+  //auto currentstep = _app.GetExecutioner()->CurrentStep();
+  //auto beginstep = 0;
+  //auto endstep = _app.GetExecutioner()->NumStep();
+
+  //Real delta = currentstep - beginstep;
+  //if (delta != 0.0)
+  //{
+  //  delta = delta / static_cast<Real>(endstep - beginstep);
+  //}
+  //std::cout << ",delta0=" << delta0 << ",delta=" << delta<<  std::endl;
+  //std::cout << ",delta=" << delta << std::endl;
+  //for (int i = 0; i < 3; i++)
+  //{
+  //  auto dt_over_period = _dt / p_period[i];
+   // auto bulkmodulus_inv = 1.0 / _bulkmodulus;
+   // p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
+    //dilation[i] = vtkm::Pow(1.0 - dt_over_period * (p_target[i] - p_current[i]) * bulkmodulus_inv, 1.0/3.0);
+ // }
+
+  //std::cout << "p_target=" << p_target[0] << ",p_current=" << p_current[0]
+  //          << ",dilation=" << dilation[0] << std::endl;
+
+  // remap simulation box and atoms
+  // redo KSpace coeffs since volume has changed
+
+  //remap();
+
+  //(2)
+  // compute new T,P
+
+  //ComputeTempe();
   Compute_Pressure_Scalar();
   Couple();
 
@@ -764,19 +798,22 @@ void ExecutionNVT::fix_press_berendsen()
   std::cout << ",delta=" << delta << std::endl;
   for (int i = 0; i < 3; i++)
   {
-    auto dt_over_period = _dt / p_period[i];
-    auto bulkmodulus_inv = 1.0 / _bulkmodulus;
     p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
-    dilation[i] = vtkm::Pow(1.0 - dt_over_period * (p_target[i] - p_current[i]) * bulkmodulus_inv, 1.0/3.0);
   }
-
-  std::cout << "p_target=" << p_target[0] << ",p_current=" << p_current[0]
-            << ",dilation=" << dilation[0] << std::endl;
-
-  // remap simulation box and atoms
-  // redo KSpace coeffs since volume has changed
-
-  remap();
+  auto dt_over_period = _dt / p_period[0];
+  auto scale_factor =
+    1.0 - dt_over_period * (p_target[0] - (p_current[0] + p_current[1] + p_current[2]) * 0.3333);
+  //
+  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  Vec3f box;
+  for (int i = 0; i < 3; ++i)
+  {
+    box[i] = range[i].Max - range[i].Min;
+    box[i] *= scale_factor;
+  }
+  _para.SetParameter(PARA_RANGE, range);
+  RunWorklet::fix_press_berendsen(scale_factor, _position, _locator);
+  _locator.SetPosition(_position);
 }
 
 void ExecutionNVT::Compute_Pressure_Scalar()
@@ -787,7 +824,7 @@ void ExecutionNVT::Compute_Pressure_Scalar()
   // compute  virial
   vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
   auto volume =
-    (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+      (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
 
   auto inv_volume = 1.0 / volume;
   ComputeVirial();
@@ -809,17 +846,17 @@ void ExecutionNVT::ComputeVirial()
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
 
-  //RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+   RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
   //pbc
-  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  Vec3f box;
-  for (int i= 0;i<3;++i)
-  {
-    box[i] = range[i].Max - range[i].Min;
-  }
-  RunWorklet::LJVirialPBC(
-    cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //Vec3f box;
+  //for (int i= 0;i<3;++i)
+  //{
+  //  box[i] = range[i].Max - range[i].Min;
+  //}
+  //RunWorklet::LJVirialPBC(
+  //  cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
 
   //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)

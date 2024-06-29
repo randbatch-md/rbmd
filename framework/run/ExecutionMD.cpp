@@ -647,35 +647,35 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
                                           num_verletlist_group,
                                           offset_verletlist_group);
 
-  //RunWorklet::LJForceRBL(rs_num,
-  //                          pice_num,
-  //                          _atoms_id,
-  //                          _locator,
-  //                          _topology,
-  //                          _force_function,
-  //                          id_verletlist_group,
-  //                          num_verletlist_group,
-  //                          offset_verletlist_group,
-  //                          corr_ljforce);
+  RunWorklet::LJForceRBL(rs_num,
+                            pice_num,
+                            _atoms_id,
+                            _locator,
+                            _topology,
+                            _force_function,
+                            id_verletlist_group,
+                            num_verletlist_group,
+                            offset_verletlist_group,
+                            corr_ljforce);
 
     //pbc
-  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  Vec3f Vlength;
-  for (int i = 0; i < 3; ++i)
-  {
-    Vlength[i] = range[i].Max - range[i].Min;
-  }
-  RunWorklet::LJForceRBLPBC(rs_num,
-                           pice_num,
-                            Vlength,
-                         _atoms_id,
-                         _locator,
-                         _topology,
-                         _force_function,
-                         id_verletlist_group,
-                         num_verletlist_group,
-                         offset_verletlist_group,
-                         corr_ljforce);
+  //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //Vec3f Vlength;
+  //for (int i = 0; i < 3; ++i)
+  //{
+  //  Vlength[i] = range[i].Max - range[i].Min;
+  //}
+  //RunWorklet::LJForceRBLPBC(rs_num,
+  //                         pice_num,
+  //                          Vlength,
+  //                       _atoms_id,
+  //                       _locator,
+  //                       _topology,
+  //                       _force_function,
+  //                       id_verletlist_group,
+  //                       num_verletlist_group,
+  //                       offset_verletlist_group,
+  //                       corr_ljforce);
 
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
