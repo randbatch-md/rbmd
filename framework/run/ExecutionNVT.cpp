@@ -89,7 +89,8 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  fix_press_berendsen();
+  //fix_press_berendsen();
+  fix_press_berendsen_scale();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -748,37 +749,40 @@ void ExecutionNVT::fix_press_berendsen()
   // compute new T,P
 
   //ComputeTempe();
-  //Compute_Pressure_Scalar();
- // Couple();
+  Compute_Pressure_Scalar();
+  Couple();
 
-  //auto currentstep = _app.GetExecutioner()->CurrentStep();
-  //auto beginstep = 0;
-  //auto endstep = _app.GetExecutioner()->NumStep();
+  auto currentstep = _app.GetExecutioner()->CurrentStep();
+  auto beginstep = 0;
+  auto endstep = _app.GetExecutioner()->NumStep();
 
-  //Real delta = currentstep - beginstep;
-  //if (delta != 0.0)
-  //{
-  //  delta = delta / static_cast<Real>(endstep - beginstep);
-  //}
-  //std::cout << ",delta0=" << delta0 << ",delta=" << delta<<  std::endl;
-  //std::cout << ",delta=" << delta << std::endl;
-  //for (int i = 0; i < 3; i++)
-  //{
-  //  auto dt_over_period = _dt / p_period[i];
-   // auto bulkmodulus_inv = 1.0 / _bulkmodulus;
-   // p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
-    //dilation[i] = vtkm::Pow(1.0 - dt_over_period * (p_target[i] - p_current[i]) * bulkmodulus_inv, 1.0/3.0);
- // }
+  Real delta = currentstep - beginstep;
+  if (delta != 0.0)
+  {
+    delta = delta / static_cast<Real>(endstep - beginstep);
+  }
+  std::cout << ",delta=" << delta << std::endl;
 
-  //std::cout << "p_target=" << p_target[0] << ",p_current=" << p_current[0]
-  //          << ",dilation=" << dilation[0] << std::endl;
+  for (int i = 0; i < 3; i++)
+  {
+    auto dt_over_period = _dt / p_period[i];
+    auto bulkmodulus_inv = 1.0 / _bulkmodulus;
+    p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
+    dilation[i] = vtkm::Pow(1.0 - dt_over_period * (p_target[i] - p_current[i]) * bulkmodulus_inv, 1.0/3.0);
+  }
 
-  // remap simulation box and atoms
-  // redo KSpace coeffs since volume has changed
+  std::cout << "p_target=" << p_target[0] << ",p_current=" << p_current[0]
+            << ",dilation=" << dilation[0] << std::endl;
 
-  //remap();
+   //remap simulation box and atoms
+   //redo KSpace coeffs since volume has changed
 
-  //(2)
+  remap();
+
+}
+
+void ExecutionNVT::fix_press_berendsen_scale()
+{
   // compute new T,P
 
   //ComputeTempe();
@@ -800,18 +804,40 @@ void ExecutionNVT::fix_press_berendsen()
   {
     p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
   }
-  auto dt_over_period = _dt / p_period[0];
-  auto scale_factor =
-    1.0 - dt_over_period * (p_target[0] - (p_current[0] + p_current[1] + p_current[2]) * 0.3333);
+  auto pressure_coupling = 1 / (p_period[0] * 3 * _bulkmodulus);
+  auto scale_factor = 1.0 - pressure_coupling *
+                    (p_target[0] - (p_current[0] + p_current[1] + p_current[2]) * 0.3333);
+  
   //
   auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
   Vec3f box;
   for (int i = 0; i < 3; ++i)
   {
     box[i] = range[i].Max - range[i].Min;
-    box[i] *= scale_factor;
   }
-  _para.SetParameter(PARA_RANGE, range);
+   box[0] *= scale_factor;
+   box[1] *= scale_factor;
+   box[2] *= scale_factor;
+  std::cout << "scale_factor =" <<  scale_factor << ",range.Min=" << range[0].Min
+            << ",range.Max=" << range[0].Max
+            << std::endl;
+   _para.SetParameter(PARA_RANGE, range);
+
+  //
+  //Vec3f position_base;
+  //auto n = _position.GetNumberOfValues();
+  //for (int i = 0; i < n; i++)
+  //{
+  //  position_base[0] = _position.ReadPortal().Get(i)[0] * scale_factor;
+  //  position_base[1] = _position.ReadPortal().Get(i)[1] * scale_factor;
+  //  position_base[2] = _position.ReadPortal().Get(i)[2] * scale_factor;
+
+  //  Vec3f x_position = { position_base[0], position_base[1] ,position_base[2] };
+
+  //  _position.WritePortal().Set(i, x_position);
+  //}
+  //_locator.SetPosition(_position);
+
   RunWorklet::fix_press_berendsen(scale_factor, _position, _locator);
   _locator.SetPosition(_position);
 }

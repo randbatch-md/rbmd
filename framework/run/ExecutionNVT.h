@@ -60,6 +60,7 @@ private:
   void Compute_Temp_Scalar();
   void Couple();
   void fix_press_berendsen();
+  void fix_press_berendsen_scale();
   void x2lamda(Id n);
   void lamda2x(Id n);
   void set_global_box();

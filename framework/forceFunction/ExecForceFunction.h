@@ -55,8 +55,8 @@ public:
     const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
     const Real cut_off_2 = cut_off * cut_off;
 
-    //if (dis_2 < cut_off_2 && dis_2 > small_value)
-    if (dis_2 < cut_off_2)
+   if (dis_2 < cut_off_2 && dis_2 > small_value)
+    //if (dis_2 < cut_off_2)
     {
       Real sigma_ij = (sigma_i + sigma_j) / 2;
 
@@ -82,8 +82,8 @@ public:
     const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
     const Real cut_off_2 = cut_off * cut_off;
 
-    //if (dis_2 < cut_off_2 && dis_2 > small_value)
-    if (dis_2 < cut_off_2)
+    if (dis_2 < cut_off_2 && dis_2 > small_value)
+    //if (dis_2 < cut_off_2)
     {
       Real sigma_ij = (sigma_i + sigma_j) / 2;
 

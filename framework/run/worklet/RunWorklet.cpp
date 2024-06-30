@@ -572,7 +572,7 @@ namespace RunWorklet
           auto sigma_j = topology.GetSigma(pts_type_j);
           auto r_ij = p_j - p_i;
 
-          virial += 2*force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
         lj_virial = virial;
@@ -1319,11 +1319,11 @@ namespace RunWorklet
 
           if (flag == 1)
           {
-            rc_force_lj += 2*force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
           }
           if (flag == 2)
           {
-            rcs_force_lj += 2 * _pice_num *
+            rcs_force_lj +=  _pice_num *
               force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
           }
         };
