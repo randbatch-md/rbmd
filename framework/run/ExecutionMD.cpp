@@ -792,10 +792,12 @@ void ExecutionMD::ComputeRBLLJForce71(ArrayHandle<Vec3f>& LJforce,
     vtkm::cont::Algorithm::Reduce(corr_ljvirial, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrLJvirial(corr_virial_value, corr_ljvirial, LJvirial);
 
-    Real corr_energy_value =
-    vtkm::cont::Algorithm::Reduce(corr_ljenergy, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
-  RunWorklet::SumRBLCorrLJenergy(corr_energy_value, corr_ljenergy, ljenergy_atom);
-   LJenergy = vtkm::cont::Algorithm::Reduce(ljenergy_atom, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
+    //Real corr_energy_value =
+   // vtkm::cont::Algorithm::Reduce(corr_ljenergy, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
+  //RunWorklet::SumRBLCorrLJenergy(corr_energy_value, corr_ljenergy, ljenergy_atom);
+   //LJenergy = vtkm::cont::Algorithm::Reduce(ljenergy_atom, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
+
+   LJenergy = vtkm::cont::Algorithm::Reduce(corr_ljenergy, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
 
 }
 

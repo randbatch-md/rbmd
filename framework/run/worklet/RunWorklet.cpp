@@ -2141,11 +2141,14 @@ namespace RunWorklet
         {
           if (position[i]< 0)
           {
-                position[i] += _vlength[i];
+                position[i] += vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i];
+                //position[i] += _vlength[i];
           }
-          else if (position[i] > _vlength[i])
+          else if (position[i] >= _vlength[i])
           {
-                position[i] -= _vlength[i];
+               // position[i] -= _vlength[i];
+                position[i] -= vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i]; 
+        
           }
         }
         locator.UpdateOverRangePoint(position);

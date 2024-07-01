@@ -69,6 +69,7 @@ void ExecutionNVT::Solve()
 
   // stage2:
   UpdatePosition();
+  //ApplyPbc();
 
   //New added
   if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
@@ -909,16 +910,18 @@ void ExecutionNVT::ComputeVirial()
   //}
 
   //reduce virial_atom
-  virial = { 0, 0, 0, 0, 0, 0 };
-  for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
-  {
-    // 获取当前原子的virial
-    Vec6f vatom = _virial_atom.ReadPortal().Get(i);
-    for (int j = 0; j < 6; ++j)
-    {
-      virial[j] += vatom[j];
-    }
-  }
+  //virial = { 0, 0, 0, 0, 0, 0 };
+  //for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
+  //{
+  //  // 获取当前原子的virial
+  //  Vec6f vatom = _virial_atom.ReadPortal().Get(i);
+  //  for (int j = 0; j < 6; ++j)
+  //  {
+  //    virial[j] += vatom[j];
+  //  }
+  //}
+    //virial = { 0, 0, 0, 0, 0, 0 };
+    virial = vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
   //
   //for (int i = 0; i < 6; ++i)
   //{
