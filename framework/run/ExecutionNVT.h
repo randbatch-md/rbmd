@@ -77,7 +77,7 @@ private:
   Real _dt;
   Real _kbT ,_Tdamp;
   Real _Tstart, _Tstop, _Tperiod, _Ttarget;
-  Real _Pstart, _Pstop, _Pperiod, _Ptarget, _bulkmodulus;
+  Real _Pstart, _Pstop, _Pperiod, _Ptarget, _bulkmodulus, _scale_factor, _pressure_coupling;
   std::string _farforce_type;
   std::string _nearforce_type;
   std::string _temp_con_type;
@@ -144,6 +144,7 @@ private:
 
     //
   ArrayHandle<Vec6f> _virial_atom;
+  Real _lj_potential_energy;
   Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
   Real _pressure_scalar; // computed global pressure scalar
 

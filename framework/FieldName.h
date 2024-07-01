@@ -73,6 +73,7 @@ const std::string PARA_BOND_ENERGY = "bond_energy";
 const std::string PARA_ANGLE_ENERGY = "angle_energy";
 const std::string PARA_TEMPT_SUM = "tempt_sum";
 const std::string PARA_TEMPT = "temp_t";
+const std::string PARA_LJPE = "lj_pe";
 const std::string PARA_RBE_P = "rbeP";
 const std::string PARA_CENTER_TYPE = "center_type";
 const std::string PARA_TARGET_TYPE = "target_type";

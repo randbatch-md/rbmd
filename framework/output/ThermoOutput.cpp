@@ -138,7 +138,8 @@ void ThermoOutput::ComputePotentialEnergy()
 
   if (_para.GetParameter<std::string>(PARA_INIT_WAY) == "inbuild")
   {
-     OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy); 
+     //OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy); 
+        _lj_potential_energy_avr = _para.GetParameter<Real>(PARA_LJPE);
       //pbc
     //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
     //Vec3f Vlength;
@@ -166,9 +167,10 @@ void ThermoOutput::ComputePotentialEnergy()
                                            weight_group,
                                            lj_potential_energy);
   }
-  auto lj_potential_energy_total =
-    vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
-  _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
+  //auto lj_potential_energy_total =
+   // vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+  //_lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
+
 
   //TODO: turn to parameter
   auto N = position.GetNumberOfValues();

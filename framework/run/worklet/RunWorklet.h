@@ -163,6 +163,20 @@ namespace RunWorklet
                     const CoordOffsetType& offset_verletlist_group,
                     vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce);
 
+    void LJForceRBL71(const Id& rs_num,
+                    const Id& pice_num,
+                    const Vec3f& box,
+                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                    const ContPointLocator& locator,
+                    const ContTopology& topology,
+                    const ContForceFunction& force_function,
+                    const GroupVecType& id_verletlist_group,
+                    const GroupNumType& num_verletlist,
+                    const CoordOffsetType& offset_verletlist_group,
+                    vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce,
+                     vtkm::cont::ArrayHandle<Vec6f>& corr_ljvirial,
+                     vtkm::cont::ArrayHandle<Real>& corr_ljenergy);
+
     void LJForceRBLPBC(const Id& rs_num,
                        const Id& pice_num,
                        const Vec3f& Vlength,
@@ -209,6 +223,14 @@ namespace RunWorklet
     void SumRBLCorrForce(const vtkm::Vec3f corr_value,
                          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& corr_force,
                          vtkm::cont::ArrayHandle<vtkm::Vec3f>& LJforce);
+
+    void SumRBLCorrLJvirial(const Vec6f corr_value,
+                            const vtkm::cont::ArrayHandle<Vec6f>& corr_virial,
+                            vtkm::cont::ArrayHandle<Vec6f>& LJvirial);
+
+    void SumRBLCorrLJenergy(const Real corr_value,
+                            const vtkm::cont::ArrayHandle<Real>& corr_energy,
+                            vtkm::cont::ArrayHandle<Real>& LJenergy);
 
     void LJForceWithPeriodicBC(const Real& cut_off,
                                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

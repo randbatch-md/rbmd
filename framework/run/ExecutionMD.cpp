@@ -603,7 +603,10 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
 
   auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
-  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto vol = (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+  auto rho_system = N / vol;
+  //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
@@ -680,6 +683,120 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
+}
+
+void ExecutionMD::ComputeRBLLJForce71(ArrayHandle<Vec3f>& LJforce,
+                                      ArrayHandle<Vec6f>& LJvirial,
+                                      Real& LJenergy)
+{
+  auto N = _position.GetNumberOfValues();
+  vtkm::cont::ArrayHandle<Vec3f> corr_ljforce;
+  vtkm::cont::ArrayHandle<Vec6f> corr_ljvirial;
+  vtkm::cont::ArrayHandle<Real> corr_ljenergy;
+  vtkm::cont::ArrayHandle<Real> ljenergy_atom;
+  corr_ljforce.Allocate(N);
+
+  auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto vol =
+    (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+  auto rho_system = N / vol;
+  //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+
+  vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+  vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
+  vtkm::cont::ArrayHandle<vtkm::Vec3f> offset_verletlist;
+
+  //0.05 is a temp parameter, to fit with the low density of system requirement
+  //so as the RBL for LJ
+  Real coeff_rcs = 1.0 + (0.05 / rho_system - 0.05);
+  Id Id_coeff_rcs = vtkm::Round(coeff_rcs);
+  Id rs_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rs * rs * rs) + 1;
+  Id rc_num = Id_coeff_rcs * rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
+  Id rcs_num = rc_num - rs_num;
+  Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
+  Real random_rate = random_num / (rcs_num);
+  Id pice_num = std::ceil(1.0 / random_rate);
+  //Id cutoff_num = rs_num + random_num;
+  Id cutoff_num = rc_num + random_num;
+  Id verletlist_num = N * cutoff_num;
+
+  num_verletlist.Allocate(N * 2);
+  id_verletlist.Allocate(verletlist_num);
+  offset_verletlist.Allocate(verletlist_num);
+
+  std::vector<Id> stride_vec(N + 1);
+  Id inc = 0;
+  std::generate(
+    stride_vec.begin(), stride_vec.end(), [&](void) -> Id { return (inc++) * cutoff_num; });
+  vtkm::cont::ArrayHandle<vtkm::Id> stride_array = vtkm::cont::make_ArrayHandle(stride_vec);
+
+  auto id_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, stride_array);
+  auto offset_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, stride_array);
+  auto num_verletlist_group = vtkm::cont::make_ArrayHandleGroupVec<2>(num_verletlist);
+
+  RunWorklet::ComputeRBLNeighboursOnce(rs_num,
+                                       pice_num,
+                                       _atoms_id,
+                                       _locator,
+                                       id_verletlist_group,
+                                       num_verletlist_group,
+                                       offset_verletlist_group);
+  //pbc
+  Vec3f box{ 0, 0, 0 };
+  for (int i = 0; i < 3; ++i)
+  {
+    box[i] = range[i].Max - range[i].Min;
+  }
+  RunWorklet::LJForceRBL71(rs_num,
+                           pice_num,
+                           box,
+                           _atoms_id,
+                           _locator,
+                           _topology,
+                           _force_function,
+                           id_verletlist_group,
+                           num_verletlist_group,
+                           offset_verletlist_group,
+                           corr_ljforce,
+                           corr_ljvirial,
+                           corr_ljenergy);
+
+  //pbc
+  //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //Vec3f Vlength;
+  //for (int i = 0; i < 3; ++i)
+  //{
+  //  Vlength[i] = range[i].Max - range[i].Min;
+  //}
+  //RunWorklet::LJForceRBLPBC(rs_num,
+  //                         pice_num,
+  //                          Vlength,
+  //                       _atoms_id,
+  //                       _locator,
+  //                       _topology,
+  //                       _force_function,
+  //                       id_verletlist_group,
+  //                       num_verletlist_group,
+  //                       offset_verletlist_group,
+  //                       corr_ljforce);
+
+  Vec3f corr_value =
+    vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
+  RunWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
+
+  Vec6f corr_virial_value =
+    vtkm::cont::Algorithm::Reduce(corr_ljvirial, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) / N;
+  RunWorklet::SumRBLCorrLJvirial(corr_virial_value, corr_ljvirial, LJvirial);
+
+    Real corr_energy_value =
+    vtkm::cont::Algorithm::Reduce(corr_ljenergy, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
+  RunWorklet::SumRBLCorrLJenergy(corr_energy_value, corr_ljenergy, ljenergy_atom);
+   LJenergy = vtkm::cont::Algorithm::Reduce(ljenergy_atom, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
+
 }
 
 void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)

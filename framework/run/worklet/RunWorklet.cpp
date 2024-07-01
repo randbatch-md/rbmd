@@ -1351,6 +1351,111 @@ namespace RunWorklet
       Id _pice_num;
     };
 
+    struct ComputeLJForceRBL71Worklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeLJForceRBL71Worklet(const Id& rs_num, const Id& pice_num, const Vec3f& box)
+        : _rs_num(rs_num)
+        , _pice_num(pice_num)
+        , _box(box)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldInOut id_verletlist_group,
+                                    FieldInOut num_verletlist,
+                                    FieldInOut offset_verletlist_group,
+                                    FieldOut corr_ljforce,
+                                    FieldOut corr_ljvirial,
+                                    FieldOut corr_ljenergy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9 ,_10);
+
+      template<typename NeighbourGroupVecType, typename numType, typename CoordOffsetType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const NeighbourGroupVecType& id_verletlist,
+                                const numType& num_verletlist,
+                                const CoordOffsetType& offset_verletlist,
+                                Vec3f& corr_ljforce,
+                                Vec6f& corr_ljvirial,
+                                Real& corr_ljenergy) const
+      {
+        vtkm::Vec3f rs_force_lj = { 0, 0, 0 };
+        vtkm::Vec3f rcs_force_lj = { 0, 0, 0 };
+        Vec6f rs_virial_lj = { 0, 0, 0, 0, 0, 0 };
+        Vec6f rcs_virial_lj = { 0, 0, 0, 0, 0, 0 };
+        Real rs_energy_lj = 0.0;
+        Real rcs_energy_lj = 0.0;
+
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+        auto rc = locator._cut_off;
+        auto rs = locator._rs;
+        auto charge_pi = topology.GetCharge(atoms_id);
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
+        {
+          auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+          if (molecular_id_i == molecular_id_j)
+            return;
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.ApplyMinVec(p_j, p_i, _box);
+
+          if (flag == 1)
+          {
+            rs_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rs);
+            rs_virial_lj += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, rs);
+            rs_energy_lj += force_function.ComputePotentialEn_r(r_ij, eps_i, eps_j, sigma_i, sigma_j, rs);       
+
+          }
+          if (flag == 2)
+          {
+            rcs_force_lj += _pice_num *
+              force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+            rcs_virial_lj += _pice_num *
+              force_function.ComputeLJVirialRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+            rcs_energy_lj += _pice_num *
+              force_function.ComputePotentialEnRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+          }
+        };
+
+        auto p_i = locator.GetPtsPosition(atoms_id);
+        for (Id p = 0; p < num_verletlist[0]; p++)
+        {
+          Id id_rs = id_verletlist[p];
+          auto p_j = locator.GetPtsPosition(id_rs) - offset_verletlist[p];
+          function(p_i, p_j, id_rs, 1);
+        }
+
+        for (Id p = 0; p < num_verletlist[1]; p++)
+        {
+          Id id_random = id_verletlist[_rs_num + p];
+          auto p_j = locator.GetPtsPosition(id_random) - offset_verletlist[_rs_num + p];
+          function(p_i, p_j, id_random, 2);
+        }
+
+        // Individual output requirements can be used
+        auto LJforce = rs_force_lj + rcs_force_lj;
+        auto LJvirial = rs_virial_lj + rcs_virial_lj;
+        auto LJenergy = rs_energy_lj + rcs_energy_lj;
+        corr_ljforce = LJforce;
+        corr_ljvirial = LJvirial;
+        corr_ljenergy = LJenergy;
+      }
+      Id _rs_num;
+      Id _pice_num;
+      Vec3f _box;
+    };
+
     struct ComputeLJForceRBLPBCWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeLJForceRBLPBCWorklet(const Id& rs_num, const Id& pice_num, const Vec3f& Vlength)
@@ -1455,6 +1560,42 @@ namespace RunWorklet
         ljforce = corr_force - _corr_value;
       }
       vtkm::Vec3f _corr_value;
+    };
+
+    struct SumRBLCorrLJVirialWorklet : vtkm::worklet::WorkletMapField
+    {
+      SumRBLCorrLJVirialWorklet(const Vec6f corr_value)
+        : _corr_value(corr_value)
+      {
+      }
+
+      using ControlSignature = void(FieldIn corr_virial, FieldOut ljvirial);
+      using ExecutionSignature = void(_1, _2);
+
+
+      VTKM_EXEC void operator()(const Vec6f& corr_virial, Vec6f& ljvirial) const
+      {
+        ljvirial = corr_virial - _corr_value;
+      }
+      Vec6f _corr_value;
+    };
+
+    struct SumRBLCorrLJenergyWorklet : vtkm::worklet::WorkletMapField
+    {
+      SumRBLCorrLJenergyWorklet(const Real corr_value)
+        : _corr_value(corr_value)
+      {
+      }
+
+      using ControlSignature = void(FieldIn corr_energy, FieldOut ljenergy);
+      using ExecutionSignature = void(_1, _2);
+
+
+      VTKM_EXEC void operator()(const Real& corr_energy, Real& ljenergy) const
+      {
+        ljenergy = corr_energy - _corr_value;
+      }
+      Real _corr_value;
     };
 
     struct ComputeNearElectrostaticsWorklet : vtkm::worklet::WorkletMapField
@@ -2423,6 +2564,33 @@ namespace RunWorklet
                             corr_ljforce);
      }
 
+     void LJForceRBL71(const Id& rs_num,
+                      const Id& pice_num,
+                      const Vec3f& box,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const ContPointLocator& locator,
+                     const ContTopology& topology,
+                     const ContForceFunction& force_function,
+                     const GroupVecType& id_verletlist_group,
+                     const GroupNumType& num_verletlist,
+                     const CoordOffsetType& offset_verletlist_group,
+                     vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce,
+                     vtkm::cont::ArrayHandle<Vec6f>& corr_ljvirial,
+                     vtkm::cont::ArrayHandle<Real>& corr_ljenergy)
+     {
+      vtkm::cont::Invoker{}(ComputeLJForceRBL71Worklet{ rs_num, pice_num, box },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            id_verletlist_group,
+                            num_verletlist,
+                            offset_verletlist_group,
+                            corr_ljforce,
+                            corr_ljvirial,
+                            corr_ljenergy);
+     }
+
      void LJForceRBLPBC(const Id& rs_num,
                         const Id& pice_num,
                         const Vec3f& Vlength,
@@ -2508,6 +2676,20 @@ namespace RunWorklet
     {
          vtkm::cont::Invoker{}(SumRBLCorrForceWorklet{corr_value}, corr_force, LJforce);
     }
+
+     void SumRBLCorrLJvirial(const Vec6f corr_value,
+                            const vtkm::cont::ArrayHandle<Vec6f>& corr_virial,
+                            vtkm::cont::ArrayHandle<Vec6f>& LJvirial)
+    {
+         vtkm::cont::Invoker{}(SumRBLCorrLJVirialWorklet{ corr_value }, corr_virial, LJvirial);
+    }
+    void SumRBLCorrLJenergy(const Real corr_value,
+                            const vtkm::cont::ArrayHandle<Real>& corr_energy,
+                            vtkm::cont::ArrayHandle<Real>& LJenergy)
+    {
+         vtkm::cont::Invoker{}(SumRBLCorrLJenergyWorklet{ corr_value }, corr_energy, LJenergy);
+    }
+
 
     void LJForceWithPeriodicBC(const Real& cut_off,
                                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

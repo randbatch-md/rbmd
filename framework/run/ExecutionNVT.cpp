@@ -69,7 +69,6 @@ void ExecutionNVT::Solve()
 
   // stage2:
   UpdatePosition();
-  //fix_press_berendsen();
 
   //New added
   if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
@@ -89,8 +88,8 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  //fix_press_berendsen();
-  fix_press_berendsen_scale();
+  fix_press_berendsen();
+  //fix_press_berendsen_scale();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -392,7 +391,9 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
   if (_nearforce_type == "RBL")
   {
-    ComputeRBLLJForce(_all_force);
+    //ComputeRBLLJForce(_all_force);
+    ComputeRBLLJForce71(_all_force, _virial_atom, _lj_potential_energy);
+    _para.SetParameter(PARA_LJPE, _lj_potential_energy);
   }
   else if (_nearforce_type == "VERLETLIST")
   {
@@ -798,27 +799,39 @@ void ExecutionNVT::fix_press_berendsen_scale()
   {
     delta = delta / static_cast<Real>(endstep - beginstep);
   }
-  //std::cout << ",delta0=" << delta0 << ",delta=" << delta<<  std::endl;
-  std::cout << ",delta=" << delta << std::endl;
+
+
   for (int i = 0; i < 3; i++)
   {
     p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
   }
-  auto pressure_coupling = 1 / (p_period[0] * 3 * _bulkmodulus);
-  auto scale_factor = 1.0 - pressure_coupling *
+  _pressure_coupling = _dt / (p_period[0] * 3 * _bulkmodulus);
+  std::cout << ",delta=" << delta << ",pressure_coupling=" << _pressure_coupling << std::endl;
+  _scale_factor = 1.0 - _pressure_coupling *
                     (p_target[0] - (p_current[0] + p_current[1] + p_current[2]) * 0.3333);
   
   //
   auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  Vec3f box;
-  for (int i = 0; i < 3; ++i)
-  {
-    box[i] = range[i].Max - range[i].Min;
-  }
-   box[0] *= scale_factor;
-   box[1] *= scale_factor;
-   box[2] *= scale_factor;
-  std::cout << "scale_factor =" <<  scale_factor << ",range.Min=" << range[0].Min
+  //Vec3f box;
+  //for (int i = 0; i < 3; ++i)
+  //{
+  //  box[i] = range[i].Max - range[i].Min;
+  //}
+  // box[0] *= scale_factor;
+  // box[1] *= scale_factor;
+  // box[2] *= scale_factor;
+  
+   // 调整range的Min和Max值
+   for (int i = 0; i < 3; ++i)
+   {
+    Real center = (range[i].Max + range[i].Min) / 2.0;
+    Real half_length = (range[i].Max - range[i].Min) / 2.0;
+    Real new_half_length = half_length * _scale_factor;
+
+    range[i].Min = center - new_half_length;
+    range[i].Max = center + new_half_length;
+   }
+  std::cout << "scale_factor =" <<  _scale_factor << ",range.Min=" << range[0].Min
             << ",range.Max=" << range[0].Max
             << std::endl;
    _para.SetParameter(PARA_RANGE, range);
@@ -838,8 +851,9 @@ void ExecutionNVT::fix_press_berendsen_scale()
   //}
   //_locator.SetPosition(_position);
 
-  RunWorklet::fix_press_berendsen(scale_factor, _position, _locator);
-  _locator.SetPosition(_position);
+
+  RunWorklet::fix_press_berendsen(_scale_factor, _position, _locator);
+   _locator.SetPosition(_position);
 }
 
 void ExecutionNVT::Compute_Pressure_Scalar()
@@ -870,9 +884,9 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  //auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
 
-   RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  // RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
   //pbc
   //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
@@ -1115,6 +1129,7 @@ void ExecutionNVT::InitParameters()
   _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
+  _para.SetParameter(PARA_LJPE, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
 }
 

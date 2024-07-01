@@ -31,6 +31,9 @@ protected:
 
   void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
   void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce);
+  void ComputeRBLLJForce71(ArrayHandle<Vec3f>& LJforce,
+                           ArrayHandle<Vec6f>& LJvirial,
+                           Real& LJenergy);
   void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce);
   void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
