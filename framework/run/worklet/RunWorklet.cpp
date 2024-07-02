@@ -1407,8 +1407,8 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          //auto r_ij = p_j - p_i;
-          auto r_ij = locator.ApplyMinVec(p_j, p_i, _box);
+          auto r_ij = p_j - p_i;
+          //auto r_ij = locator.ApplyMinVec(p_j, p_i, _box);
 
           if (flag == 1)
           {

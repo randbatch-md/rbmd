@@ -69,7 +69,6 @@ void ExecutionNVT::Solve()
 
   // stage2:
   UpdatePosition();
-  //ApplyPbc();
 
   //New added
   if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
@@ -868,7 +867,8 @@ void ExecutionNVT::Compute_Pressure_Scalar()
       (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
 
   auto inv_volume = 1.0 / volume;
-  ComputeVirial();
+  //ComputeVirial();
+  ComputeVirial_r();
 
   //compute dof
   auto n = _position.GetNumberOfValues();
@@ -885,9 +885,9 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-  //auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
 
-  // RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+   RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
   //pbc
   //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
@@ -920,13 +920,23 @@ void ExecutionNVT::ComputeVirial()
   //    virial[j] += vatom[j];
   //  }
   //}
-    //virial = { 0, 0, 0, 0, 0, 0 };
-    virial = vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+   virial = vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
   //
   //for (int i = 0; i < 6; ++i)
   //{
   //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
   //}
+}
+
+void ExecutionNVT::ComputeVirial_r()
+{
+    virial = vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+    //
+    //for (int i = 0; i < 6; ++i)
+    //{
+    //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
+    //}
 }
 
 void ExecutionNVT::Couple()

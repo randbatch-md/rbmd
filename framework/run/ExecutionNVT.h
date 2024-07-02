@@ -56,6 +56,7 @@ private:
 
      //
   void ComputeVirial();
+  void ComputeVirial_r();
   void Compute_Pressure_Scalar();
   void Compute_Temp_Scalar();
   void Couple();

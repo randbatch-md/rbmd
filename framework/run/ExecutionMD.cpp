@@ -788,15 +788,16 @@ void ExecutionMD::ComputeRBLLJForce71(ArrayHandle<Vec3f>& LJforce,
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
 
-  Vec6f corr_virial_value =
-    vtkm::cont::Algorithm::Reduce(corr_ljvirial, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) / N;
-  RunWorklet::SumRBLCorrLJvirial(corr_virial_value, corr_ljvirial, LJvirial);
+  //Vec6f corr_virial_value =
+  //  vtkm::cont::Algorithm::Reduce(corr_ljvirial, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) / N;
+  //RunWorklet::SumRBLCorrLJvirial(corr_virial_value, corr_ljvirial, LJvirial);
 
     //Real corr_energy_value =
    // vtkm::cont::Algorithm::Reduce(corr_ljenergy, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
   //RunWorklet::SumRBLCorrLJenergy(corr_energy_value, corr_ljenergy, ljenergy_atom);
    //LJenergy = vtkm::cont::Algorithm::Reduce(ljenergy_atom, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
 
+   LJvirial = corr_ljvirial;
    LJenergy = vtkm::cont::Algorithm::Reduce(corr_ljenergy, vtkm::TypeTraits<Real>::ZeroInitialization()) / N;
 
 }

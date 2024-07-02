@@ -136,41 +136,42 @@ void ThermoOutput::ComputePotentialEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
-  if (_para.GetParameter<std::string>(PARA_INIT_WAY) == "inbuild")
-  {
-     //OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy); 
-        _lj_potential_energy_avr = _para.GetParameter<Real>(PARA_LJPE);
-      //pbc
-    //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-    //Vec3f Vlength;
-    //for (int i= 0;i<3;++i)
-    //{
-    //  Vlength[i] = range[i].Max - range[i].Min;
-    //}
-    //OutPut::ComputePotentialEnergyPBC(_cut_off, Vlength, atoms_id, locator, topology, force_function, lj_potential_energy); 
-  }
-  else
-  {
-    auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
-    auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
-    auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
-    auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
-    auto weight_group =
-      vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+  //if (_para.GetParameter<std::string>(PARA_INIT_WAY) == "inbuild")
+  //{
+  //   OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy); 
 
-    OutPut::ComputeSpecialBondsLJPotential(_cut_off,
-                                           atoms_id,
-                                           locator,
-                                           topology,
-                                           force_function,
-                                           ids_group,
-                                           weight_group,
-                                           lj_potential_energy);
-  }
+  //    //pbc
+  //  //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //  //Vec3f Vlength;
+  //  //for (int i= 0;i<3;++i)
+  //  //{
+  //  //  Vlength[i] = range[i].Max - range[i].Min;
+  //  //}
+  //  //OutPut::ComputePotentialEnergyPBC(_cut_off, Vlength, atoms_id, locator, topology, force_function, lj_potential_energy); 
+  //}
+  //else
+  //{
+  //  auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  //  auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+  //  auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+  //  auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+  //  auto weight_group =
+  //    vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+
+  //  OutPut::ComputeSpecialBondsLJPotential(_cut_off,
+  //                                         atoms_id,
+  //                                         locator,
+  //                                         topology,
+  //                                         force_function,
+  //                                         ids_group,
+  //                                         weight_group,
+  //                                         lj_potential_energy);
+  //}
   //auto lj_potential_energy_total =
-   // vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+  //  vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
   //_lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
 
+  _lj_potential_energy_avr = _para.GetParameter<Real>(PARA_LJPE);
 
   //TODO: turn to parameter
   auto N = position.GetNumberOfValues();
