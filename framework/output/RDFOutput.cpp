@@ -1,12 +1,9 @@
 ﻿#include "Executioner.h"
 #include "RDFOutput.h"
 #include "Application.h"
-#include "LennardJonesSystem.h"
 #include <vtkm/cont/Algorithm.h>
 #include "output/worklet/OutPutWorklet.h"
 #include "FieldName.h"
-
-//RegisterObject(RDFOutput);
 
 RDFOutput::RDFOutput(const Configuration& cfg)
   : FileOutput(cfg)

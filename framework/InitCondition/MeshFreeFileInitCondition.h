@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "InitCondition.h"
-#include "MeshFreeSystem.h"
 
 class MeshFreeFileInitCondition : public InitCondition
 {

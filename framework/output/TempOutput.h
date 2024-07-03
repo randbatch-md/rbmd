@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "ConsoleOutput.h"
-#include "MeshFreeSystem.h"
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 
 

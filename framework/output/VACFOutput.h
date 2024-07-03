@@ -20,7 +20,7 @@ protected:
   Executioner& _executioner;
   std::ofstream _VACF_file;
 
-  ArrayHandle<Id3> temp_position_flag;
+  vtkm::cont::ArrayHandle<Id3> temp_position_flag;
   vtkm::cont::ArrayHandle<vtkm::Vec3f> _original_position;
   vtkm::Vec4f _MSD_value_ave;
 
@@ -29,8 +29,8 @@ protected:
 
 private:
   Real _Vlength;
-  ArrayHandle<Vec3f> _position;
-  ArrayHandle<vtkm::Vec3f> _velocity;
+  vtkm::cont::ArrayHandle<Vec3f> _position;
+  vtkm::cont::ArrayHandle<vtkm::Vec3f> _velocity;
   IdComponent _start_step;
   IdComponent _end_step;
 };

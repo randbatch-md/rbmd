@@ -5,7 +5,6 @@
 #include <vtkm/cont/Invoker.h>
 #include <vtkm/cont/ArrayCopy.h>
 
-//RegisterObject(MadelungInitCondition);
 struct MadelungInitCondition::SetChargeWorklet : vtkm::worklet::WorkletPointNeighborhood
 {
   using ControlSignature = void(CellSetIn, FieldOut charge);

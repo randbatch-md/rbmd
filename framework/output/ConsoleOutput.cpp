@@ -1,7 +1,6 @@
 ﻿#include "ConsoleOutput.h"
 #include "Executioner.h"
 
-//RegisterObject(ConsoleOutput);
 const std::string HEADER_STEP_NAME = "Step";
 const std::string HEADER_TIME_NAME = "Time";
 const std::string HEADER_CUMULATIVE_TIME_NAME = "Cumulative_Time";

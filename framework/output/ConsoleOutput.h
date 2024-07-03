@@ -2,7 +2,7 @@
 
 #include "Output.h"
 #include "model/FormatTable.h"
-#include "System.h"
+#include "Timer.h"
 class JsonParser;
 
 class ConsoleOutput : public Output

@@ -3,11 +3,8 @@
 #include "Executioner.h"
 #include <vtkm/cont/Algorithm.h>
 #include "output/worklet/OutPutWorklet.h"
-#include "MeshFreeSystem.h"
 #include "ConsoleOutput.h"
 #include "FieldName.h"
-//
-//RegisterObject(MSDOutput);
 
 MSDOutput::MSDOutput(const Configuration& cfg)
   : FileOutput(cfg)

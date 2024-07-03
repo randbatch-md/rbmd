@@ -21,7 +21,6 @@ const std::string HEADER_KBT_NAME = "KBT";
 const std::string HEADER_CUMULATIVE_TIME_NAME = "Cumulative_Time";
 const std::string HEADER_DIHEDRAL_ENERGY_NAME = "Dihedral_Energy";
 
-//RegisterObject(ThermoOutput);
 ThermoOutput::ThermoOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
   , _file("energy.rbmd")

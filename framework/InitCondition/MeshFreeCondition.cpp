@@ -1,5 +1,5 @@
 ﻿#include "MeshFreeCondition.h"
-#include "worklet/SystemWorklet.h"
+#include "run/worklet/RunWorklet.h"
 #include "math/Utiles.h"
 #include "FieldName.h"
 #include <vtkm/cont/ArrayCopy.h>
@@ -42,7 +42,7 @@ void MeshFreeCondition::InitPosition()
   }
   auto data_set = vtkm::cont::DataSetBuilderUniform::Create(point_dim, start, space);
 
-  SystemWorklet::InitPosition(data_set.GetCellSet(), data_set.GetCoordinateSystem(), _position);
+  RunWorklet::InitPosition(data_set.GetCellSet(), data_set.GetCoordinateSystem(), _position);
 }
 
 void MeshFreeCondition::InitMassAndVelocity()
@@ -80,7 +80,7 @@ void MeshFreeCondition::InitMassAndVelocity()
   }
   auto velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
   auto mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
-  SystemWorklet::InitCondtion(_position, velocity_temp, mass, velocity);
+  RunWorklet::InitCondtion(_position, velocity_temp, mass, velocity);
 }
 
 void MeshFreeCondition::InitPositionFlag()

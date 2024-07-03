@@ -15,8 +15,6 @@ const std::string HEADER_TOTAL_ENERGY_NAME = "TOTAL_ENERGY";
 const std::string HEADER_KBT_NAME = "KBT";
 const std::string HEADER_CUMULATIVE_TIME_NAME = "CUMULATIVE_TIME";
 
-//RegisterObject(AtomsTableOutput);
-
 AtomsTableOutput::AtomsTableOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
   , _binary(Get<bool>("binary", false))

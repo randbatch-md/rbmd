@@ -1,9 +1,7 @@
 ﻿#include "Application.h"
+#include "parser/InitGlobal.h"
 #include "CommandLine.h"
-//#include "Register.h"
 #include <vtkm/cont/RuntimeDeviceTracker.h>
-#include "InitGlobal.h"
-//#include "SetupDeviceAction.h"
 
 Application::Application(int argc, char** argv)
 {
@@ -45,9 +43,6 @@ Application::Application(int argc, char** argv)
   {
     ErrerMessages();
   }
-  //_command_line = std::make_unique<CommandLine>(argc, argv);
-  //_init_global = std::make_unique<InitGlobal>(argc, argv);
-  //RegisterObjectGlobal();
 }
 
 Application::~Application() {}

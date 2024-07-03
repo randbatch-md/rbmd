@@ -11,8 +11,6 @@
 #include "ExecutionNPT.h"
 #include "ExecutionNVE.h"
 #include "ExecutionNVT.h"
-
-#include "H2OSystem.h"
 #include "ThermoOutput.h"
 #include "TempOutput.h"
 #include "RDFOutput.h"

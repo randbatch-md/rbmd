@@ -1,7 +1,6 @@
 ﻿#pragma once
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 #include "ConsoleOutput.h"
-#include "MeshFreeSystem.h"
 
 enum STATUS
 {

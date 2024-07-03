@@ -10,7 +10,6 @@
 #include <vtkm/cont/ConvertNumComponentsToOffsets.h>
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 
-//RegisterObject(ModelFileInitCondition);
 ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
   : MeshFreeFileInitCondition(cfg)
 {

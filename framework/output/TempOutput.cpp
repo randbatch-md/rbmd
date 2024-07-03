@@ -12,8 +12,6 @@
 
 const std::string HEADER_KBT_NAME = "KBT";
 
-//RegisterObject(TempOutput);
-
 TempOutput::TempOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
   , _file("temperature.rbmd")

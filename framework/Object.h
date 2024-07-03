@@ -3,6 +3,7 @@
 #include "Configuration.h"
 #include "Factory.h"
 #include "Application.h"
+#include <vtkm/Types.h>
 
 class Object// : public Factory<Object, Configuration&>
 {
@@ -55,14 +56,4 @@ public:
 protected:
   const Configuration& _cfg;
 };
-
-//#define RegisterObject(ObjectName)                                                                 \
-//  template<>                                                                                       \
-//  template<>                                                                                       \
-//  volatile bool Object::Registar<ObjectName>::registered =                                         \
-//    Object::Register<ObjectName>(#ObjectName)
-//using ObjectFactory = Factory<Object, Configuration&>;
-//
-//#define RegisterObject(ObjectName)                                                                 \
-//  volatile bool registered_##ObjectName = ObjectFactory::Register<ObjectName>(#ObjectName)
 

@@ -3,11 +3,8 @@
 #include "Executioner.h"
 #include <vtkm/cont/Algorithm.h>
 #include "output/worklet/OutPutWorklet.h"
-#include "MeshFreeSystem.h"
 #include "ConsoleOutput.h"
 #include "FieldName.h"
-
-//RegisterObject(VACFOutput);
 
 VACFOutput::VACFOutput(const Configuration& cfg)
   : FileOutput(cfg)
@@ -22,8 +19,6 @@ VACFOutput::VACFOutput(const Configuration& cfg)
 void VACFOutput::Init() 
 {  
   _position = _para.GetFieldAsArrayHandle<vtkm::Vec3f>(field::position);
-  //_original_position.AllocateAndFill(_position.GetNumberOfValues(), 0);
-  //temp_position_flag.AllocateAndFill(_position.GetNumberOfValues(), 0);
   _velocity = _para.GetFieldAsArrayHandle<vtkm::Vec3f>(field::velocity);
   _original_velocity.AllocateAndFill(_position.GetNumberOfValues(), 0);
 }
@@ -32,11 +27,6 @@ void VACFOutput::Execute()
 {
   if (_executioner.CurrentStep() == _start_step)
   {
-    //_original_position.DeepCopyFrom(_position);
-    //auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
-
-    //_VACF_value_ave = {0,0,0,0};
-
     _original_velocity.DeepCopyFrom(_velocity);
   }
 

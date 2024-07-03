@@ -2,7 +2,6 @@
 #include "Application.h"
 #include "Logging.h"
 #include "Output.h"
-#include "System.h"
 #include <iostream>    
 #include <iomanip>  
 

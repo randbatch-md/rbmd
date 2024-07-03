@@ -1,9 +1,7 @@
 ﻿#include "LJInitCondition.h"
-#include "system/worklet/SystemWorklet.h"
 #include "FieldName.h"
 #include "UnitFactor.h"
 
-//RegisterObject(LJInitCondition);
 LJInitCondition::LJInitCondition(const Configuration& cfg)
   : MeshFreeCondition(cfg)
 {
@@ -13,17 +11,9 @@ LJInitCondition::LJInitCondition(const Configuration& cfg)
 
 void LJInitCondition::Execute() 
 {
-  //InitField();
-  //SetParameters();
+
   AddMoleculeInfo();
   UpdateField();
- // auto step = 0;
- // while (step < _max_steps)
- // {
- //   DoInit();
- //   step++;
- // }
- // //console::Info("Init System End!");
 }
 
 void LJInitCondition::UpdateField()
@@ -78,9 +68,6 @@ void LJInitCondition::SetParameters()
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
   _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-  //auto xLength = _para.GetParameter<Real>(PARA_VLENGTH);
-  //auto yLength = xLength;
-  //auto zLength = xLength;
   auto bin_number = Id3{
     static_cast<int>(xLength / cut_off),
     static_cast<int>(yLength / cut_off),
@@ -97,67 +84,3 @@ void LJInitCondition::SetParameters()
   // };
   // SetParameter(PARA_BIN_NUMBER, bin_number);
 }
-
-/*
-void LJInitCondition::DoInit() 
-{
-
-  // stage1:
-  ComputeForce();
-  UpdateVelocity();
-
-  // stage2:
-  UpdatePosition();
-
-  // stage3:
-  ComputeForce();
-  UpdateVelocity();
-}
-
-void LJInitCondition::ComputeForce()
-{
-  auto pts_type = _para.GetFieldAsArrayHandle<Id>(field::pts_type);
-  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
-  try
-  {
-    ContForceFunction force_function;
-
-    ContTopology topology;
-    SetTopology(topology);
-
-    ContPointLocator locator;
-    SetLocator(locator);
-    auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-    SystemWorklet::LJForceWithPeriodicBC(cut_off, atom_id, locator, topology, force_function, _LJforce);
-  }
-  catch (const std::exception& e)
-  {
-    std::cout << e.what() << std::endl;
-  }
-}
-
-void LJInitCondition::UpdateVelocity() 
-{
-  try
-  {
-    auto velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
-    auto mass = _para.GetFieldAsArrayHandle<Real>(field::mass);
-
-    auto unit_factor = _para.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
-    SystemWorklet::UpdateVelocity(_dt, unit_factor._fmt2v, _LJforce, mass, velocity);
-  }
-  catch (const std::exception& e)
-  {
-    std::cout << e.what() << std::endl;
-  }
-}
-
-void LJInitCondition::UpdatePosition() 
-{
-  auto velocity = _para.GetFieldAsArrayHandle<Vec3f>(field::velocity);
-
-  ContPointLocator locator;
-  SetLocator(locator);
-  SystemWorklet::UpdatePosition(_dt, velocity, locator, _position);
-}
-*/
