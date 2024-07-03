@@ -182,22 +182,36 @@ public:
     return vec;
   }
 
-  VTKM_EXEC Vec3f ApplyMinVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _vlength) const
+  VTKM_EXEC Vec3f ApplyMinVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
   {
-    Vec3f vec = p1 - p2;
-    // 处理原子间的距离
-    for (vtkm::Id i = 0; i < 3; ++i)
+    Vec3f p12 = p1 - p2;
+    //case1:  orthogonal box
+    if (p12[0] < -_box[0] * 0.5)
     {
-      if (vec[i] < -_vlength[i]* 0.5)
-      {
-        vec[i] += _vlength[i];
-      }
-      else if (vec[i] > _vlength[i] * 0.5)
-      {
-        vec[i] -= _vlength[i];
-      }
+      p12[0] += _box[0];
+    }else if (p12[0] > _box[0] * 0.5)
+    {
+      p12[0] -= _box[0];
     }
-    return vec;
+    if (p12[1] < -_box[1] * 0.5)
+    {
+      p12[1] += _box[1];
+    }
+    else if (p12[0] > _box[1] * 0.5)
+    {
+      p12[1] -= _box[1];
+    }
+    if (p12[2] < -_box[2] * 0.5)
+    {
+      p12[2] += _box[2];
+    }
+    else if (p12[2] > _box[2] * 0.5)
+    {
+      p12[2] -= _box[2];
+    }
+
+   //case2:  triclinic box
+    return p12;
   }
 
   VTKM_EXEC Vec3f ApplyPbcVec(const Vec3f& p,  const Vec3f& _vlength) const

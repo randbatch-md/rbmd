@@ -63,6 +63,7 @@ const std::string PARA_VLENGTH = "vLength";
 const std::string PARA_VOLUME = "volume";
 const std::string PARA_BIN_NUMBER = "bin_number";
 const std::string PARA_RANGE = "range";
+const std::string PARA_BOX = "box";
 const std::string PARA_UNIT = "unit";
 const std::string PARA_UNIT_FACTOR = "unit_factor";
 const std::string PARA_RHO = "rho";

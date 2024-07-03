@@ -603,8 +603,11 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
 
   auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+
+  //auto box = _para.GetParameter<Vec3f >(PARA_BOX);
+  //auto vol = box[0] * box[1] * box[2];
   auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  auto vol = (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+  auto vol =  (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
   auto rho_system = N / vol;
   //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
 
@@ -661,16 +664,15 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
                             offset_verletlist_group,
                             corr_ljforce);
 
-    //pbc
-  //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  //Vec3f Vlength;
+    //mic
+  //Vec3f box{0,0,0};
   //for (int i = 0; i < 3; ++i)
   //{
-  //  Vlength[i] = range[i].Max - range[i].Min;
+  //  box[i] = range[i].Max - range[i].Min;
   //}
   //RunWorklet::LJForceRBLPBC(rs_num,
   //                         pice_num,
-  //                          Vlength,
+  //                          box,
   //                       _atoms_id,
   //                       _locator,
   //                       _topology,

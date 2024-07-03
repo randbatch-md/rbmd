@@ -617,11 +617,10 @@ namespace RunWorklet
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
           // auto r_ij = p_j - p_i;
-          //auto r_ij = locator.MinDistanceVec(pbc_pi, pbc_pj, _Vlength);
-          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
-          //auto r_ij = locator.ApplyMinVec(p_i, p_j, _box);
+          //auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
+          auto r_ij = locator.ApplyMinVec(p_i, p_j, _box);
 
-          virial += 2*force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
         lj_virial = virial;
@@ -1504,17 +1503,17 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-         // auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
           //auto r_ij = locator.MinDistanceVec(p_i, p_j, _Vlength);
           auto r_ij = locator.ApplyMinVec(p_i,p_j,_Vlength);
 
           if (flag == 1)
           {
-            rc_force_lj += 2*force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
           }
           if (flag == 2)
           {
-            rcs_force_lj += 2 * _pice_num *
+            rcs_force_lj +=  _pice_num *
               force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
           }
         };
@@ -2141,13 +2140,13 @@ namespace RunWorklet
         {
           if (position[i]< 0)
           {
-                position[i] += vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i];
-                //position[i] += _vlength[i];
+                //position[i] += vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i];
+                position[i] += _vlength[i];
           }
           else if (position[i] >= _vlength[i])
           {
-               // position[i] -= _vlength[i];
-                position[i] -= vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i]; 
+                position[i] -= _vlength[i];
+                // position[i] -= vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i]; 
         
           }
         }
@@ -2166,8 +2165,7 @@ namespace RunWorklet
       using ControlSignature = void(FieldInOut position, ExecObject locator);
       using ExecutionSignature = void(_1, _2);
 
-      template<typename CoordType>
-      VTKM_EXEC void operator()(CoordType& position, const ExecPointLocator locator) const
+      VTKM_EXEC void operator()(Vec3f& position, const ExecPointLocator locator) const
       {
         position = _scale_factor * position;
         locator.UpdateOverRangePoint(position);

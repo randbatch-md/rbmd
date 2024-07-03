@@ -116,18 +116,18 @@ public:
       Real dis_6 = dis_2 * dis_2 * dis_2;
       Real sigmaij_dis_6 = sigmaij_6 / dis_6;
       Real eps_ij = vtkm::Sqrt(eps_i * eps_j);
-      auto fpair = 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6) / dis_2;
+      auto fpair = 0.5 * 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6) * r_ij / dis_2;
 
       //auto forcelj = 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6;
       //auto fpair = forcelj / dis_2;
 
       //compute virial
-      virial[0] = r_ij[0] * r_ij[0] * fpair;
-      virial[1] = r_ij[1] * r_ij[1] * fpair;
-      virial[2] = r_ij[2] * r_ij[2] * fpair;
-      virial[3] = r_ij[0] * r_ij[1] * fpair;
-      virial[4] = r_ij[0] * r_ij[2] * fpair;
-      virial[5] = r_ij[1] * r_ij[2] * fpair;
+      virial[0] = r_ij[0] * fpair[0]; //xx
+      virial[1] = r_ij[1] * fpair[1]; //yy    
+      virial[2] = r_ij[2] * fpair[2]; //zz
+      virial[3] = r_ij[0] * fpair[1]; //xy
+      virial[4] = r_ij[0] * fpair[2]; //xz
+      virial[5] = r_ij[1] * fpair[2]; //yz
     }
     return virial;
   }

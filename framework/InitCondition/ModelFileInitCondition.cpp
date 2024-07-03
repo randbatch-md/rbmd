@@ -168,6 +168,8 @@ void ModelFileInitCondition::Header(std::ifstream& file)
   auto xLength = x_high - x_low;
   auto yLength = y_high - y_low;
   auto zLength = z_high - z_low;
+  Vec3f box = { xLength, yLength, zLength };
+  _para.SetParameter(PARA_BOX, box);
   _para.SetParameter(PARA_VLENGTH, xLength);
   _para.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
   _para.SetParameter(PARA_RHO, _header._num_atoms / (xLength * yLength * zLength));

@@ -67,6 +67,7 @@ void LJInitCondition::SetParameters()
   auto xLength = _x_range[1] - _x_range[0];
   auto yLength = _y_range[1] - _y_range[0];
   auto zLength = _z_range[1] - _z_range[0];
+  Vec3f box = { xLength, yLength, zLength };
   auto num_pos = _dims[0] * _dims[1] * _dims[2];
   auto range = vtkm::Vec<vtkm::Range, 3>{ { _x_range[0], _x_range[1] },
                                           { _y_range[0], _y_range[1] },
@@ -75,6 +76,7 @@ void LJInitCondition::SetParameters()
   _para.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
   _para.SetParameter(PARA_RHO, num_pos / (xLength * yLength * zLength));
   _para.SetParameter(PARA_RANGE, range);
+  _para.SetParameter(PARA_BOX, box);
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
   _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);

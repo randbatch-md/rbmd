@@ -167,11 +167,13 @@ void ThermoOutput::ComputePotentialEnergy()
   //                                         weight_group,
   //                                         lj_potential_energy);
   //}
-  //auto lj_potential_energy_total =
-  //  vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
-  //_lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
 
-  _lj_potential_energy_avr = _para.GetParameter<Real>(PARA_LJPE);
+  OutPut::ComputePotentialEnergy(_cut_off, atoms_id, locator, topology, force_function, lj_potential_energy); 
+  auto lj_potential_energy_total =
+    vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+  _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
+
+  //_lj_potential_energy_avr = _para.GetParameter<Real>(PARA_LJPE);
 
   //TODO: turn to parameter
   auto N = position.GetNumberOfValues();
@@ -199,10 +201,10 @@ void ThermoOutput::ComputePotentialEnergy()
 
   _spec_far_ele_potential_energy_avr = 0.0;
 
-  if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
-  {
-    SpecialFarCoulEnergy();
-  }
+  //if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
+  //{
+  //  SpecialFarCoulEnergy();
+  //}
 
   _near_ele_potential_energy_avr = _near_ele_potential_energy_avr - _spec_far_ele_potential_energy_avr;
 

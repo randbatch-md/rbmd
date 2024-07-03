@@ -88,8 +88,8 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  fix_press_berendsen();
-  //fix_press_berendsen_scale();
+  //fix_press_berendsen();
+  fix_press_berendsen_scale();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -140,23 +140,23 @@ void ExecutionNVT::ComputeAllForce()
     NearForceLJ();
   }
 
-  if (_init_way == "read_data" && _para.GetParameter<std::string>(PARA_FILE_TYPE) != "EAM")
-  { 
-    Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
-    
-    //all force with bondforce
-    Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
-    
-    //all force with angleforce
-    Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
-    
-    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
-        _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
-    {
-      //all force with dihedral+force
-      Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
-    }
-  }
+  //if (_init_way == "read_data" && _para.GetParameter<std::string>(PARA_FILE_TYPE) != "EAM")
+  //{ 
+  //  Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
+  //  
+  //  //all force with bondforce
+  //  Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
+  //  
+  //  //all force with angleforce
+  //  Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
+  //  
+  //  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
+  //      _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
+  //  {
+  //    //all force with dihedral+force
+  //    Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
+  //  }
+  //}
 }
 
 void ExecutionNVT::UpdateVelocity()
@@ -391,9 +391,9 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
   if (_nearforce_type == "RBL")
   {
-    //ComputeRBLLJForce(_all_force);
-    ComputeRBLLJForce71(_all_force, _virial_atom, _lj_potential_energy);
-    _para.SetParameter(PARA_LJPE, _lj_potential_energy);
+    ComputeRBLLJForce(_all_force);
+    //ComputeRBLLJForce71(_all_force, _virial_atom, _lj_potential_energy);
+    //_para.SetParameter(PARA_LJPE, _lj_potential_energy);
   }
   else if (_nearforce_type == "VERLETLIST")
   {
@@ -769,7 +769,8 @@ void ExecutionNVT::fix_press_berendsen()
     auto dt_over_period = _dt / p_period[i];
     auto bulkmodulus_inv = 1.0 / _bulkmodulus;
     p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
-    dilation[i] = vtkm::Pow(1.0 - dt_over_period * (p_target[i] - p_current[i]) * bulkmodulus_inv, 1.0/3.0);
+
+    dilation[i] = vtkm::Pow(1.0 - dt_over_period * (p_target[0] - p_current[i]) * bulkmodulus_inv, 1.0 / 3.0);
   }
 
   std::cout << "p_target=" << p_target[0] << ",p_current=" << p_current[0]
@@ -806,22 +807,21 @@ void ExecutionNVT::fix_press_berendsen_scale()
     p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
   }
   _pressure_coupling = _dt / (p_period[0] * 3 * _bulkmodulus);
-  std::cout << ",delta=" << delta << ",pressure_coupling=" << _pressure_coupling << std::endl;
-  _scale_factor = 1.0 - _pressure_coupling *
-                    (p_target[0] - (p_current[0] + p_current[1] + p_current[2]) * 0.3333);
+  //std::cout << ",delta=" << delta << ",pressure_coupling=" << _pressure_coupling << std::endl;
+  _scale_factor = 1.0 - _pressure_coupling * (p_target[0] - (p_current[0] + p_current[1] + p_current[2]) * 0.3333);
   
   //
-  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  //Vec3f box;
-  //for (int i = 0; i < 3; ++i)
-  //{
-  //  box[i] = range[i].Max - range[i].Min;
-  //}
-  // box[0] *= scale_factor;
-  // box[1] *= scale_factor;
-  // box[2] *= scale_factor;
-  
+  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  //box[0] *= _scale_factor;
+  //box[1] *= _scale_factor;
+  //box[2] *= _scale_factor;
+  //_para.SetParameter(PARA_BOX, box);
+  //std::cout << "scale_factor =" << _scale_factor << ",box[0]=" << box[0] << ",box[1]=" << box[1]
+  //          << ",box[2]=" << box[2]
+  //          << std::endl;
+   
    // 调整range的Min和Max值
+    auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
    for (int i = 0; i < 3; ++i)
    {
     Real center = (range[i].Max + range[i].Min) / 2.0;
@@ -862,13 +862,15 @@ void ExecutionNVT::Compute_Pressure_Scalar()
   auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
 
   // compute  virial
-  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  auto volume =
-      (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
-
+  auto  range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto volume =  (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
   auto inv_volume = 1.0 / volume;
-  //ComputeVirial();
-  ComputeVirial_r();
+
+  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  //auto volume = box[0] * box[1] * box[2];
+  //auto inv_volume = 1.0 / volume;
+  ComputeVirial();
+  //ComputeVirial_r();
 
   //compute dof
   auto n = _position.GetNumberOfValues();
@@ -889,15 +891,15 @@ void ExecutionNVT::ComputeVirial()
 
    RunWorklet::LJVirial(cut_off, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
-  //pbc
+  //mic
+  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  //Vec3f box;
-  //for (int i= 0;i<3;++i)
+  //Vec3f box{0,0,0};
+  //for (int i = 0; i < 3; ++i)
   //{
   //  box[i] = range[i].Max - range[i].Min;
   //}
-  //RunWorklet::LJVirialPBC(
-  //  cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  //RunWorklet::LJVirialPBC(cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
 
   //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
