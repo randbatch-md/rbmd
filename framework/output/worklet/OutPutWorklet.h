@@ -13,7 +13,7 @@ using GroupRealIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::Arra
 namespace OutPut
 {
 void EAM_rho(const Real& eam_cut_off,
-             const Real& Vlength,
+             const Vec3f& box,
              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
              const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
              const ContPointLocator& locator,
@@ -30,7 +30,7 @@ void EAM_EmbeddingEnergy(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                          vtkm::cont::ArrayHandle<Real>& embedding_energy);
 
 void EAM_PairEnergy(const Real& eam_cut_off,
-                    const Real& Vlength,
+                    const Vec3f& box,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                     const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
                     const ContPointLocator& locator,
@@ -104,7 +104,7 @@ void ComputerKineticEnergy(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
                            const vtkm::cont::ArrayHandle<Real>& mass,
                            vtkm::cont::ArrayHandle<Real>& sq_velocity);
 
-void ComputeMSD(const Real& _Vlength,
+void ComputeMSD(const Vec3f& _box,
                 const vtkm::cont::ArrayHandle<vtkm::Vec3f>& original_position,
                 const vtkm::cont::ArrayHandle<vtkm::Vec3f>& current_pts_position,
                 const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,

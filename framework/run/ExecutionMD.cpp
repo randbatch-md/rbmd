@@ -374,6 +374,40 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Real& _Vlength
   return rhok;
 }
 
+std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald_box( Vec3f& _box, IdComponent& Kmax)
+{
+  std::vector<Vec2f> rhok;
+  ArrayHandle<Real> density_real;
+  ArrayHandle<Real> density_image;
+  for (Id i = -Kmax; i <= Kmax; i++)
+  {
+    for (Id j = -Kmax; j <= Kmax; j++)
+    {
+      for (Id k = -Kmax; k <= Kmax; k++)
+      {
+        if (!(i == 0 && j == 0 && k == 0))
+        {
+          Vec3f K = { Real(i), Real(j), Real(k) };
+          //
+          for (Id ii = 0;ii < 3; ii++)
+          {
+            K[ii] = 2 * vtkm::Pi() * K[ii] / _box[ii];
+          }
+          RunWorklet::ComputeChargeStructureFactorComponent(
+            K, _position, _charge, density_real, density_image);
+          Real value_Re = vtkm::cont::Algorithm::Reduce(
+            density_real, vtkm::TypeTraits<Real>::ZeroInitialization());
+          Real value_Im = vtkm::cont::Algorithm::Reduce(
+            density_image, vtkm::TypeTraits<Real>::ZeroInitialization());
+
+          rhok.push_back({ value_Re, value_Im });
+        }
+      }
+    }
+  }
+  return rhok;
+}
+
 void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                   IdComponent& RBE_P,
                                   ArrayHandle<Vec3f>& RBE_ele_force)
@@ -381,10 +415,11 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
  
 
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
- 
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   ArrayHandle<Vec2f> new_whole_rhok;
   ComputeNewChargeStructureFactorRBE(Vlength, psample, new_whole_rhok);
+  //ComputeNewChargeStructureFactorRBE_box(box, psample, new_whole_rhok);
   
   RunWorklet::ComputeNewRBEForce(RBE_P,
                                     _atoms_id,
@@ -438,10 +473,58 @@ void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
   
 }
 
+void ExecutionMD::ComputeNewChargeStructureFactorRBE_box(Vec3f& _box,
+                                                     ArrayHandle<Vec3f>& _psample,
+                                                     ArrayHandle<Vec2f>& new_rhok)
+{
+
+  auto N = _position.GetNumberOfValues();
+
+  const Id p_number = _psample.GetNumberOfValues();
+
+
+
+  RunWorklet::ComputePnumberChargeStructureFactorbox(_box,
+                                                  p_number,
+                                                  N,
+                                                  _atoms_id,
+                                                  _position,
+                                                  _charge,
+                                                  _psample,
+                                                  //psamplekey,
+                                                  /*rhok_Re,*/ _rhok_Re,
+                                                  /*rhok_Im*/ _rhok_Im);
+
+
+  vtkm::cont::ArrayHandle<Id> psamplekey_out;
+  vtkm::cont::ArrayHandle<Real> rhok_Re_reduce;
+  vtkm::cont::ArrayHandle<Real> rhok_Im_reduce;
+
+
+  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
+    /*psamplekey,*/ _psamplekey,
+    /*rhok_Re,*/ _rhok_Re,
+    psamplekey_out,
+    rhok_Re_reduce,
+    vtkm::Add());
+  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
+    /*psamplekey,*/ _psamplekey,
+    /*rhok_Im,*/ _rhok_Im,
+    psamplekey_out,
+    rhok_Im_reduce,
+    vtkm::Add());
+
+
+
+  RunWorklet::ChangePnumberChargeStructureFactor(rhok_Re_reduce, rhok_Im_reduce, new_rhok);
+}
+
 void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force)
 {
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto rhok = ComputeChargeStructureFactorEwald(Vlength, Kmax);
+  //auto rhok = ComputeChargeStructureFactorEwald_box(box, Kmax);
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   RunWorklet::ComputeNewFarElectrostatics(
     Kmax, _atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force);
@@ -755,6 +838,7 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
 {
   ArrayHandle<Real> fp;
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
   auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
   auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
@@ -805,7 +889,7 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
                                           offset_verletlist_group);
 
   RunWorklet::EAMfp(rc,
-                    Vlength,
+                    box,
                     rs,
                     rs_num,
                     pice_num,
@@ -820,7 +904,7 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
                     fp);
 
  RunWorklet::EAMRBLForce(rc,
-                         Vlength,
+                         box,
                          rs,
                          rs_num,                            
                          pice_num,
@@ -844,6 +928,7 @@ void ExecutionMD::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
 {
  ArrayHandle<Real> fp;
  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+ auto box = _para.GetParameter<Vec3f>(PARA_BOX);
  auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
  auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
  auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
@@ -874,35 +959,36 @@ void ExecutionMD::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
     cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::EAMfpVerlet(cut_off,
-                             Vlength,
+                          box,
+                          _atoms_id,
+                          rhor_spline,
+                          frho_spline,
+                          _locator,
+                          _force_function,
+                          id_verletlist_group,
+                          num_verletlist,
+                          offset_verletlist_group,
+                          fp);
+
+  RunWorklet::EAMForceVerlet(cut_off,
+                             box,
                              _atoms_id,
-                             rhor_spline,
-                             frho_spline,
+                              rhor_spline,
+                              z2r_spline,
+                              fp,
                              _locator,
                              _force_function,
                              id_verletlist_group,
                              num_verletlist,
                              offset_verletlist_group,
-                             fp);
-
-  RunWorklet::EAMForceVerlet(cut_off,
-                                Vlength,
-                               _atoms_id,
-                                rhor_spline,
-                                z2r_spline,
-                                fp,
-                               _locator,
-                               _force_function,
-                               id_verletlist_group,
-                               num_verletlist,
-                               offset_verletlist_group,
-                               force);
+                             force);
 }
 
 void ExecutionMD::ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force)
 {
   auto cut_off = _para.GetParameter<Real>(EAM_PARA_CUTOFF);
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
   auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
@@ -913,22 +999,22 @@ void ExecutionMD::ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force)
 
   //1:compute _EAM_rho   = density at each atom
   RunWorklet::EAM_rho(
-    cut_off, Vlength, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
+    cut_off, box, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
 
   // 2:compute fp    = derivative of embedding energy at each atom
   RunWorklet::EAM_fp(_atoms_id, EAM_rho, frho_spline, _locator, _topology, _force_function, fp);
 
   // 3:compute force  = EAM_force
   RunWorklet::EAM_force(cut_off,
-                           Vlength,
-                           _atoms_id,
-                           fp,
-                           rhor_spline,
-                           z2r_spline,
-                           _locator,
-                           _topology,
-                           _force_function,
-                           force);
+                        box,
+                        _atoms_id,
+                        fp,
+                        rhor_spline,
+                        z2r_spline,
+                        _locator,
+                        _topology,
+                        _force_function,
+                        force);
 }
 
 void ExecutionMD::ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce) 

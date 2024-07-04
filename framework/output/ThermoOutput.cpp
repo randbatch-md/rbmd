@@ -68,6 +68,7 @@ void ThermoOutput::Init()
   _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   _volume = _para.GetParameter<Real>(PARA_VOLUME);
   _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  _box = _para.GetParameter<Vec3f>(PARA_BOX);
   _rho = _para.GetParameter<Real>(PARA_RHO);
   if (_para.GetParameter<bool>(PARA_FAR_FORCE))
   {
@@ -400,6 +401,7 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
   //
   auto cut_off = _para.GetParameter<Real>(EAM_PARA_CUTOFF);
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
   auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
@@ -418,7 +420,7 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
   //1:compute EAM_rho;
   ArrayHandle<Real> EAM_rho;
   OutPut::EAM_rho(
-    cut_off, Vlength, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
+    cut_off, box, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
 
   //2: embedding_energy_atom
   ArrayHandle<Real> embedding_energy_atom;
@@ -431,7 +433,7 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
   //3: pair_energy_atom
   ArrayHandle<Real> pair_energy_atom;
   OutPut::EAM_PairEnergy(
-    cut_off, Vlength, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
+    cut_off, box, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
 
   auto pair_energy_atom_total =
     vtkm::cont::Algorithm::Reduce(pair_energy_atom, vtkm::TypeTraits<Real>::ZeroInitialization());

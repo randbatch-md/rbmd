@@ -67,11 +67,13 @@ void LJInitCondition::SetParameters()
   auto xLength = _x_range[1] - _x_range[0];
   auto yLength = _y_range[1] - _y_range[0];
   auto zLength = _z_range[1] - _z_range[0];
+  Vec3f box = { xLength, yLength, zLength };
   auto num_pos = _dims[0] * _dims[1] * _dims[2];
   auto range = vtkm::Vec<vtkm::Range, 3>{ { _x_range[0], _x_range[1] },
                                           { _y_range[0], _y_range[1] },
                                           { _z_range[0], _z_range[1] } };
   _para.SetParameter(PARA_VLENGTH, xLength);
+  _para.SetParameter(PARA_BOX, box);
   _para.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
   _para.SetParameter(PARA_RHO, num_pos / (xLength * yLength * zLength));
   _para.SetParameter(PARA_RANGE, range);

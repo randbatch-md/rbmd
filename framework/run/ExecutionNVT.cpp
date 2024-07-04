@@ -618,6 +618,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
 {
   auto vLength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
   auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
   auto groupVecArray = vtkm::cont::make_ArrayHandleGroupVecVariable(source_array, offsets_array);
@@ -631,7 +632,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
     auto weight_group =
       vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
 
-    RunWorklet::ComputeSpecialCoulGeneral(vLength,
+    RunWorklet::ComputeSpecialCoulGeneral(box,
                                              _atoms_id,
                                              groupVecArray,
                                              _force_function,
@@ -643,7 +644,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
   }
   else
   {  
-    RunWorklet::ComputeSpecialCoul(vLength, _atoms_id, groupVecArray, _force_function, _topology, _locator, _spec_coul_force);
+    RunWorklet::ComputeSpecialCoul(box, _atoms_id, groupVecArray, _force_function, _topology, _locator, _spec_coul_force);
   }
   return _spec_coul_force;
 }

@@ -29,6 +29,7 @@ protected:
 
 private:
   Real _Vlength;
+  Vec3f _box;
   ArrayHandle<Vec3f> _position;
   IdComponent _start_step;
   IdComponent _end_step;

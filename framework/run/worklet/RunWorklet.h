@@ -60,7 +60,7 @@ namespace RunWorklet
                         vtkm::cont::ArrayHandle<Vec3f>& LJforce);
 
    void EAMfpVerlet(const Real& cut_off,
-                    const Real& Vlength,
+                    const Vec3f& box,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                     const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                     const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
@@ -72,7 +72,7 @@ namespace RunWorklet
                     vtkm::cont::ArrayHandle<Real>& EAM_fp);
 
    void EAMForceVerlet(const Real& cut_off,
-                       const Real& vlength,
+                       const Vec3f& box,
                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                        const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                        const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
@@ -85,7 +85,7 @@ namespace RunWorklet
                        vtkm::cont::ArrayHandle<Vec3f>& force);
 
    void EAM_rho(const Real& eam_cut_off,
-                const Real& Vlength,
+                const Vec3f& box,
                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                 const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                 const ContPointLocator& locator,
@@ -102,7 +102,7 @@ namespace RunWorklet
                vtkm::cont::ArrayHandle<Real>& fp);
 
    void EAM_force(const Real& eam_cut_off,
-                  const Real& Vlength,
+                  const Vec3f& box,
                   const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                   const vtkm::cont::ArrayHandle<Real>& fp,
                   const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
@@ -164,7 +164,7 @@ namespace RunWorklet
                     vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce);
 
     void EAMfp(const Real& rc,
-               const Real& Vlength,
+               const Vec3f& box,
                const Real& rs,
                const Id& rs_num,
                const Id& pice_num,
@@ -179,20 +179,20 @@ namespace RunWorklet
                vtkm::cont::ArrayHandle<Real>& EAM_fp);
 
     void EAMRBLForce(const Real& rc,
-                   const Real& Vlength,
-                   const Real& rs,
-                   const Id& rs_num,
-                   const Id& pice_num,
-                   const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                   const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
-                   const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
-                   const vtkm::cont::ArrayHandle<Real>& EAM_fp,
-                   const ContPointLocator& locator,
-                   const ContForceFunction& force_function,
-                   const GroupVecType& id_verletlist_group,
-                   const GroupNumType& num_verletlist_group,
-                   const CoordOffsetType& offset_verletlist_group,
-                   vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+                     const Vec3f& box,
+                     const Real& rs,
+                     const Id& rs_num,
+                     const Id& pice_num,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                     const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                     const vtkm::cont::ArrayHandle<Real>& EAM_fp,
+                     const ContPointLocator& locator,
+                     const ContForceFunction& force_function,
+                     const GroupVecType& id_verletlist_group,
+                     const GroupNumType& num_verletlist_group,
+                     const CoordOffsetType& offset_verletlist_group,
+                     vtkm::cont::ArrayHandle<Vec3f>& corr_force);
     
     void SumRBLCorrForce(const vtkm::Vec3f corr_value,
                          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& corr_force,
@@ -225,14 +225,14 @@ namespace RunWorklet
                                       const ContForceFunction& force_function,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleNearforce);
 
-    void ComputeSpecialCoul(const Real& Vlength,
+    void ComputeSpecialCoul(const Vec3f& box,
                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                             const GroupVecType& group_vec,
                             const ContForceFunction& force_function,
                             const ContTopology& topology,
                             const ContPointLocator& locator,
                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce);
-    void ComputeSpecialCoulGeneral(const Real& Vlength,
+    void ComputeSpecialCoulGeneral(const Vec3f& box,
                                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                    const GroupVecType& group_vec,
                                    const ContForceFunction& force_function,
@@ -312,6 +312,21 @@ namespace RunWorklet
         /*                                     GroupVecType& psamplekey_group,
                                              GroupRealType& rhok_Re_group,
                                              GroupRealType& rhok_Im_group*/);
+
+        void ComputePnumberChargeStructureFactorbox(const Vec3f& _box,
+                                            const Id& pnumber,
+                                            const Id& pos_number,
+                                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                                             const vtkm::cont::ArrayHandle<Real>& charge,
+                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
+                                            // vtkm::cont::ArrayHandle<vtkm::Id>& psamplekey_group,
+                                             vtkm::cont::ArrayHandle<Real>& rhok_Re_group,
+                                             vtkm::cont::ArrayHandle<Real>& rhok_Im_group
+        /*                                     GroupVecType& psamplekey_group,
+                                             GroupRealType& rhok_Re_group,
+                                             GroupRealType& rhok_Im_group*/);
+
     void ChangePnumberChargeStructureFactor(const vtkm::cont::ArrayHandle<Real>& rhok_Re,
                                              const vtkm::cont::ArrayHandle<Real>& rhok_Im,
                                              vtkm::cont::ArrayHandle<vtkm::Vec2f>& new_rhok);

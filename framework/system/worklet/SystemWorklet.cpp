@@ -272,9 +272,9 @@ namespace SystemWorklet
 
     struct ComputeEAMfpVerletWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMfpVerletWorklet(const Real& Vlength,const Real& rc)
+      ComputeEAMfpVerletWorklet(const Real& rc, const Vec3f& box)
         : _rc(rc) 
-        ,_Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -306,7 +306,7 @@ namespace SystemWorklet
         Real rho = 0;
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           rho += force_function.ComputeEAMrho(_rc, r_ij, rhor_spline);
         };
 
@@ -323,14 +323,14 @@ namespace SystemWorklet
         EAM_fp = force_function.ComputeEAMfp(atoms_id, rho, frho_spline);
       }
       Real _rc;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeEAMForceVerletWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMForceVerletWorklet(const Real& cut_off, const Real& Vlength)
+      ComputeEAMForceVerletWorklet(const Real& cut_off, const Vec3f& box)
         : _rc(cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -367,7 +367,7 @@ namespace SystemWorklet
         auto function_force =
           [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           rc_force += force_function.ComputeEAMforce(_rc, atoms_id, pts_id_j, r_ij, EAM_fp, rhor_spline, z2r_spline);
         };
 
@@ -381,14 +381,14 @@ namespace SystemWorklet
         force = rc_force;
       }
       Real _rc;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeEAMrhoWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Real& Vlength)
+      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Vec3f& box)
         : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -413,14 +413,14 @@ namespace SystemWorklet
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           rho += force_function.ComputeEAMrho(_eam_cut_off, r_ij, rhor_spline);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
         EAM_rho = rho;
       }
       Real _eam_cut_off;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeEAMfpWorklet : vtkm::worklet::WorkletMapField
@@ -450,9 +450,9 @@ namespace SystemWorklet
 
     struct ComputeEAMforceWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMforceWorklet(const Real& eam_cut_off, const Real& Vlength)
+      ComputeEAMforceWorklet(const Real& eam_cut_off, const Vec3f& box)
         : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -480,7 +480,7 @@ namespace SystemWorklet
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           force += force_function.ComputeEAMforce(
             _eam_cut_off, atoms_id, pts_id_j, r_ij, fp, rhor_spline, z2r_spline);
         };
@@ -488,7 +488,7 @@ namespace SystemWorklet
         eam_force = force;
       }
       Real _eam_cut_off;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeLJForceWithPeriodicBCWorklet : vtkm::worklet::WorkletMapField
