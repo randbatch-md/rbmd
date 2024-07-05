@@ -343,38 +343,17 @@ void ExecutionMD::InitParameters()
   _para.SetParameter(PARA_UNIT_FACTOR, _unit_factor);
 }
 
-std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Real& _Vlength,
-                                                                      IdComponent& Kmax)
+void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force)
 {
-  std::vector<Vec2f> rhok;
-  ArrayHandle<Real> density_real;
-  ArrayHandle<Real> density_image;
-  for (Id i = -Kmax; i <= Kmax; i++)
-  {
-    for (Id j = -Kmax; j <= Kmax; j++)
-    {
-      for (Id k = -Kmax; k <= Kmax; k++)
-      {
-        if (!(i == 0 && j == 0 && k == 0))
-        {
-          Vec3f K = { Real(i), Real(j), Real(k) };
-          K = 2 * vtkm::Pi() * K / _Vlength;
-          RunWorklet::ComputeChargeStructureFactorComponent(
-            K, _position, _charge, density_real, density_image);
-          Real value_Re = vtkm::cont::Algorithm::Reduce(
-            density_real, vtkm::TypeTraits<Real>::ZeroInitialization());
-          Real value_Im = vtkm::cont::Algorithm::Reduce(
-            density_image, vtkm::TypeTraits<Real>::ZeroInitialization());
-
-          rhok.push_back({ value_Re, value_Im });
-        }
-      }
-    }
-  }
-  return rhok;
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  auto rhok = ComputeChargeStructureFactorEwald_box(box, Kmax);
+  ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
+  RunWorklet::ComputeNewFarElectrostatics(
+    Kmax, _atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force);
 }
 
-std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald_box( Vec3f& _box, IdComponent& Kmax)
+std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald_box( Vec3f& box, IdComponent& Kmax)
 {
   std::vector<Vec2f> rhok;
   ArrayHandle<Real> density_real;
@@ -389,10 +368,9 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald_box( Vec3f& _b
         {
           Vec3f K = { Real(i), Real(j), Real(k) };
           //
-          for (Id ii = 0;ii < 3; ii++)
-          {
-            K[ii] = 2 * vtkm::Pi() * K[ii] / _box[ii];
-          }
+          K = { Real(2 * vtkm::Pi() * K[0] / box[0]),
+                Real(2 * vtkm::Pi() * K[1] / box[1]),
+                Real(2 * vtkm::Pi() * K[2] / box[2]) };
           RunWorklet::ComputeChargeStructureFactorComponent(
             K, _position, _charge, density_real, density_image);
           Real value_Re = vtkm::cont::Algorithm::Reduce(
@@ -418,8 +396,7 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   ArrayHandle<Vec2f> new_whole_rhok;
-  ComputeNewChargeStructureFactorRBE(Vlength, psample, new_whole_rhok);
-  //ComputeNewChargeStructureFactorRBE_box(box, psample, new_whole_rhok);
+  ComputeNewChargeStructureFactorRBE_box(box, psample, new_whole_rhok);
   
   RunWorklet::ComputeNewRBEForce(RBE_P,
                                     _atoms_id,
@@ -430,47 +407,6 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                     RBE_ele_force);
  
 
-}
-
-void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
-                                                                ArrayHandle<Vec3f>& _psample,
-                                                                ArrayHandle<Vec2f>& new_rhok)
-{
- 
-  auto N = _position.GetNumberOfValues();
-  
-  const Id p_number = _psample.GetNumberOfValues();
-  
-
-
-  RunWorklet::ComputePnumberChargeStructureFactor(_Vlength,
-                                                     p_number,
-                                                     N,
-                                                     _atoms_id,
-                                                     _position,
-                                                     _charge,
-                                                     _psample,
-                                                     //psamplekey,
-                                                     /*rhok_Re,*/_rhok_Re,
-                                                     /*rhok_Im*/_rhok_Im);
- 
-
-  vtkm::cont::ArrayHandle<Id> psamplekey_out;
-  vtkm::cont::ArrayHandle<Real> rhok_Re_reduce;
-  vtkm::cont::ArrayHandle<Real> rhok_Im_reduce;
-
-   
-  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
-    /*psamplekey,*/ _psamplekey, /*rhok_Re,*/ _rhok_Re, psamplekey_out, rhok_Re_reduce, vtkm::Add());
-  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
-    /*psamplekey,*/ _psamplekey, /*rhok_Im,*/ _rhok_Im, psamplekey_out, rhok_Im_reduce, vtkm::Add());
- 
-
-
-  RunWorklet::ChangePnumberChargeStructureFactor(rhok_Re_reduce, rhok_Im_reduce, new_rhok);
- 
-
-  
 }
 
 void ExecutionMD::ComputeNewChargeStructureFactorRBE_box(Vec3f& _box,
@@ -517,17 +453,6 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE_box(Vec3f& _box,
 
 
   RunWorklet::ChangePnumberChargeStructureFactor(rhok_Re_reduce, rhok_Im_reduce, new_rhok);
-}
-
-void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force)
-{
-  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-  auto rhok = ComputeChargeStructureFactorEwald(Vlength, Kmax);
-  //auto rhok = ComputeChargeStructureFactorEwald_box(box, Kmax);
-  ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
-  RunWorklet::ComputeNewFarElectrostatics(
-    Kmax, _atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force);
 }
 
 void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
@@ -826,6 +751,7 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
                             offset_verletlist_group,
                             ljforce);
 }
+
 void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);

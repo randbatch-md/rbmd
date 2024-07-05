@@ -21,6 +21,7 @@ public:
                     const Real& alpha,
                     const Real& volume,
                     const Real& vlength,
+                    const Vec3f& box,
                     const IdComponent& kmax,
                     const IdComponent& rbeP,
                     const Real& rhomax,
@@ -32,6 +33,7 @@ public:
     , _alpha(alpha)
     , _volume(volume)
     , _Vlength(vlength)
+    , _box(box)
     , Kmax(kmax)
     , RBEP(rbeP)
     , _rhomax(rhomax)
@@ -184,15 +186,19 @@ public:
                                 const Vec2f& rhok_ri)
   {
     Vec3f force = { 0, 0, 0 };
-  
-    Vec3f K = 2 * vtkm::Pi() * M / _Vlength; // TODO: Lx
+    auto volume = _box[0] * _box[1] * _box[2];
+    //Vec3f K = { 2 * vtkm::Pi()* M / _Vlength ,} // TODO: Lx
+    Vec3f K{0,0,0};
+    K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
+    K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
+    K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
     Real range_K_2 = K[0] * K[0] + K[1] * K[1] + K[2] * K[2];
     auto factor_a = -4 * vtkm::Pi() * charge_p_i * K;
     auto factor_b = vtkm::Exp(-range_K_2 / (4 * _alpha));
     auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
     auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
 
-    force = factor_a / (_volume * range_K_2) * factor_b * (factor_c - factor_d);  
+    force = factor_a / (volume * range_K_2) * factor_b * (factor_c - factor_d);  
     return force;
   }
 
@@ -202,7 +208,9 @@ public:
                                      const Vec2f& rhok_ri)
   {
     Vec3f force = { 0, 0, 0 };
-    kl = 2.0 * vtkm::Pi() * kl / _Vlength;
+    kl[0] = 2.0 * vtkm::Pi() * kl[0] / _box[0];
+    kl[1] = 2.0 * vtkm::Pi() * kl[1] / _box[1];
+    kl[2] = 2.0 * vtkm::Pi() * kl[2] / _box[2];
     Real range_kl_2 = kl[0] * kl[0] + kl[1] * kl[1] + kl[2] * kl[2];
 
     auto factor_a = -4 * vtkm::Pi() * current_charge * kl;
@@ -220,22 +228,26 @@ public:
 
   VTKM_EXEC Real Compute_S() const
   {
-    const Real& factor = Compute_H();
-    Real factor_3 = factor * factor * factor;
+    const Vec3f& factor = Compute_H();
+    Real factor_3 = factor[0] * factor[1] * factor[2];
     Real S = factor_3 - 1;
     return S;
   }
 
-  VTKM_EXEC Real Compute_H() const
+  VTKM_EXEC Vec3f Compute_H() const
   {
-    Real H = 0.0;
-    const Real factor = -(_alpha * _Vlength * _Vlength);
-    for (int m = -10; m <= 10; m++)
+    Vec3f H = {0,0,0};
+    for (Id i=0; i<3;++i)
     {
-      Real expx = m * m * factor;
-      H += vtkm::Exp(expx);
+      const Real factor = -(_alpha * _box[i] * _box[i]);
+      for (int m = -10; m <= 10; m++)
+      {
+        Real expx = m * m * factor;
+        H[i] += vtkm::Exp(expx);
+      }
+      H[i] *=  vtkm::Sqrt(-(factor) / vtkm::Pi());
     }
-    H = H * vtkm::Sqrt(-(factor) / vtkm::Pi());
+
     return H;
   }
 
@@ -563,6 +575,7 @@ public:
   Real _alpha;
   Real _volume;
   Real _Vlength;
+  Vec3f _box;
   Real _sum_gauss;
   IdComponent Kmax;
   IdComponent RBEP;

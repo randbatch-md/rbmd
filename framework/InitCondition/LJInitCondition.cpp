@@ -74,15 +74,12 @@ void LJInitCondition::SetParameters()
                                           { _z_range[0], _z_range[1] } };
   _para.SetParameter(PARA_VLENGTH, xLength);
   _para.SetParameter(PARA_BOX, box);
-  _para.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
-  _para.SetParameter(PARA_RHO, num_pos / (xLength * yLength * zLength));
+  _para.SetParameter(PARA_VOLUME, box[0] * box[1] * box[2]);
+  _para.SetParameter(PARA_RHO, num_pos / (box[0] * box[1] * box[2]));
   _para.SetParameter(PARA_RANGE, range);
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
   _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-  //auto xLength = _para.GetParameter<Real>(PARA_VLENGTH);
-  //auto yLength = xLength;
-  //auto zLength = xLength;
   auto bin_number = Id3{
     static_cast<int>(xLength / cut_off),
     static_cast<int>(yLength / cut_off),

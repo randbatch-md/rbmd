@@ -5,33 +5,41 @@ struct RBEPSAMPLE
 {
   Real _alpha;
   Real _Length;
+  Vec3f _box;
   Id _P;
   bool _RBE_random;
 
   Real Compute_S() const
   {
-    Real S = pow(Compute_H(), 3) - 1;
+    const Vec3f& factor = Compute_H();
+    Real factor_3 = factor[0] * factor[1] * factor[2];
+    Real S = factor_3 - 1;
     return S;
   }
 
-  Real Compute_H() const
+  Vec3f Compute_H() const
   {
-    Real H = 0.0;
-    for (int m = -10; m <= 10; m++)
+    Vec3f H = 0.0;
+    for (Id i = 0; i < 3; ++i)
     {
-      Real expx = -_alpha * m * m * _Length * _Length;
-      H += vtkm::Exp(expx);
+      const Real factor = -(_alpha * _box[i] * _box[i]);
+      for (int m = -10; m <= 10; m++)
+      {
+        Real expx = m * m * factor;
+        H[i] += vtkm::Exp(expx);
+      }
+      H[i] *= vtkm::Sqrt(-(factor) / vtkm::Pi());
     }
-    H = H * vtkm::Sqrt(_alpha * pow(_Length, 2.0) / vtkm::Pi());
+
     return H;
   }
 
-  Real MH_Algorithm(Real m, Real mu, Real sigma) const
+  Real MH_Algorithm(Real m, Real mu, const Vec3f& sigma, Id dimension) const
   {
-    Real x_wait = FetchSample_1D(mu, sigma);
+    Real x_wait = FetchSample_1D(mu, sigma[dimension]);
     Real m_wait = Real(vtkm::Round(x_wait));
-    Real Prob =
-      (Distribution_P(m_wait) / Distribution_P(m)) * (Distribution_q(m) / Distribution_q(m_wait));
+    Real Prob = (Distribution_P(m_wait, dimension) / Distribution_P(m, dimension)) *
+                (Distribution_q(m, dimension) / Distribution_q(m_wait, dimension));
     Prob = vtkm::Min(Prob, Real(1.0));
 
     if (_RBE_random)
@@ -50,26 +58,26 @@ struct RBEPSAMPLE
     }
   }
 
-  Real Distribution_P(const Real& x) const
+  Real Distribution_P(const Real& x, const Id dimension) const
   {
-    Real P_m = vtkm::Exp(-vtkm::Pow(2 * vtkm::Pi() * x / _Length, 2) / (4 * _alpha));
-    P_m = P_m / Compute_H();
+    Real P_m = vtkm::Exp(-vtkm::Pow(2 * vtkm::Pi() * x / _box[dimension], 2) / (4 * _alpha));
+    P_m = P_m / Compute_H()[dimension];
     return P_m;
   }
 
-  Real Distribution_q(const Real& x) const
+  Real Distribution_q(const Real& x, const Id dimension) const
   {
     Real q_m;
     if (x == 0)
     {
       q_m = vtkm::ERF((1.0 / 2) /
-                      (vtkm::Sqrt(_alpha * vtkm::Pow(_Length, 2) / vtkm::Pow(vtkm::Pi(), 2))));
+                  (vtkm::Sqrt(_alpha * vtkm::Pow(_box[dimension], 2) / vtkm::Pow(vtkm::Pi(), 2))));
     }
     else
       q_m = (vtkm::ERF(((1.0 / 2) + vtkm::Abs(x)) /
-                       (vtkm::Sqrt(_alpha * vtkm::Pow(_Length, 2) / vtkm::Pow(vtkm::Pi(), 2)))) -
+               (vtkm::Sqrt(_alpha * vtkm::Pow(_box[dimension], 2) / vtkm::Pow(vtkm::Pi(), 2)))) -
              vtkm::ERF((vtkm::Abs(x) - (1.0 / 2)) /
-                       (vtkm::Sqrt(_alpha * vtkm::Pow(_Length, 2) / vtkm::Pow(vtkm::Pi(), 2))))) /
+               (vtkm::Sqrt(_alpha * vtkm::Pow(_box[dimension], 2) / vtkm::Pow(vtkm::Pi(), 2))))) /
         2;
     return q_m;
   }
@@ -102,15 +110,15 @@ struct RBEPSAMPLE
     }
   }
 
-  vtkm::cont::ArrayHandle<Vec3f> Fetch_P_Sample(const Real& mu, const Real& sigma) const
+  vtkm::cont::ArrayHandle<Vec3f> Fetch_P_Sample(const Real& mu, const Vec3f& sigma) const
   {
     Real epsilonx = 1e-6; // precision
     Vec3f X_0;
     do
     {
-      X_0 = { Real(vtkm::Round(FetchSample_1D(mu, sigma))),
-              Real(vtkm::Round(FetchSample_1D(mu, sigma))),
-              Real(vtkm::Round(FetchSample_1D(mu, sigma))) };
+      X_0 = { Real(vtkm::Round(FetchSample_1D(mu, sigma[0]))),
+              Real(vtkm::Round(FetchSample_1D(mu, sigma[1]))),
+              Real(vtkm::Round(FetchSample_1D(mu, sigma[2]))) };
     } while (vtkm::Abs(X_0[0]) < epsilonx && vtkm::Abs(X_0[1]) < epsilonx &&
              vtkm::Abs(X_0[2]) < epsilonx);
 
@@ -121,9 +129,9 @@ struct RBEPSAMPLE
 
     for (int i = 1; i < _P; i++)
     {
-      Vec3f X_1 = { MH_Algorithm(X_0[0], mu, sigma),
-                    MH_Algorithm(X_0[1], mu, sigma),
-                    MH_Algorithm(X_0[2], mu, sigma) };
+      Vec3f X_1 = { MH_Algorithm(X_0[0], mu, sigma,0),
+                    MH_Algorithm(X_0[1], mu, sigma,1),
+                    MH_Algorithm(X_0[2], mu, sigma,2) };
       writePortal.Set(i, X_1);
       X_0 = X_1;
       if (vtkm::Abs(X_1[0]) < epsilonx && vtkm::Abs(X_1[1]) < epsilonx &&

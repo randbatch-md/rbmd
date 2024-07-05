@@ -1569,64 +1569,6 @@ namespace RunWorklet
       Vec3f _K;
     };
 
-    struct ComputePnumberChargeStructureFactorWorklet : vtkm ::worklet::WorkletMapField
-    {
-      ComputePnumberChargeStructureFactorWorklet(const Real& Vlength, const Id& pnumber, const Id& pos_number)
-        : _Vlength(Vlength)
-        , _pnumber(pnumber)
-        , _pos_num(pos_number)
-      {
-      }
-
-      using ControlSignature = void(FieldIn atoms_id,
-                                    FieldIn current_pts,
-                                    FieldIn current_charge,
-                                    WholeArrayIn psample,
-                                   // WholeArrayInOut psamplekey_group,
-                                    WholeArrayInOut rhok_Re_group,
-                                    WholeArrayInOut rhok_Im_group);
-
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
-
-      template<typename CoordType,  typename Densitytype, typename SampleType>
-      VTKM_EXEC void operator()(const Id atoms_id,
-                                const CoordType& current_pts,
-                                const Real& current_charge,
-                                const SampleType& psample,
-                               // Keytype& psamplekey_group,
-                                Densitytype& rhok_Re_group,
-                                Densitytype& rhok_Im_group) const
-      {
-        //auto p_i = locator.GetPtsPosition(atoms_id);
-        //Vec3f r_i = current_pts;
-        /*Real rho_Re_i = 0.0;
-        Real rho_Im_i = 0.0;
-        density_Re = current_charge * vtkm::Cos(vtkm::Dot(_K, r_i));
-        density_Im = current_charge * vtkm::Sin(vtkm::Dot(_K, r_i));*/
-
-        for (Id i = 0; i < _pnumber; i++)
-        {
-          auto kl = psample.Get(i);
-          kl = 2 * vtkm::Pi() * kl / _Vlength;
-
-          auto index = atoms_id + i * _pos_num;
-          //psamplekey_group.Set(index,i);
-          rhok_Re_group.Set(index,current_charge * vtkm::Cos(vtkm::Dot(kl, current_pts)));
-          rhok_Im_group.Set(index,current_charge * vtkm::Sin(vtkm::Dot(kl, current_pts)));
-	            //rhok_Re_group.Set(index,current_charge * 1.0);
-          //rhok_Im_group.Set(index,current_charge * 1.0);
-          //psamplekey_group[index] = i;
-          //rhok_Re_group[index] = current_charge * vtkm::Cos(vtkm::Dot(kl, r_i));
-          //rhok_Im_group[index] = current_charge * vtkm::Sin(vtkm::Dot(kl, r_i));
-        }
-      }
-
-
-      Real _Vlength;
-      Id _pnumber;
-      Id _pos_num;
-    };
-
     struct ComputePnumberChargeStructureFactorboxWorklet : vtkm ::worklet::WorkletMapField
     {
       ComputePnumberChargeStructureFactorboxWorklet(const Vec3f& box,
@@ -2517,30 +2459,6 @@ namespace RunWorklet
                                charge,
                                Density_Real,
                                Density_Image);
-    }
-
-    void ComputePnumberChargeStructureFactor(const Real& _Vlength,
-                                            const Id& pnumber,
-                                            const Id& pos_number,
-                                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
-                                             const vtkm::cont::ArrayHandle<Real>& charge,
-                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
-                                            // vtkm::cont::ArrayHandle<vtkm::Id>& psamplekey_group,
-                                             vtkm::cont::ArrayHandle<Real>& rhok_Re_group,
-                                             vtkm::cont::ArrayHandle<Real>& rhok_Im_group
-/*                                             GroupVecType& psamplekey_group,
-                                             GroupRealType& rhok_Re_group,
-                                             GroupRealType& rhok_Im_group*/)
-    {
-      vtkm::cont::Invoker{}(ComputePnumberChargeStructureFactorWorklet{ _Vlength, pnumber,pos_number },
-                            atoms_id,
-                            position,
-                            charge,
-                            psample,
-                            //psamplekey_group,
-                            rhok_Re_group,
-                            rhok_Im_group);
     }
 
      void ComputePnumberChargeStructureFactorbox(const Vec3f& _box,

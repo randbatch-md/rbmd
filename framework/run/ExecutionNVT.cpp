@@ -286,14 +286,17 @@ void ExecutionNVT::SetCenterTargetPositions()
 void ExecutionNVT::PreForce()
 {
   _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  _box = _para.GetParameter<Vec3f>(PARA_BOX);
+  Vec3f sigma = { static_cast<Real>(vtkm::Sqrt(_alpha / 2.0) * _box[0] / vtkm::Pi()),
+                  static_cast<Real>(vtkm::Sqrt(_alpha / 2.0) * _box[1] / vtkm::Pi()),
+                  static_cast<Real>(vtkm::Sqrt(_alpha / 2.0) * _box[2] / vtkm::Pi()) };
   _dt = _executioner->Dt();
   // prepare for RBE force
   auto velocity_type = _para.GetParameter<std::string>(gtest::velocity_type);
   auto random = (velocity_type != "TEST") ? true : false;
-  RBEPSAMPLE rbe_presolve_psample = { _alpha, _Vlength, _RBE_P };
+  RBEPSAMPLE rbe_presolve_psample = { _alpha, _Vlength, _box, _RBE_P };
   rbe_presolve_psample._RBE_random = random;
-  _psample = rbe_presolve_psample.Fetch_P_Sample(
-    Real(0.0), (vtkm::Sqrt(_alpha / 2.0) * _Vlength / vtkm::Pi()));
+  _psample = rbe_presolve_psample.Fetch_P_Sample(Real(0.0), sigma);
 
   // prepare for Langevin dynamics
   RBEPSAMPLE sample_presolve_1d;
@@ -724,7 +727,8 @@ void ExecutionNVT::SetForceFunction()
     auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
     auto volume = _para.GetParameter<Real>(PARA_VOLUME);
     auto vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-    _force_function.SetParameters(cut_off, _alpha, volume, vlength, _Kmax);
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+    _force_function.SetParameters(cut_off, _alpha, volume, vlength, box, _Kmax);
   }
 
   if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")

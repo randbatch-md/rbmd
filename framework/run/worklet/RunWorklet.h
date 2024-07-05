@@ -299,33 +299,20 @@ namespace RunWorklet
                                                const vtkm::cont::ArrayHandle<Real>& charge,
                                                vtkm::cont::ArrayHandle<Real>& Density_Real,
                                                vtkm::cont::ArrayHandle<Real>& Density_Image);
-    void ComputePnumberChargeStructureFactor(const Real& _Vlength,
-                                            const Id& pnumber,
-                                            const Id& pos_number,
-                                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
-                                             const vtkm::cont::ArrayHandle<Real>& charge,
-                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
-                                            // vtkm::cont::ArrayHandle<vtkm::Id>& psamplekey_group,
-                                             vtkm::cont::ArrayHandle<Real>& rhok_Re_group,
-                                             vtkm::cont::ArrayHandle<Real>& rhok_Im_group
-        /*                                     GroupVecType& psamplekey_group,
-                                             GroupRealType& rhok_Re_group,
-                                             GroupRealType& rhok_Im_group*/);
 
-        void ComputePnumberChargeStructureFactorbox(const Vec3f& _box,
-                                            const Id& pnumber,
-                                            const Id& pos_number,
-                                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
-                                             const vtkm::cont::ArrayHandle<Real>& charge,
-                                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
-                                            // vtkm::cont::ArrayHandle<vtkm::Id>& psamplekey_group,
-                                             vtkm::cont::ArrayHandle<Real>& rhok_Re_group,
-                                             vtkm::cont::ArrayHandle<Real>& rhok_Im_group
-        /*                                     GroupVecType& psamplekey_group,
-                                             GroupRealType& rhok_Re_group,
-                                             GroupRealType& rhok_Im_group*/);
+    void ComputePnumberChargeStructureFactorbox(const Vec3f& _box,
+                                                const Id& pnumber,
+                                                const Id& pos_number,
+                                                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                                 const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                                                 const vtkm::cont::ArrayHandle<Real>& charge,
+                                                 const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
+                                                // vtkm::cont::ArrayHandle<vtkm::Id>& psamplekey_group,
+                                                 vtkm::cont::ArrayHandle<Real>& rhok_Re_group,
+                                                 vtkm::cont::ArrayHandle<Real>& rhok_Im_group
+        /*                                         GroupVecType& psamplekey_group,
+                                                 GroupRealType& rhok_Re_group,
+                                                 GroupRealType& rhok_Im_group*/);
 
     void ChangePnumberChargeStructureFactor(const vtkm::cont::ArrayHandle<Real>& rhok_Re,
                                              const vtkm::cont::ArrayHandle<Real>& rhok_Im,

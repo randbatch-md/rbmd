@@ -29,6 +29,7 @@ ThermoOutput::ThermoOutput(const Configuration& cfg)
   , _system_state("SystemState.csv")
   , _cut_off(0.0)
   , _Vlength(0.0)
+  , _box(0.0)
   , _volume(0.0)
   , _Kmax(0)
   , _alpha(0.0)
@@ -198,7 +199,8 @@ void ThermoOutput::ComputePotentialEnergy()
 
   if (_para.GetParameter<bool>(PARA_FAR_FORCE))
   {
-    Real Volume = vtkm::Pow(_Vlength, 3);
+    //Real Volume = vtkm::Pow(_Vlength, 3);
+    Real Volume = _box[0] * _box[1] * _box[2];
     ArrayHandle<Real> Density_Real;
     ArrayHandle<Real> Density_Image;
     Real far_ele_potential_energy_total = 0.0;
@@ -211,7 +213,14 @@ void ThermoOutput::ComputePotentialEnergy()
           if (!(i == 0 && j == 0 && k == 0))
           {
             Vec3f K = { Real(i), Real(j), Real(k) };
-            K = 2 * vtkm::Pi() * K / _Vlength;
+            //K = 2 * vtkm::Pi() * K / _Vlength;
+            K = { Real(2 * vtkm::Pi() * K[0] / _box[0]),
+                  Real(2 * vtkm::Pi() * K[1] / _box[1]),
+                  Real(2 * vtkm::Pi() * K[2] / _box[2]) };
+            //for (Id jj = 0; jj < 3; jj++)
+            //{
+            //  K[jj] = 2 * vtkm::Pi() * K[jj] / _box[jj];
+            //}
             Real Range_K = vtkm::Magnitude(K);
             OutPut::ComputeDensity(K, position, charge, Density_Real, Density_Image);
             Real Value_Re = vtkm::cont::Algorithm::Reduce(
