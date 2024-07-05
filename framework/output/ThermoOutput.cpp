@@ -137,7 +137,8 @@ void ThermoOutput::ComputePotentialEnergy()
 
   if (_para.GetParameter<std::string>(PARA_INIT_WAY) == "inbuild")
   {
-    OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy);  
+    //OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy); 
+    OutPut::ComputeClass2PotentialEnergy( _cut_off, atoms_id, locator, topology, force_function, lj_potential_energy);
   }
   else
   {

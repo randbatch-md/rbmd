@@ -67,6 +67,40 @@ public:
     return force;
   }
 
+  VTKM_EXEC vtkm::Vec3f ComputeClass2LJForce(const Vec3f& r_ij,
+                                             const Real& eps_i,
+                                             const Real& eps_j,
+                                             const Real& sigma_i,
+                                             const Real& sigma_j,
+                                             const Real& cut_off) const
+  {
+    const Real small_value = 0.0001;
+    Vec3f force{ 0, 0, 0 };
+    const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    const Real cut_off_2 = cut_off * cut_off;
+
+    if (dis_2 < cut_off_2 && dis_2 > small_value)
+    {
+      auto sigma_i3 = sigma_i * sigma_i * sigma_i;
+      auto sigma_i6 = sigma_i3 * sigma_i3;
+      auto sigma_j3 = sigma_j * sigma_j * sigma_j;
+      auto sigma_j6 = sigma_j3 * sigma_j3;
+      Real eps_ij = (2 * vtkm::Sqrt(eps_i * eps_j) * sigma_i3 * sigma_j3) / (sigma_i6 + sigma_j6);
+      Real sigma_ij = vtkm::Pow((sigma_i6 + sigma_j6) / 2, 1 / 6);
+      Real sigma_ij_3 = sigma_ij * sigma_ij * sigma_ij;
+      Real sigma_ij_6 = sigma_ij_3 * sigma_ij_3;
+      Real sigma_ij_9 = sigma_ij_6 * sigma_ij_3;
+
+      //Real sigmaij_6 = sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij;
+      Real dis_6 = dis_2 * dis_2 * dis_2;
+      Real dis_9 = dis_6 * dis_2 * vtkm::Sqrt(dis_2);
+      //Real sigmaij_dis_6 = sigmaij_6 / dis_6;
+      force =
+        -((18 * eps_ij * (sigma_ij_9 / dis_9) - 18 * eps_ij * (sigma_ij_6 / dis_6)) / dis_2 * r_ij);
+    }
+    return force;
+  }
+
   VTKM_EXEC vtkm::Vec3f ComputeLJForceRcs(const Vec3f& r_ij,
                                           const Real& eps_i,
                                           const Real& eps_j,
@@ -254,6 +288,27 @@ public:
       Real sigmaij_6 = sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij;
       Real dis_6 = dis_2 * dis_2 * dis_2;
       ComptePE_ij = 4 * eps_ij * (sigmaij_6 / dis_6 - 1) * (sigmaij_6 / dis_6);
+    }
+    return 0.5 * ComptePE_ij;
+  }
+
+  VTKM_EXEC Real ComputeClass2PotentialEn(const Vec3f& r_ij,
+                                          const Real& eps_ij,
+                                          const Real& sigma_ij,
+                                          const Real& cut_off) const
+  {
+    const Real small_value = 0.0001;
+    Real cut_off_2 = cut_off * cut_off;
+    Real ComptePE_ij = 0;
+    Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+
+    if (dis_2 < cut_off_2 && dis_2 > small_value)
+    {
+      Real sigmaij_3 = sigma_ij * sigma_ij * sigma_ij;
+      Real sigmaij_6 = sigmaij_3 * sigmaij_3;
+      Real sigmaij_9 = sigmaij_3 * sigmaij_6;
+      Real dis_6 = dis_2 * dis_2 * dis_2;
+      ComptePE_ij = eps_ij * (2 * sigmaij_3 / vtkm::Sqrt(dis_2) * dis_2 - 3) * (sigmaij_6 / dis_6);
     }
     return 0.5 * ComptePE_ij;
   }

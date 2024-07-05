@@ -62,6 +62,20 @@ void ModelFileInitCondition::SetParameters()
 void ModelFileInitCondition::InitField()
 {
   MeshFreeFileInitCondition::InitField();
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
+  {
+    _para.AddField(field::bond_coeffs_k3, ArrayHandle<Real>{});
+    _para.AddField(field::bond_coeffs_k4, ArrayHandle<Real>{});
+    _para.AddField(field::angle_coeffs_k3, ArrayHandle<Real>{});
+    _para.AddField(field::angle_coeffs_k4, ArrayHandle<Real>{});
+    _para.AddField(field::bb_m, ArrayHandle<Real>{});
+    _para.AddField(field::bb_r1, ArrayHandle<Real>{});
+    _para.AddField(field::bb_r2, ArrayHandle<Real>{});
+    _para.AddField(field::ba_n1, ArrayHandle<Real>{});
+    _para.AddField(field::ba_n2, ArrayHandle<Real>{});
+    _para.AddField(field::ba_r1, ArrayHandle<Real>{});
+    _para.AddField(field::ba_r2, ArrayHandle<Real>{});
+  }
   _para.AddField(field::position_flag, ArrayHandle<Id3>{});
   _para.AddField(field::bond_atom_id, ArrayHandle<Id>{});
   _para.AddField(field::bond_type, ArrayHandle<Id>{});
@@ -200,6 +214,14 @@ void ModelFileInitCondition::Parser(std::ifstream& file)
       {
         PairCoeffs(file, line);
       }
+      else if (line.find("BondBond") != std::string::npos)
+      {
+        BondBondCoeffs(file, line);
+      }
+      else if (line.find("BondAngle") != std::string::npos)
+      {
+        BondAngleCoeffs(file, line);
+      }
       else if (line.find("Bond Coeffs") != std::string::npos)
       {
         BondCoeffs(file, line);
@@ -292,30 +314,102 @@ void ModelFileInitCondition::BondCoeffs(std::ifstream& file, std::string& line)
   std::vector<Real> bond_id_bondcoeffs(_header._num_bound_type);
   _bond_coeffs_k.resize(_header._num_bound_type);
   _bond_coeffs_equilibrium.resize(_header._num_bound_type);
-
-  for (int i = 0; i < _header._num_bound_type && getline(file, line); i)
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
   {
-    if (!line.empty() && line != "\r")
+    _bond_coeffs_k3.resize(_header._num_bound_type);
+    _bond_coeffs_k4.resize(_header._num_bound_type);
+    for (int i = 0; i < _header._num_bound_type && getline(file, line); i)
     {
-      std::istringstream iss(line);
-      iss >> bond_id_bondcoeffs[i] >> _bond_coeffs_k[i] >> _bond_coeffs_equilibrium[i];
-      i++;
+      if (!line.empty() && line != "\r")
+      {
+        std::istringstream iss(line);
+        iss >> bond_id_bondcoeffs[i] >> _bond_coeffs_equilibrium[i] >> _bond_coeffs_k[i] >>
+          _bond_coeffs_k3[i] >> _bond_coeffs_k4[i];
+        i++;
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i < _header._num_bound_type && getline(file, line); i)
+    {
+      if (!line.empty() && line != "\r")
+      {
+        std::istringstream iss(line);
+        iss >> bond_id_bondcoeffs[i] >> _bond_coeffs_k[i] >> _bond_coeffs_equilibrium[i];
+        i++;
+      }
     }
   }
 }
 
 void ModelFileInitCondition::AngleCoeffs(std::ifstream& file, std::string& line)
 {
-  std::vector<Real> bond_id_anglecoeffs(_header._num_angle_type);
+  std::vector<Real> angle_id_anglecoeffs(_header._num_angle_type);
   _angle_coeffs_k.resize(_header._num_angle_type);
   _angle_coeffs_equilibrium.resize(_header._num_angle_type);
+
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
+  {
+    _angle_coeffs_k3.resize(_header._num_angle_type);
+    _angle_coeffs_k4.resize(_header._num_angle_type);
+    for (int i = 0; i < _header._num_angle_type && getline(file, line); i)
+    {
+      if (!line.empty() && line != "\r")
+      {
+        std::istringstream iss(line);
+        iss >> angle_id_anglecoeffs[i] >> _angle_coeffs_equilibrium[i] >> _angle_coeffs_k[i] >>
+          _angle_coeffs_k3[i] >> _angle_coeffs_k4[i];
+        i++;
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i < _header._num_angle_type && getline(file, line); i)
+    {
+      if (!line.empty() && line != "\r")
+      {
+        std::istringstream iss(line);
+        iss >> angle_id_anglecoeffs[i] >> _angle_coeffs_k[i] >> _angle_coeffs_equilibrium[i];
+        i++;
+      }
+    }
+  }
+}
+
+void ModelFileInitCondition::BondBondCoeffs(std::ifstream& file, std::string& line)
+{
+  std::vector<Real> bond_id_bbcoeffs(_header._num_angle_type);
+  _bb_m.resize(_header._num_angle_type);
+  _bb_r1.resize(_header._num_angle_type);
+  _bb_r2.resize(_header._num_angle_type);
 
   for (int i = 0; i < _header._num_angle_type && getline(file, line); i)
   {
     if (!line.empty() && line != "\r")
     {
       std::istringstream iss(line);
-      iss >> bond_id_anglecoeffs[i] >> _angle_coeffs_k[i] >> _angle_coeffs_equilibrium[i];
+      iss >> bond_id_bbcoeffs[i] >> _bb_m[i] >> _bb_r1[i] >> _bb_r2[i];
+      i++;
+    }
+  }
+}
+
+void ModelFileInitCondition::BondAngleCoeffs(std::ifstream& file, std::string& line)
+{
+  std::vector<Real> bond_id_bacoeffs(_header._num_angle_type);
+  _ba_n1.resize(_header._num_angle_type);
+  _ba_n2.resize(_header._num_angle_type);
+  _ba_r1.resize(_header._num_angle_type);
+  _ba_r2.resize(_header._num_angle_type);
+
+  for (int i = 0; i < _header._num_angle_type && getline(file, line); i)
+  {
+    if (!line.empty() && line != "\r")
+    {
+      std::istringstream iss(line);
+      iss >> bond_id_bacoeffs[i] >> _ba_n1[i] >> _ba_n2[i] >> _ba_r1[i] >> _ba_r2[i];
       i++;
     }
   }
@@ -790,10 +884,31 @@ void ModelFileInitCondition::SetBondField()
 
   std::vector<Real> bond_coeffs_k_temp(_header._num_bonds);
   std::vector<Real> bond_coeffs_equilibrium_temp(_header._num_bonds);
-  for (size_t i = 0; i < _header._num_bonds; i++)
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
   {
-    bond_coeffs_k_temp[i] = _bond_coeffs_k[_bond_type[i]];
-    bond_coeffs_equilibrium_temp[i] = _bond_coeffs_equilibrium[_bond_type[i]];
+    std::vector<Real> bond_coeffs_k3_temp(_header._num_bonds);
+    std::vector<Real> bond_coeffs_k4_temp(_header._num_bonds);
+    for (size_t i = 0; i < _header._num_bonds; i++)
+    {
+      bond_coeffs_k_temp[i] = _bond_coeffs_k[_bond_type[i]];
+      bond_coeffs_k3_temp[i] = _bond_coeffs_k3[_bond_type[i]];
+      bond_coeffs_k4_temp[i] = _bond_coeffs_k4[_bond_type[i]];
+      bond_coeffs_equilibrium_temp[i] = _bond_coeffs_equilibrium[_bond_type[i]];
+    }
+
+    auto bond_coeffs_k3 = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k3);
+    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bond_coeffs_k3_temp), bond_coeffs_k3);
+
+    auto bond_coeffs_k4 = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k4);
+    vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bond_coeffs_k4_temp), bond_coeffs_k4);
+  }
+  else
+  {
+    for (size_t i = 0; i < _header._num_bonds; i++)
+    {
+      bond_coeffs_k_temp[i] = _bond_coeffs_k[_bond_type[i]];
+      bond_coeffs_equilibrium_temp[i] = _bond_coeffs_equilibrium[_bond_type[i]];
+    }
   }
 
   auto bond_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k);
@@ -930,10 +1045,57 @@ void ModelFileInitCondition::SetAngleField()
 
   std::vector<Real> angle_coeffs_k_temp(_header._num_angles);
   std::vector<Real> angle_coeffs_equilibrium_temp(_header._num_angles);
-  for (size_t i = 0; i < _header._num_angles; i++)
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
   {
-    angle_coeffs_k_temp[i] = _angle_coeffs_k[_angle_type[i]];
-    angle_coeffs_equilibrium_temp[i] = _angle_coeffs_equilibrium[_angle_type[i]];
+    std::vector<Real> angle_coeffs_k3_temp(_header._num_angles);
+    std::vector<Real> angle_coeffs_k4_temp(_header._num_angles);
+    std::vector<Real> bb_m_temp(_header._num_angles);
+    std::vector<Real> bb_r1_temp(_header._num_angles);
+    std::vector<Real> bb_r2_temp(_header._num_angles);
+    std::vector<Real> ba_n1_temp(_header._num_angles);
+    std::vector<Real> ba_n2_temp(_header._num_angles);
+    std::vector<Real> ba_r1_temp(_header._num_angles);
+    std::vector<Real> ba_r2_temp(_header._num_angles);
+    for (size_t i = 0; i < _header._num_angles; i++)
+    {
+      angle_coeffs_k_temp[i] = _angle_coeffs_k[_angle_type[i]];
+      angle_coeffs_k3_temp[i] = _angle_coeffs_k3[_angle_type[i]];
+      angle_coeffs_k4_temp[i] = _angle_coeffs_k4[_angle_type[i]];
+      angle_coeffs_equilibrium_temp[i] = _angle_coeffs_equilibrium[_angle_type[i]];
+      bb_m_temp[i] = _bb_m[_angle_type[i]];
+      bb_r1_temp[i] = _bb_r1[_angle_type[i]];
+      bb_r2_temp[i] = _bb_r2[_angle_type[i]];
+      ba_n1_temp[i] = _ba_n1[_angle_type[i]];
+      ba_n2_temp[i] = _ba_n2[_angle_type[i]];
+      ba_r1_temp[i] = _ba_r1[_angle_type[i]];
+      ba_r2_temp[i] = _ba_r2[_angle_type[i]];
+      auto angle_coeffs_k3 = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k3);
+      auto angle_coeffs_k4 = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k4);
+      auto bb_m = _para.GetFieldAsArrayHandle<Real>(field::bb_m);
+      auto bb_r1 = _para.GetFieldAsArrayHandle<Real>(field::bb_r1);
+      auto bb_r2 = _para.GetFieldAsArrayHandle<Real>(field::bb_r2);
+      auto ba_n1 = _para.GetFieldAsArrayHandle<Real>(field::ba_n1);
+      auto ba_n2 = _para.GetFieldAsArrayHandle<Real>(field::ba_n2);
+      auto ba_r1 = _para.GetFieldAsArrayHandle<Real>(field::ba_r1);
+      auto ba_r2 = _para.GetFieldAsArrayHandle<Real>(field::ba_r2);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(angle_coeffs_k3_temp), angle_coeffs_k3);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(angle_coeffs_k4_temp), angle_coeffs_k4);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bb_m_temp), bb_m);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bb_r1_temp), bb_r1);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(bb_r2_temp), bb_r2);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(ba_n1_temp), ba_n1);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(ba_n2_temp), ba_n2);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(ba_r1_temp), ba_r1);
+      vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(ba_r2_temp), ba_r2);
+    }
+  }
+  else
+  {
+    for (size_t i = 0; i < _header._num_angles; i++)
+    {
+      angle_coeffs_k_temp[i] = _angle_coeffs_k[_angle_type[i]];
+      angle_coeffs_equilibrium_temp[i] = _angle_coeffs_equilibrium[_angle_type[i]];
+    }
   }
 
   auto angle_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);

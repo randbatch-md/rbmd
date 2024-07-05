@@ -23,6 +23,21 @@
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 
+#include <iomanip>
+
+template<typename T>
+void PrintArrayhandle(const vtkm::cont::ArrayHandle<T> arrayHandle)
+{
+  auto num = arrayHandle.GetNumberOfValues();
+  auto read_protol = arrayHandle.ReadPortal();
+  for (int i = 0; i < num; ++i)
+  {
+    std::cout << std::right << std::setw(10) << read_protol.Get(i)[0] << " " << std::right
+              << std::setw(10) << read_protol.Get(i)[1] << " " << std::right << std::setw(10)
+              << read_protol.Get(i)[2] << std::endl;
+  }
+}
+
 ExecutionNVT::ExecutionNVT(const Configuration& cfg)
   : ExecutionMD(cfg)
   , _executioner((_app.GetExecutioner()))
@@ -372,6 +387,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   else if (_nearforce_type == "ORIGINAL")
   {
     ComputeOriginalLJForce(_all_force);
+    //PrintArrayhandle(_all_force);
   }
   return _all_force;
 }
@@ -412,15 +428,34 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
   vtkm::cont::ArrayHandle<Vec3f> forcebond;
   vtkm::cont::ArrayHandle<Real> bond_energy;
   auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
-  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _Vlength },
-            bond_type,
-            bondlist_group,
-            bond_coeffs_k,
-            bond_coeffs_equilibrium,
-            _position,
-            forcebond_group,
-            bond_energy,
-            _locator);
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
+  {
+    auto bond_coeffs_k3 = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k3);
+    auto bond_coeffs_k4 = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k4);
+    Invoker{}(MolecularWorklet::ComputeBondClass2Worklet{ _Vlength },
+              bond_type,
+              bondlist_group,
+              bond_coeffs_k,
+              bond_coeffs_k3,
+              bond_coeffs_k4,
+              bond_coeffs_equilibrium,
+              _position,
+              forcebond_group,
+              bond_energy,
+              _locator);
+  }
+  else
+  {
+    Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _Vlength },
+              bond_type,
+              bondlist_group,
+              bond_coeffs_k,
+              bond_coeffs_equilibrium,
+              _position,
+              forcebond_group,
+              bond_energy,
+              _locator);
+  }
 
   auto bond_energy_avr =
     vtkm::cont::Algorithm::Reduce(bond_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
@@ -483,15 +518,50 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
   vtkm::cont::ArrayHandle<Vec3f> force_angle;
   vtkm::cont::ArrayHandle<Real> angle_energy;
   auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
-  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _Vlength },
-            angle_type,
-            anglelist_group,
-            angle_coeffs_k,
-            angle_coeffs_equilibrium,
-            _position,
-            forceangle_group,
-            angle_energy,
-            _locator);
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
+  {
+    auto angle_coeffs_k2 = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);
+    auto angle_coeffs_k3 = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k3);
+    auto angle_coeffs_k4 = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k4);
+    auto bb_m = _para.GetFieldAsArrayHandle<Real>(field::bb_m);
+    auto bb_r1 = _para.GetFieldAsArrayHandle<Real>(field::bb_r1);
+    auto bb_r2 = _para.GetFieldAsArrayHandle<Real>(field::bb_r2);
+    auto ba_n1 = _para.GetFieldAsArrayHandle<Real>(field::ba_n1);
+    auto ba_n2 = _para.GetFieldAsArrayHandle<Real>(field::ba_n2);
+    auto ba_r1 = _para.GetFieldAsArrayHandle<Real>(field::ba_r1);
+    auto ba_r2 = _para.GetFieldAsArrayHandle<Real>(field::ba_r2);
+
+    Invoker{}(MolecularWorklet::ComputeAngleClass2Worklet{ _Vlength },
+              angle_type,
+              anglelist_group,
+              angle_coeffs_k2,
+              angle_coeffs_k3,
+              angle_coeffs_k4,
+              angle_coeffs_equilibrium,
+              bb_m,
+              bb_r1,
+              bb_r2,
+              ba_n1,
+              ba_n2,
+              ba_r1,
+              ba_r2,
+              _position,
+              forceangle_group,
+              angle_energy,
+              _locator);
+  }
+  else
+  {
+    Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _Vlength },
+              angle_type,
+              anglelist_group,
+              angle_coeffs_k,
+              angle_coeffs_equilibrium,
+              _position,
+              forceangle_group,
+              angle_energy,
+              _locator);
+  }
 
   auto angle_energy_avr =
     vtkm::cont::Algorithm::Reduce(angle_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /

@@ -746,9 +746,16 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
 void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-
-  RunWorklet::LJForceWithPeriodicBC(
-    cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+  if (_para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE) == "PCFF")
+  {
+    RunWorklet::Class2LJForceWithPeriodicBC(
+      cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+  }
+  else
+  {
+    RunWorklet::LJForceWithPeriodicBC(
+      cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+  }
 }
 
 void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
