@@ -61,7 +61,8 @@ struct RBEPSAMPLE
   Real Distribution_P(const Real& x, const Id dimension) const
   {
     Real P_m = vtkm::Exp(-vtkm::Pow(2 * vtkm::Pi() * x / _box[dimension], 2) / (4 * _alpha));
-    P_m = P_m / Compute_H()[dimension];
+    Vec3f H = Compute_H();
+    P_m = P_m / H[dimension];
     return P_m;
   }
 

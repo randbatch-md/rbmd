@@ -79,6 +79,7 @@ void LJInitCondition::SetParameters()
   _para.SetParameter(PARA_RANGE, range);
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
   _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
+  _para.SetParameter(ATOM_STYLE, Get<std::string>("atom_style"));
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto bin_number = Id3{
     static_cast<int>(xLength / cut_off),

@@ -30,8 +30,8 @@ struct UnitRescaleWorklet : vtkm::worklet::WorkletMapField
 
 struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
 {
-  ComputeBondHarmonicWorklet(const Real& Vlength)
-    : _Vlength(Vlength)
+  ComputeBondHarmonicWorklet(const Vec3f& box)
+    : _box(box)
   {
   }
   using ControlSignature = void(FieldIn bond_type,
@@ -95,7 +95,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f p_j = _position.Get(bondj);
 
     // minimum image distance
-    Vec3f r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+    Vec3f r_ij = locator.MinDistanceV(p_i, p_j, _box);
 
     Real dis_2 = vtkm::MagnitudeSquared(r_ij);
     Real disij = vtkm::Sqrt(dis_2);
@@ -111,7 +111,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     bondEnergy = rk * dr;
   }
-  Real _Vlength;
+  Vec3f _box;
 };
 
 struct ReduceForceWorklet : vtkm::worklet::WorkletReduceByKey
@@ -147,8 +147,8 @@ struct AddForceWorklet : vtkm::worklet::WorkletMapField
 struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
 {
 
-  ComputeAngleHarmonicWorklet(const Real& Vlength)
-    : _Vlength(Vlength)
+  ComputeAngleHarmonicWorklet(const Vec3f& box)
+    : _box(box)
   {
   }
   using ControlSignature = void(FieldIn angle_type,
@@ -217,8 +217,8 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f p_k = whole_pts.Get(anglek);
 
     // minimum image distance
-    Vec3f r_ij = locator.MinDistance(p_i, p_j, _Vlength);
-    Vec3f r_kj = locator.MinDistance(p_k, p_j, _Vlength);
+    Vec3f r_ij = locator.MinDistanceV(p_i, p_j, _box);
+    Vec3f r_kj = locator.MinDistanceV(p_k, p_j, _box);
 
     Real disij_2 = vtkm::MagnitudeSquared(r_ij);
     Real disij = vtkm::Sqrt(disij_2);
@@ -251,7 +251,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     force_anglek = a22 * r_kj + a12 * r_ij;
   }
 
-  Real _Vlength;
+  Vec3f _box;
 };
 
 
@@ -529,8 +529,8 @@ struct ComputeDihedralOPLSWorklet : vtkm::worklet::WorkletMapField
 struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
 {
 
-  ComputeDihedralHarmonicWorklet(const Real& Vlength)
-    : _Vlength(Vlength)
+  ComputeDihedralHarmonicWorklet(const Vec3f& box)
+    : _box(box)
   {
   }
   using ControlSignature = void(FieldIn dihedral_type,
@@ -629,11 +629,11 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f p_w = whole_pts.Get(dihedralw);
 
     
-    Vec3f vb1 = locator.MinDistance(p_i, p_j, _Vlength);
-    Vec3f vb2 = locator.MinDistance(p_k, p_j, _Vlength);
+    Vec3f vb1 = locator.MinDistanceV(p_i, p_j, _box);
+    Vec3f vb2 = locator.MinDistanceV(p_k, p_j, _box);
 
     Vec3f vb2m = -vb2;
-    Vec3f vb3 = locator.MinDistance(p_w, p_k, _Vlength);
+    Vec3f vb3 = locator.MinDistanceV(p_w, p_k, _box);
 
     // c,s calculation
 
@@ -788,14 +788,14 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     //f3[2] = -sz2 - f4[2];
   }
 
-  Real _Vlength;
+  Vec3f _box;
 };
 
 struct ComputeImproperHarmonicWorklet : vtkm::worklet::WorkletMapField
 {
 
-  ComputeImproperHarmonicWorklet(const Real& Vlength)
-    : _Vlength(Vlength)
+  ComputeImproperHarmonicWorklet(const Vec3f& box)
+    : _box(box)
   {
   }
   using ControlSignature = void(FieldIn improper_type,
@@ -872,76 +872,76 @@ struct ComputeImproperHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     Vec3f vb1 = p_i - p_j; 
     // minimum image distance
-    if (vtkm::Abs(vb1[0]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb1[0]) > _box[0] / 2.0)
     {
       if (vb1[0] < 0)
-        vb1[0] += _Vlength;
+        vb1[0] += _box[0];
       else
-        vb1[0] -= _Vlength;
+        vb1[0] -= _box[0];
     }
-    if (vtkm::Abs(vb1[1]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb1[1]) > _box[1] / 2.0)
     {
       if (vb1[1] < 0)
-        vb1[1] += _Vlength;
+        vb1[1] += _box[1];
       else
-        vb1[1] -= _Vlength;
+        vb1[1] -= _box[1];
     }
-    if (vtkm::Abs(vb1[2]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb1[2]) > _box[2] / 2.0)
     {
       if (vb1[2] < 0)
-        vb1[2] += _Vlength;
+        vb1[2] += _box[2];
       else
-        vb1[2] -= _Vlength;
+        vb1[2] -= _box[2];
     }
 
     Vec3f vb2 = p_k - p_j;
     //Vec3f r_kj = p_k - p_j;
     // minimum image distance
-    if (vtkm::Abs(vb2[0]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb2[0]) > _box[0] / 2.0)
     {
       if (vb2[0] < 0)
-        vb2[0] += _Vlength;
+        vb2[0] += _box[0];
       else
-        vb2[0] -= _Vlength;
+        vb2[0] -= _box[0];
     }
-    if (vtkm::Abs(vb2[1]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb2[1]) > _box[1] / 2.0)
     {
       if (vb2[1] < 0)
-        vb2[1] += _Vlength;
+        vb2[1] += _box[1];
       else
-        vb2[1] -= _Vlength;
+        vb2[1] -= _box[1];
     }
-    if (vtkm::Abs(vb2[2]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb2[2]) > _box[2] / 2.0)
     {
       if (vb2[2] < 0)
-        vb2[2] += _Vlength;
+        vb2[2] += _box[2];
       else
-        vb2[2] -= _Vlength;
+        vb2[2] -= _box[2];
     }
     
 
     Vec3f vb3 = p_w - p_k;
     // minimum image distance
-    if (vtkm::Abs(vb3[0]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb3[0]) > _box[0] / 2.0)
     {
       if (vb3[0] < 0)
-        vb3[0] += _Vlength;
+        vb3[0] += _box[0];
       else
-        vb3[0] -= _Vlength;
+        vb3[0] -= _box[0];
     }
-    if (vtkm::Abs(vb3[1]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb3[1]) > _box[1] / 2.0)
     {
       if (vb3[1] < 0)
-        vb3[1] += _Vlength;
+        vb3[1] += _box[1];
       else
-        vb3[1] -= _Vlength;
+        vb3[1] -= _box[1];
     }
-    if (vtkm::Abs(vb3[2]) > _Vlength / 2.0)
+    if (vtkm::Abs(vb3[2]) > _box[2] / 2.0)
     {
       if (vb3[2] < 0)
-        vb3[2] += _Vlength;
+        vb3[2] += _box[2];
       else
-        vb3[2] -= _Vlength;
+        vb3[2] -= _box[2];
     }
 
     /*ss1 = 1.0 / (vb1x * vb1x + vb1y * vb1y + vb1z * vb1z);
@@ -1037,7 +1037,7 @@ struct ComputeImproperHarmonicWorklet : vtkm::worklet::WorkletMapField
     //f3[2] = sz2 - f4[2];
   }
 
-  Real _Vlength;
+  Vec3f _box;
 };
 
 // "ConstraintWaterBondAngleWorklet"未使用
@@ -1575,11 +1575,11 @@ struct ConstraintWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 
 struct ConstraintWaterVelocityBondAngleWorklet : vtkm::worklet::WorkletMapField
 {
-  ConstraintWaterVelocityBondAngleWorklet(const Real& vlength,
+  ConstraintWaterVelocityBondAngleWorklet(const Vec3f& box,
                                           const Real& dt,
                                           const Real fmt2v,
                                           const Vec<Vec2f, 3>& range)
-    : _vlength(vlength)
+    : _box(box)
     , _dt(dt)
     , _fmt2v(fmt2v)
     , _range(range)
@@ -1623,9 +1623,9 @@ struct ConstraintWaterVelocityBondAngleWorklet : vtkm::worklet::WorkletMapField
 
     // r01,r02,r12 = distance vec between atoms, with PBC
 
-    Vec3f r01 = locator.MinDistance(whole_pts.Get(i1), whole_pts.Get(i0), _vlength);
-    Vec3f r02 = locator.MinDistance(whole_pts.Get(i2), whole_pts.Get(i0), _vlength);
-    Vec3f r12 = locator.MinDistance(whole_pts.Get(i2), whole_pts.Get(i1), _vlength);
+    Vec3f r01 = locator.MinDistanceVec(whole_pts.Get(i1), whole_pts.Get(i0), _box);
+    Vec3f r02 = locator.MinDistanceVec(whole_pts.Get(i2), whole_pts.Get(i0), _box);
+    Vec3f r12 = locator.MinDistanceVec(whole_pts.Get(i2), whole_pts.Get(i1), _box);
     //std::cout << "Before: r01 = " << r01 << std::endl;
 
     //domain->minimum_image(r01);
@@ -1732,7 +1732,7 @@ struct ConstraintWaterVelocityBondAngleWorklet : vtkm::worklet::WorkletMapField
     //printf("\n");
   }
 
-  Real _vlength;
+  Vec3f _box;
   Real _dt;
   Vec<Vec2f, 3> _range;
   Real _fmt2v;
@@ -2182,11 +2182,11 @@ struct ConstraintShakeForceStepWaterBondAngleWorklet : vtkm::worklet::WorkletMap
 
 struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 {
-  NewConstraintAWaterBondAngleWorklet(const Real& vlength,
+  NewConstraintAWaterBondAngleWorklet(const Vec3f& box,
                                       const Real& dt,
                                       const Real fmt2v,
                                       const Vec<Vec2f, 3>& range)
-    : _vlength(vlength)
+    : _box(box)
     , _dt(dt)
     , _fmt2v(fmt2v)
     , _range(range)
@@ -2235,18 +2235,15 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
                              2.0 * bond1 * bond2 * vtkm::Cos((109.4700 / 180.0) * vtkm::Pif()));
 
     // minimum image
-    Vec3f r01 = locator.MinDistance(whole_pts.Get(i1), whole_pts.Get(i0), _vlength);
-    Vec3f r12 = locator.MinDistance(whole_pts.Get(i2), whole_pts.Get(i1), _vlength);
-    Vec3f r20 = locator.MinDistance(whole_pts.Get(i0), whole_pts.Get(i2), _vlength);
+    Vec3f r01 = locator.MinDistanceVec(whole_pts.Get(i1), whole_pts.Get(i0), _box);
+    Vec3f r12 = locator.MinDistanceVec(whole_pts.Get(i2), whole_pts.Get(i1), _box);
+    Vec3f r20 = locator.MinDistanceVec(whole_pts.Get(i0), whole_pts.Get(i2), _box);
 
     // s01,s02,s12 = distance vec after unconstrained update, with PBC
 
-    Vec3f s10 = locator.MinDistance(shake_position[0],
-                                    shake_position[1], _vlength);
-    Vec3f s21 = locator.MinDistance(shake_position[1],
-                                    shake_position[2], _vlength);
-    Vec3f s02 = locator.MinDistance(shake_position[2],
-                                    shake_position[0], _vlength);
+    Vec3f s10 = locator.MinDistanceVec(shake_position[0], shake_position[1], _box);
+    Vec3f s21 = locator.MinDistanceVec(shake_position[1], shake_position[2], _box);
+    Vec3f s02 = locator.MinDistanceVec(shake_position[2], shake_position[0], _box);
 
     // scalar distances between atoms
 
@@ -2438,7 +2435,7 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
     }
   }
 
-  Real _vlength;
+  Vec3f _box;
   Real _dt;
   Vec<Vec2f, 3> _range;
   Real _fmt2v;
@@ -2446,11 +2443,11 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 
 struct NewConstraintBWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 {
-  NewConstraintBWaterBondAngleWorklet(const Real& vlength,
+  NewConstraintBWaterBondAngleWorklet(const Vec3f& box,
                                       const Real& dt,
                                       const Real fmt2v,
                                       const Vec<Vec2f, 3>& range)
-    : _vlength(vlength)
+    : _box(box)
     , _dt(dt)
     , _fmt2v(fmt2v)
     , _range(range)
@@ -2490,9 +2487,9 @@ struct NewConstraintBWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 
     // minimum image
 
-    Vec3f r01 = locator.MinDistance(whole_pts.Get(i1), whole_pts.Get(i0), _vlength);
-    Vec3f r12 = locator.MinDistance(whole_pts.Get(i2), whole_pts.Get(i1), _vlength);
-    Vec3f r20 = locator.MinDistance(whole_pts.Get(i0), whole_pts.Get(i2), _vlength);
+    Vec3f r01 = locator.MinDistanceVec(whole_pts.Get(i1), whole_pts.Get(i0), _box);
+    Vec3f r12 = locator.MinDistanceVec(whole_pts.Get(i2), whole_pts.Get(i1), _box);
+    Vec3f r20 = locator.MinDistanceVec(whole_pts.Get(i0), whole_pts.Get(i2), _box);
 
     // s01,s02,s12 = distance vec after unconstrained update, with PBC
 
@@ -2625,7 +2622,7 @@ struct NewConstraintBWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
     }
   }
 
-  Real _vlength;
+  Vec3f _box;
   Real _dt;
   Vec<Vec2f, 3> _range;
   Real _fmt2v;

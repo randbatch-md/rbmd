@@ -118,7 +118,9 @@ void ExecutionNVT::ComputeAllForce()
 {
   // FarNearLJforce
   //RunWorklet::SumFarNearLJForce(EleNewForce(), EleNearForce(), LJForce(), _all_force); //RBE + LJ
-  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  auto atom_style = _para.GetParameter<std::string>(ATOM_STYLE);
+  //if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+  if (atom_style == "charge"|| atom_style == "full")
   {
     RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force); //RBE + LJ
   }
@@ -126,12 +128,14 @@ void ExecutionNVT::ComputeAllForce()
   {
     NearForceEAM();
   }
-  else
+  else if (atom_style == "atomic")
   {
     NearForceLJ();
   }
 
-  if (_init_way == "read_data" && _para.GetParameter<std::string>(PARA_FILE_TYPE) != "EAM")
+  //if (_init_way == "read_data" && _para.GetParameter<std::string>(PARA_FILE_TYPE) != "EAM")
+
+  if (atom_style == "full")
   { 
     Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
     
@@ -415,7 +419,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
   vtkm::cont::ArrayHandle<Vec3f> forcebond;
   vtkm::cont::ArrayHandle<Real> bond_energy;
   auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
-  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _Vlength },
+  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _box },
             bond_type,
             bondlist_group,
             bond_coeffs_k,
@@ -486,7 +490,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
   vtkm::cont::ArrayHandle<Vec3f> force_angle;
   vtkm::cont::ArrayHandle<Real> angle_energy;
   auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
-  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _Vlength },
+  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _box },
             angle_type,
             anglelist_group,
             angle_coeffs_k,
@@ -568,7 +572,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
   //auto a3 = dihedrals_coeffs_k.GetNumberOfValues();
   //auto a4 = dihedrals_coeffs_sign.GetNumberOfValues();
   //auto a5 = dihedrals_coeffs_multiplicity.GetNumberOfValues();
-  Invoker{}(MolecularWorklet::ComputeDihedralHarmonicWorklet{ _Vlength },
+  Invoker{}(MolecularWorklet::ComputeDihedralHarmonicWorklet{ _box },
             dihedrals_type,
             dihedralslist_group,
             dihedrals_coeffs_k,
@@ -830,7 +834,7 @@ void ExecutionNVT::ConstraintA()
 
   Invoker{}(
     MolecularWorklet::NewConstraintAWaterBondAngleWorklet{
-      _Vlength, _dt, _unit_factor._fmt2v, range },
+      _box, _dt, _unit_factor._fmt2v, range },
     anglelist_group,
     _old_position,
     _old_velocity,

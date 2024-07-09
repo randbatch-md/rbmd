@@ -139,6 +139,28 @@ public:
     }
     return vec;
   }
+  //
+  VTKM_EXEC Vec3f MinDistanceV(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
+  {
+    Vec3f vec = p1 - p2;
+    // 处理原子间的距离
+    for (vtkm::Id i = 0; i < 3; ++i)
+    {
+      while (vtkm::Abs(vec[i]) > _box[i] / 2.0)
+      {
+        if (vec[i] < 0)
+        {
+          vec[i] += _box[i];
+        }
+        else
+        {
+          vec[i] -= _box[i];
+        }
+      }
+    }
+    return vec;
+  }
+
 
   VTKM_EXEC Vec3f MinDistanceVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
   {
