@@ -775,6 +775,112 @@ namespace RunWorklet
       Real _qqr2e;
     };
 
+    struct ComputeNearForceRBLERFboxWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeNearForceRBLERFboxWorklet(const Id& rs_num, const Id& pice_num, const Real& qqr2e,const Vec3f& box )
+        : _rs_num(rs_num)
+        , _pice_num(pice_num)
+        , _qqr2e(qqr2e)
+        , _box(box)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    ExecObject static_table,
+                                    FieldInOut id_verletlist_group,
+                                    FieldInOut num_verletlist,
+                                    FieldInOut offset_verletlist_group,
+                                    FieldOut corr_force);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
+
+      template<typename NeighbourGroupVecType, typename numType, typename CoordOffsetType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const ExecStaticTable& static_table,
+                                const NeighbourGroupVecType& id_verletlist,
+                                const numType& num_verletlist,
+                                const CoordOffsetType& offset_verletlist,
+                                Vec3f& corr_force) const
+      {
+        vtkm::Vec3f rc_force_lj = { 0, 0, 0 };
+        vtkm::Vec3f rcs_force_lj = { 0, 0, 0 };
+        vtkm::Vec3f rc_force_eleforce = { 0, 0, 0 };
+        vtkm::Vec3f rcs_force_eleforce = { 0, 0, 0 };
+
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+        auto rc = locator._cut_off;
+        auto rs = locator._rs;
+        auto charge_pi = topology.GetCharge(atoms_id);
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
+        {
+          auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i,_box);
+
+          auto charge_pj = topology.GetCharge(pts_id_j);
+          Real dispij = vtkm::Magnitude(r_ij);
+          IdComponent index_table_pij = static_table.Extract(dispij);
+          auto table_pij = static_table.TableGnearValue(dispij, index_table_pij);
+
+          if (flag == 1)
+          {
+            rc_force_eleforce +=
+              force_function.ComputeNearEnergyForceERF_box(r_ij, charge_pi, charge_pj, table_pij);
+
+            if (molecular_id_i == molecular_id_j)
+              return;
+            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+          }
+          if (flag == 2)
+          {
+            rcs_force_eleforce += _pice_num *
+              force_function.ComputeNearEnergyForceRcsERF_box(r_ij, charge_pi, charge_pj, table_pij, rs);
+
+            if (molecular_id_i == molecular_id_j)
+              return;
+            rcs_force_lj += _pice_num *
+              force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+          }
+        };
+
+        auto p_i = locator.GetPtsPosition(atoms_id);
+        for (Id p = 0; p < num_verletlist[0]; p++)
+        {
+          Id id_rs = id_verletlist[p];
+          auto p_j = locator.GetPtsPosition(id_rs) - offset_verletlist[p];
+          function(p_i, p_j, id_rs, 1);
+        }
+
+        for (Id p = 0; p < num_verletlist[1]; p++)
+        {
+          Id id_random = id_verletlist[_rs_num + p];
+          auto p_j = locator.GetPtsPosition(id_random) - offset_verletlist[_rs_num + p];
+          function(p_i, p_j, id_random, 2);
+        }
+
+        // Individual output requirements can be used
+        auto LJforce = rc_force_lj + rcs_force_lj;
+        auto nearele_force = _qqr2e * (rc_force_eleforce + rcs_force_eleforce);
+        corr_force = LJforce + nearele_force;
+      }
+      Id _rs_num;
+      Id _pice_num;
+      Real _qqr2e;
+      Vec3f _box;
+    };
+
     struct ComputeNearForceRBLERFSpecialBondsWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeNearForceRBLERFSpecialBondsWorklet(const Id& rs_num,
@@ -910,6 +1016,148 @@ namespace RunWorklet
       Id _rs_num;
       Id _pice_num;
       Real _qqr2e;
+    };
+
+    struct ComputeNearForceRBLERFSpecialBondsboxWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputeNearForceRBLERFSpecialBondsboxWorklet(const Id& rs_num,
+                                                const Id& pice_num,
+                                                const Real& qqr2e ,
+                                                const Vec3f& box)
+        : _rs_num(rs_num)
+        , _pice_num(pice_num)
+        , _qqr2e(qqr2e)
+        , _box(box)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    ExecObject static_table,
+                                    FieldInOut id_verletlist_group,
+                                    FieldInOut num_verletlist,
+                                    FieldInOut offset_verletlist_group,
+                                    FieldIn special_ids,
+                                    FieldIn special_weights,
+                                    FieldOut corr_force);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11);
+
+      template<typename NeighbourGroupVecType,
+               typename numType,
+               typename CoordOffsetType,
+               typename idsType,
+               typename weightsType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const ExecStaticTable& static_table,
+                                const NeighbourGroupVecType& id_verletlist,
+                                const numType& num_verletlist,
+                                const CoordOffsetType& offset_verletlist,
+                                const idsType& special_ids,
+                                const weightsType& special_weights,
+                                Vec3f& corr_force) const
+      {
+        vtkm::Vec3f rc_force_lj = { 0, 0, 0 };
+        vtkm::Vec3f rcs_force_lj = { 0, 0, 0 };
+        vtkm::Vec3f rc_force_eleforce = { 0, 0, 0 };
+        vtkm::Vec3f rcs_force_eleforce = { 0, 0, 0 };
+
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+        auto rc = locator._cut_off;
+        auto rs = locator._rs;
+        auto charge_pi = topology.GetCharge(atoms_id);
+
+        auto num_components = special_ids.GetNumberOfComponents();
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
+        {
+          auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i,_box);
+
+          auto charge_pj = topology.GetCharge(pts_id_j);
+          Real dispij = vtkm::Magnitude(r_ij);
+          IdComponent index_table_pij = static_table.Extract(dispij);
+          auto table_pij = static_table.TableGnearValue(dispij, index_table_pij);
+
+          if (flag == 1)
+          {
+            rc_force_eleforce +=
+              force_function.ComputeNearEnergyForceERF_box(r_ij, charge_pi, charge_pj, table_pij);
+
+            /*if (molecular_id_i == molecular_id_j)
+              return;
+            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);*/
+            Vec3f forceij = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+            auto weight = 1.0;
+            for (auto i = 0; i < num_components; ++i)
+            {
+              if (special_ids[i] == pts_id_j)
+              {
+                weight = special_weights[i];
+              }
+            }
+
+            rc_force_lj += weight * forceij;
+          }
+          if (flag == 2)
+          {
+            rcs_force_eleforce += _pice_num *
+              force_function.ComputeNearEnergyForceRcsERF_box(r_ij ,charge_pi, charge_pj, table_pij, rs);
+
+            /*if (molecular_id_i == molecular_id_j)
+              return;
+            rcs_force_lj += _pice_num *
+              force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);*/
+            Vec3f forceij = _pice_num *
+              force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+            auto weight = 1.0;
+            for (auto i = 0; i < num_components; ++i)
+            {
+              if (special_ids[i] == pts_id_j)
+              {
+                weight = special_weights[i];
+              }
+            }
+
+            rcs_force_lj += weight * forceij;
+          }
+        };
+
+        auto p_i = locator.GetPtsPosition(atoms_id);
+        for (Id p = 0; p < num_verletlist[0]; p++)
+        {
+          Id id_rs = id_verletlist[p];
+          auto p_j = locator.GetPtsPosition(id_rs) - offset_verletlist[p];
+          function(p_i, p_j, id_rs, 1);
+        }
+
+        for (Id p = 0; p < num_verletlist[1]; p++)
+        {
+          Id id_random = id_verletlist[_rs_num + p];
+          auto p_j = locator.GetPtsPosition(id_random) - offset_verletlist[_rs_num + p];
+          function(p_i, p_j, id_random, 2);
+        }
+
+        // Individual output requirements can be used
+        auto LJforce = rc_force_lj + rcs_force_lj;
+        auto nearele_force = _qqr2e * (rc_force_eleforce + rcs_force_eleforce);
+        corr_force = LJforce + nearele_force;
+      }
+      Id _rs_num;
+      Id _pice_num;
+      Real _qqr2e;
+      Vec3f _box;
     };
 
     struct ComputeNearForceRBLWorklet : vtkm::worklet::WorkletMapField
@@ -2097,6 +2345,32 @@ namespace RunWorklet
                              corr_force);
      }
 
+       void NearForceRBLERF_box(const Id& rs_num,
+                                const Id& pice_num,
+                                const Real& qqr2e,
+                                const Vec3f& box,
+                                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                const ContPointLocator& locator,
+                                const ContTopology& topology,
+                                const ContForceFunction& force_function,
+                                const ContStaticTable& static_table,
+                                const GroupVecType& id_verletlist_group,
+                                const GroupNumType& num_verletlist,
+                                const CoordOffsetType& offset_verletlist_group,
+                                vtkm::cont::ArrayHandle<Vec3f>& corr_force)
+     {
+      vtkm::cont::Invoker{}(ComputeNearForceRBLERFboxWorklet{ rs_num, pice_num, qqr2e ,box},
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            static_table,
+                            id_verletlist_group,
+                            num_verletlist,
+                            offset_verletlist_group,
+                            corr_force);
+     }
+
      void NearForceRBLERFSpecialBonds(const Id& rs_num,
                           const Id& pice_num,
                           const Real& qqr2e,
@@ -2123,6 +2397,36 @@ namespace RunWorklet
                              offset_verletlist_group,
                              group_ids,
                              group_weights,  
+                             corr_force);
+     }
+
+      void NearForceRBLERFSpecialBonds_box(const Id& rs_num,
+                                           const Id& pice_num,
+                                           const Real& qqr2e,
+                                           const Vec3f& box,
+                                           const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                           const ContPointLocator& locator,
+                                           const ContTopology& topology,
+                                           const ContForceFunction& force_function,
+                                           const ContStaticTable& static_table,
+                                           const GroupVecType& id_verletlist_group,
+                                           const GroupNumType& num_verletlist,
+                                           const CoordOffsetType& offset_verletlist_group,
+                                           const GroupIdIdType& group_ids,
+                                           const GroupRealIdType& group_weights,
+                                           vtkm::cont::ArrayHandle<Vec3f>& corr_force)
+     {
+       vtkm::cont::Invoker{}(ComputeNearForceRBLERFSpecialBondsboxWorklet{ rs_num, pice_num, qqr2e ,box},
+                             atoms_id,
+                             locator,
+                             topology,
+                             force_function,
+                             static_table,
+                             id_verletlist_group,
+                             num_verletlist,
+                             offset_verletlist_group,
+                             group_ids,
+                             group_weights,
                              corr_force);
      }
 

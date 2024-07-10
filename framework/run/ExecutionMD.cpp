@@ -463,6 +463,7 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
 
   auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto rho_system = _para.GetParameter<Real>(PARA_RHO);
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
@@ -538,9 +539,25 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   // 这里的判断待定！！
   if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
   {
-    RunWorklet::NearForceRBLERFSpecialBonds(rs_num,
+    //RunWorklet::NearForceRBLERFSpecialBonds(rs_num,
+    //                                        pice_num,
+    //                                        _unit_factor._qqr2e,
+    //                                        _atoms_id,
+    //                                        _locator,
+    //                                        _topology,
+    //                                        _force_function,
+    //                                        _static_table,
+    //                                        id_verletlist_group,
+    //                                        num_verletlist_group,
+    //                                        offset_verletlist_group,
+    //                                        ids_group,
+    //                                        weight_group,
+    //                                        corr_force);
+
+    RunWorklet::NearForceRBLERFSpecialBonds_box(rs_num,
                                             pice_num,
                                             _unit_factor._qqr2e,
+                                             box,
                                             _atoms_id,
                                             _locator,
                                             _topology,
@@ -555,9 +572,23 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   }
   else
   {
-    RunWorklet::NearForceRBLERF(rs_num,
+    //RunWorklet::NearForceRBLERF(rs_num,
+    //                            pice_num,
+    //                            _unit_factor._qqr2e,
+    //                            _atoms_id,
+    //                            _locator,
+    //                            _topology,
+    //                            _force_function,
+    //                            _static_table,
+    //                            id_verletlist_group,
+    //                            num_verletlist_group,
+    //                            offset_verletlist_group,
+    //                            corr_force);
+
+    RunWorklet::NearForceRBLERF_box(rs_num,
                                 pice_num,
                                 _unit_factor._qqr2e,
+                                 box,
                                 _atoms_id,
                                 _locator,
                                 _topology,

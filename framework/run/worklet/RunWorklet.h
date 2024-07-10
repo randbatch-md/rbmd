@@ -125,6 +125,20 @@ namespace RunWorklet
                          const CoordOffsetType& offset_verletlist_group,
                          vtkm::cont::ArrayHandle<Vec3f>& corr_force);
 
+     void NearForceRBLERF_box(const Id& rs_num,
+                         const Id& pice_num,
+                         const Real& qqr2e,
+                         const Vec3f& box,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const ContStaticTable& static_table,
+                         const GroupVecType& id_verletlist_group,
+                         const GroupNumType& num_verletlist,
+                         const CoordOffsetType& offset_verletlist_group,
+                         vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+
     void NearForceRBLERFSpecialBonds(const Id& rs_num,
                                      const Id& pice_num,
                                      const Real& qqr2e,
@@ -139,6 +153,22 @@ namespace RunWorklet
                                      const GroupIdIdType& group_ids,
                                      const GroupRealIdType& group_weights,
                                      vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+
+    void NearForceRBLERFSpecialBonds_box(const Id& rs_num,
+                                          const Id& pice_num,
+                                          const Real& qqr2e,
+                                          const Vec3f& box,
+                                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                          const ContPointLocator& locator,
+                                          const ContTopology& topology,
+                                          const ContForceFunction& force_function,
+                                          const ContStaticTable& static_table,
+                                          const GroupVecType& id_verletlist_group,
+                                          const GroupNumType& num_verletlist,
+                                          const CoordOffsetType& offset_verletlist_group,
+                                          const GroupIdIdType& group_ids,
+                                          const GroupRealIdType& group_weights,
+                                          vtkm::cont::ArrayHandle<Vec3f>& corr_force);
 
     void NearForceRBL(const Id& rs_num,
                       const Id& pice_num,

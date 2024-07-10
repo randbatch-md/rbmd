@@ -95,7 +95,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f p_j = _position.Get(bondj);
 
     // minimum image distance
-    Vec3f r_ij = locator.MinDistanceV(p_i, p_j, _box);
+    Vec3f r_ij = locator.MinDistanceVec(p_i, p_j, _box);
 
     Real dis_2 = vtkm::MagnitudeSquared(r_ij);
     Real disij = vtkm::Sqrt(dis_2);
@@ -217,8 +217,8 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f p_k = whole_pts.Get(anglek);
 
     // minimum image distance
-    Vec3f r_ij = locator.MinDistanceV(p_i, p_j, _box);
-    Vec3f r_kj = locator.MinDistanceV(p_k, p_j, _box);
+    Vec3f r_ij = locator.MinDistanceVec(p_i, p_j, _box);
+    Vec3f r_kj = locator.MinDistanceVec(p_k, p_j, _box);
 
     Real disij_2 = vtkm::MagnitudeSquared(r_ij);
     Real disij = vtkm::Sqrt(disij_2);
@@ -629,11 +629,11 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f p_w = whole_pts.Get(dihedralw);
 
     
-    Vec3f vb1 = locator.MinDistanceV(p_i, p_j, _box);
-    Vec3f vb2 = locator.MinDistanceV(p_k, p_j, _box);
+    Vec3f vb1 = locator.MinDistanceVec(p_i, p_j, _box);
+    Vec3f vb2 = locator.MinDistanceVec(p_k, p_j, _box);
 
     Vec3f vb2m = -vb2;
-    Vec3f vb3 = locator.MinDistanceV(p_w, p_k, _box);
+    Vec3f vb3 = locator.MinDistanceVec(p_w, p_k, _box);
 
     // c,s calculation
 

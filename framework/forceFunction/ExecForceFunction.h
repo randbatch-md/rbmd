@@ -150,6 +150,24 @@ public:
     return force;
   }
 
+  VTKM_EXEC Vec3f ComputeNearEnergyForceERF_box(const Vec3f& r_ij,
+                                            const Real& charge_pi,
+                                            const Real& charge_pj,
+                                            const Real& table_pij) const
+  {
+    const Real small_value = 0.0001;
+    Vec3f force{ 0, 0, 0 };
+    Real dis = vtkm::Magnitude(r_ij);
+    Real dis_2 = vtkm::MagnitudeSquared(r_ij);
+    auto rc_2 = _cut_Off * _cut_Off;
+    if (dis_2 < rc_2 && dis_2 > small_value)
+    {
+      force = -charge_pi * charge_pj * table_pij * r_ij / dis;
+    }
+    return force;
+  }
+
+
   VTKM_EXEC Vec3f ComputeNearEnergyForceRcsERF(const Vec3f& p_i,
                                           const Vec3f& p_j,
                                           const Real& charge_pi,
@@ -170,6 +188,26 @@ public:
     }
     return force;
   }
+
+   VTKM_EXEC Vec3f ComputeNearEnergyForceRcsERF_box(const Vec3f& r_ij,
+                                               const Real& charge_pi,
+                                               const Real& charge_pj,
+                                               const Real& table_pij,
+                                               const Real& rs) const
+  {
+    const Real small_value = 0.0001;
+    Vec3f force{ 0, 0, 0 };
+    Real dis = vtkm::Magnitude(r_ij);
+    Real dis_2 = vtkm::MagnitudeSquared(r_ij);
+    auto rc_2 = _cut_Off * _cut_Off;
+    auto rs_2 = rs * rs;
+    if (dis_2 < rc_2 && dis_2 > rs_2)
+    {
+      force = -charge_pi * charge_pj * table_pij * r_ij / dis;
+    }
+    return force;
+  }
+
 
   VTKM_EXEC Real Gnear(const Real& _nearalpha, const Real& dis) const
   {

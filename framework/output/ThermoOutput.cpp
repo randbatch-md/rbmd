@@ -159,7 +159,7 @@ void ThermoOutput::ComputePotentialEnergy()
 
   }
 
-  else if ( atom_style == "charge" || atom_style == "full")
+  if (atom_style == "charge" || atom_style == "full")
   {
     if (_para.GetParameter<bool>(PARA_FAR_FORCE))
     {
