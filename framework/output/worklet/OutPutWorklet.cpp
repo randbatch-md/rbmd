@@ -294,8 +294,8 @@ namespace OutPut
 
     struct ComputeSpecialFarCoulWorklet : vtkm ::worklet::WorkletMapField
     {
-        ComputeSpecialFarCoulWorklet(const Real& Vlength)
-      : _Vlength(Vlength)
+      ComputeSpecialFarCoulWorklet(const Vec3f& box)
+        : _box(box)
     {
     }
         using ControlSignature = void(FieldIn current_atoms_id,
@@ -333,20 +333,20 @@ namespace OutPut
 
                 auto atoms_charge_j = topology.GetCharge(id);
                 auto atoms_coord_j = locator.GetPtsPosition(id);
-                Vec3f rij = locator.MinDistanceIf(atoms_coord_i, atoms_coord_j, _Vlength);
+                Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
                 Real dis_ij = vtkm::Magnitude(rij);
                 Real energy_atom = charge_p_i * atoms_charge_j / dis_ij;
                 spec_far_coul_energy += energy_atom;
               }
             }
         }
-        Real _Vlength;
+        Vec3f _box;
     };
 
     struct ComputeSpecialBondsCoulWorklet : vtkm ::worklet::WorkletMapField
     {
-      ComputeSpecialBondsCoulWorklet(const Real& Vlength)
-        : _Vlength(Vlength)
+      ComputeSpecialBondsCoulWorklet(const Vec3f& box)
+          : _box(box)
       {
       }
       using ControlSignature = void(FieldIn current_atoms_id,
@@ -388,7 +388,7 @@ namespace OutPut
 
             auto atoms_charge_j = topology.GetCharge(id);
             auto atoms_coord_j = locator.GetPtsPosition(id);
-            Vec3f rij = locator.MinDistanceIf(atoms_coord_i, atoms_coord_j, _Vlength);
+            Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
             Real dis_ij = vtkm::Magnitude(rij);
             Real energy_atom = charge_p_i * atoms_charge_j / dis_ij;
             //spec_far_coul_energy += energy_atom;
@@ -407,7 +407,7 @@ namespace OutPut
           }
         }
       }
-      Real _Vlength;
+      Vec3f _box;
     };
     
     struct ComputeSqChargeWorklet : vtkm::worklet::WorkletMapField
@@ -740,7 +740,7 @@ namespace OutPut
 
     using GroupVecType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Id>, 
                                                                 vtkm::cont::ArrayHandle<vtkm::Id>>;
-    void ComputeSpecialFarCoul(const Real& Vlength,
+    void ComputeSpecialFarCoul(const Vec3f& box,
                                const vtkm::cont::ArrayHandle<Id>& atoms_id,
                                const GroupVecType& group_vec,
                                const ContPointLocator& locator,
@@ -748,10 +748,16 @@ namespace OutPut
                                const ContForceFunction& force_function,
                                vtkm::cont::ArrayHandle<Real>& SpecFarEnergy)
     {
-      vtkm::cont::Invoker{}(ComputeSpecialFarCoulWorklet{ Vlength }, atoms_id, group_vec, locator, topology, force_function, SpecFarEnergy);
+      vtkm::cont::Invoker{}(ComputeSpecialFarCoulWorklet{ box },
+                            atoms_id,
+                            group_vec,
+                            locator,
+                            topology,
+                            force_function,
+                            SpecFarEnergy);
     }
 
-    void ComputeSpecialBondsCoul(const Real& Vlength,
+    void ComputeSpecialBondsCoul(const Vec3f& box,
                                const vtkm::cont::ArrayHandle<Id>& atoms_id,
                                const GroupVecType& group_vec,
                                const ContPointLocator& locator,
@@ -761,7 +767,7 @@ namespace OutPut
                                const GroupRealIdType& group_weights,
                                vtkm::cont::ArrayHandle<Real>& SpecFarEnergy)
     {
-      vtkm::cont::Invoker{}(ComputeSpecialBondsCoulWorklet{ Vlength },
+      vtkm::cont::Invoker{}(ComputeSpecialBondsCoulWorklet{ box },
                             atoms_id,
                             group_vec,
                             locator,

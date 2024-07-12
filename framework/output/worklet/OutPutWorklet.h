@@ -73,14 +73,14 @@ void ComputeSqCharge(const vtkm::cont::ArrayHandle<Real>& charge,
 
 using GroupVecType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Id>,
                                                              vtkm::cont::ArrayHandle<vtkm::Id>>;
-void ComputeSpecialFarCoul(const Real& Vlength,
+void ComputeSpecialFarCoul(const Vec3f& box,
                            const vtkm::cont::ArrayHandle<Id>& atoms_id,
                            const GroupVecType& group_vec,
                            const ContPointLocator& locator,
                            const ContTopology& topology,
                            const ContForceFunction& force_function,
                            vtkm::cont::ArrayHandle<Real>& SpecFarEnergy); 
-void ComputeSpecialBondsCoul(const Real& Vlength,
+void ComputeSpecialBondsCoul(const Vec3f& box,
                              const vtkm::cont::ArrayHandle<Id>& atoms_id,
                              const GroupVecType& group_vec,
                              const ContPointLocator& locator,

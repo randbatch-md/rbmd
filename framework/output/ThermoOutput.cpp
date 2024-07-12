@@ -295,14 +295,14 @@ void ThermoOutput::SpecialFarCoulEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
-  //OutPut::ComputeSpecialFarCoul(_Vlength, atoms_id, groupVecArray, locator, topology, force_function, Spec_far_coul_energy); 
+  //OutPut::ComputeSpecialFarCoul(_box, atoms_id, groupVecArray, locator, topology, force_function, Spec_far_coul_energy); 
   auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
   auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
   auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
   auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
   auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
   OutPut::ComputeSpecialBondsCoul(
-    _Vlength, atoms_id, groupVecArray, locator, topology, force_function,ids_group,weight_group, Spec_far_coul_energy);
+    _box, atoms_id, groupVecArray, locator, topology, force_function,ids_group,weight_group, Spec_far_coul_energy);
 
   _spec_far_ele_potential_energy_total = vtkm::cont::Algorithm::Reduce(
     Spec_far_coul_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
