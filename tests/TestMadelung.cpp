@@ -61,7 +61,7 @@
     std::shared_ptr<Application> app = std::make_shared<MDApplication>(argc, argv);
     app->Run();
   
-    _madelung_result = (app->GetSystem())->GetParameter<Real>(gtest::madelung);
+    _madelung_result = (app->GetParameter())->GetParameter<Real>(gtest::madelung);
   }
 
 TEST_F(TestMadelung, MadeLung)

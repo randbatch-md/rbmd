@@ -57,7 +57,7 @@ void TestNaClSystem::NaClSystemFormater(const std::string& type,
 
     [Outputs]
     [./TableOutput]
-      type = MoleculesTableOutput
+      type = ThermoOutput
       interval = 1
       binary = false
       out_initial = false
@@ -67,7 +67,7 @@ void TestNaClSystem::NaClSystemFormater(const std::string& type,
     [../]
 
     [./FileOutput]
-      type = MoleculesFileOutput
+      type = RDFOutput
       interval = 10
       binary = false
       out_initial = false
@@ -121,10 +121,10 @@ void TestNaClSystem::ComputeNaClSystem()
   std::shared_ptr<Application> app = std::make_shared<MDApplication>(argc, argv);
   app->Run();
 
-  _kbt = (app->GetSystem())->GetParameter<Real>(PARA_TEMPT);
-  _ave_kbt = (app->GetSystem())->GetParameter<Real>(gtest::ave_temp_t);
-  _ave_pe = (app->GetSystem())->GetParameter<Real>(gtest::ave_potential_energy);
-  _ave_ke = (app->GetSystem())->GetParameter<Real>(gtest::ave_kin_energy);
+  _kbt = (app->GetParameter())->GetParameter<Real>(PARA_TEMPT);
+  _ave_kbt = (app->GetParameter())->GetParameter<Real>(gtest::ave_temp_t);
+  _ave_pe = (app->GetParameter())->GetParameter<Real>(gtest::ave_potential_energy);
+  _ave_ke = (app->GetParameter())->GetParameter<Real>(gtest::ave_kin_energy);
 }
 
 TEST_F(TestNaClSystem, thermo_out)

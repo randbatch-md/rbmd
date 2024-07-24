@@ -41,7 +41,7 @@
 
   "outputs": {
     "table_output": {
-      "type": "MoleculesTableOutput",
+      "type": "ThermoOutput",
       "interval": 1,
       "binary": false,
       "out_initial": false,
@@ -51,7 +51,7 @@
     },
 	
     "file_output": {
-      "type": "MoleculesFileOutput",
+      "type": "RDFOutput",
       "interval": 10,
       "binary": false,
       "out_initial": false,

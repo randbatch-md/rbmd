@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "InitCondition.h"
-#include "MeshFreeSystem.h"
 
 class MeshFreeFileInitCondition : public InitCondition
 {
@@ -10,6 +9,8 @@ public:
 
   void Execute() override {};
   void UpdateField() override {};
+  void InitField() override;
+  void SetParameters() override;
 
 protected:
   std::ifstream _file;
