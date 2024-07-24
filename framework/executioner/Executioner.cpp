@@ -2,19 +2,20 @@
 #include "Application.h"
 #include "Logging.h"
 #include "Output.h"
-#include "System.h"
 #include <iostream>    
 #include <iomanip>  
 
 Executioner::Executioner(const Configuration& cfg)
   : Object(cfg)
   , _app(*(Get<Application*>("_app")))
-  , _system(*(_app.GetSystem()))
-  , _timer(_system.GetTimer())
-  , _dt(Get<Real>("dt"))
+  , _para(*(_app.GetParameter()))
+  //, _system(*(_app.GetSystem()))
+  , _run(*(_app.GetRun()))
+  , _timer(_run.GetTimer())
+  , _dt(_para.GetParameter<Real>(PARA_TIMESTEP))
   , _start_time(0)
   , _current_time(0)
-  , _num_steps(Get<int>("num_steps"))
+  , _num_steps(_para.GetParameter<Real>(PARA_NUM_STEPS))
   , _end_time(std::numeric_limits<Real>::max())
 {
   _current_step = 0;
@@ -24,7 +25,8 @@ Executioner::Executioner(const Configuration& cfg)
 
 void Executioner::Init() 
 {
-  _system.Init();
+  //_system.Init();
+  _run.Init();
 
   for (auto& output : _app.GetOutputWarehouse())
   {
@@ -83,7 +85,8 @@ void Executioner::TakeStep()
   //TODO: 求解前增加step，还是求解后增加step?
   _current_step++;
   _current_time += _dt;
-  _system.Evolve();
+  _run.Execute();
+  //_system.Evolve();
 }
 
 void Executioner::PostStep() {}

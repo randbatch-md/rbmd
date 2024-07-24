@@ -1,7 +1,5 @@
 ﻿#include "Progress.h"
 
-//RegisterObject(Progress);
-
 Progress::Progress(const Configuration& cfg)
   : FileOutput(cfg)
   , _progress("Progress.csv")

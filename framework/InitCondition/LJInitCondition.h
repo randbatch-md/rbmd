@@ -10,12 +10,14 @@ public:
   void Execute() override;
   void UpdateField() override;
   void AddMoleculeInfo();
-
-private:
-  void DoInit();
-  void ComputeForce();
-  void UpdateVelocity();
-  void UpdatePosition();
+  void InitField() override;
+  void SetParameters() override;
+//
+//private:
+//  void DoInit();
+//  void ComputeForce();
+//  void UpdateVelocity();
+//  void UpdatePosition();
 
 private:
   ArrayHandle<Vec3f> _LJforce;

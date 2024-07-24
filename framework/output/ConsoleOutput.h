@@ -2,7 +2,7 @@
 
 #include "Output.h"
 #include "model/FormatTable.h"
-#include "System.h"
+#include "Timer.h"
 class JsonParser;
 
 class ConsoleOutput : public Output
@@ -28,7 +28,6 @@ private:
 
 protected:
   std::unique_ptr<FormatTable> _format_table;
-  std::string _name;
   Timer& _timer;
   Real _time;
   Real _cumulative_time;

@@ -1,5 +1,4 @@
 ﻿#include "output/worklet/OutPutWorklet.h"
-#include "System.h"
 #include "Executioner.h"
 #include <vtkm/worklet/WorkletMapField.h>
 #include <vtkm/cont/Algorithm.h>

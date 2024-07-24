@@ -120,7 +120,7 @@ void TestSalineSolutionSystem::ComputeSalineSolutionSystem()
 
   std::shared_ptr<Application> app = std::make_shared<MDApplication>(argc, argv);
   app->Run();
-  _kbt = (app->GetSystem())->GetParameter<Real>(PARA_TEMPT);
+  _kbt = (app->GetParameter())->GetParameter<Real>(PARA_TEMPT);
 }
 
 TEST_F(TestSalineSolutionSystem, thermo_out)
