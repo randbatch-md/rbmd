@@ -7,7 +7,6 @@ public:
   ForceField(const Configuration& cfg);
   ~ForceField(){};
   void Execute() override;
-  void SetParameters() override;
 
 protected:
 

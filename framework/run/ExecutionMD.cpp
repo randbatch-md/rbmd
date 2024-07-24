@@ -91,7 +91,7 @@ ExecutionMD::ExecutionMD(const Configuration& cfg)
 void ExecutionMD::Init()
 {
   _position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
-  InitPointLocator(); 
+  InitPointLocator(); //
   SetForceFunction();
   SetTopology();
 
@@ -472,9 +472,7 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
-  //std::cout << "rs_num = " << rs_num << " rc_num = " << rc_num << " rcs_num = " << rcs_num
-  //          << " random_num = " << random_num << " random_rate = " << random_rate << " pice_num = " << pice_num  << std::endl;
-  //Id cutoff_num = rs_num + random_num;
+
   Id cutoff_num = rc_num + random_num;
   Id verletlist_num = N * cutoff_num;
 
@@ -561,32 +559,8 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
                                 corr_force);
   }
 
-  //}
-  //else
-  //{
-  //  RunWorklet::NearForceRBL(rs_num,
-  //                              pice_num,
-  //                              _unit_factor._qqr2e,
-  //                              _atoms_id,
-  //                              _locator,
-  //                              _topology,
-  //                              _force_function,
-  //                              id_verletlist_group,
-  //                              num_verletlist_group,
-  //                              offset_verletlist_group,
-  //                              corr_force);
-  //}
-
   Vec3f corr_value = vtkm::cont::Algorithm::Reduce(corr_force, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrForce(corr_value, corr_force, nearforce);
-
-  //auto N = _position.GetNumberOfValues();
-  //vtkm::cont::ArrayHandle<Vec3f> corr_force;
-  //corr_force.Allocate(N);
-  //ComputeCorrForce(corr_force);
-  //Vec3f corr_value =
-  //  vtkm::cont::Algorithm::Reduce(corr_force, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
-  //RunWorklet::SumRBLCorrForce(corr_value, corr_force, nearforce);
 }
 
 void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)

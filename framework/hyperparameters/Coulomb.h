@@ -7,7 +7,6 @@ public:
   Coulomb(const Configuration& cfg);
   ~Coulomb(){};
   void Execute() override;
-  void SetParameters() override;
 
 protected:
 };

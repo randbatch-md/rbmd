@@ -12,11 +12,11 @@ public:
   void Run() override;
   void RunExecutioner();
   void CreateActions() override;
-  void CreateCommandom();
-  void InitConfigurationCommandom(); // 可以直接在这里初始化一套流程运算
-  void HyperParametersCommandom();
-  void ExecutionCommandom();
-  void OutputsCommandom();
+  void CreateCommand();
+  void InitConfigurationCommand();
+  void HyperParametersCommand();
+  void ExecutionCommand();
+  void OutputsCommand();
 
 private:
   std::string _ifile;

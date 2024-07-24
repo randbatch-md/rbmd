@@ -7,7 +7,6 @@ public:
   Extend(const Configuration& cfg);
   ~Extend(){};
   void Execute() override;
-  void SetParameters() override;
 
 protected:
 };

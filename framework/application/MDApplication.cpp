@@ -39,7 +39,7 @@ void MDApplication::Run()
 {
   PrintLogo();
   ParseCLI();
-  CreateCommandom();
+  CreateCommand();
   //CreateActions();
   //SetupDevice();
 
@@ -55,29 +55,18 @@ void MDApplication::RunExecutioner()
 
 void MDApplication::CreateActions()
 {
- // _awh.push_back(std::make_shared<SetupDeviceAction>(*this));
- // _awh.push_back(std::make_shared<CreateSystemAction>(*this));
- // _awh.push_back(std::make_shared<CreateInitConditionAction>(*this));
- // _awh.push_back(std::make_shared<CreateExecutionerAction>(*this));
- // _awh.push_back(std::make_shared<AddOutputAction>(*this));
- //
- // for (auto& action : _awh)
- // {
- //   action->Execute();
- // }
 }
 
-void MDApplication::CreateCommandom()
+void MDApplication::CreateCommand()
 {
   // 初始化配置文件节点
-  HyperParametersCommandom();
-  InitConfigurationCommandom();
-  //HyperParametersCommandom();
-  ExecutionCommandom();
-  OutputsCommandom();
+  HyperParametersCommand();
+  InitConfigurationCommand();
+  ExecutionCommand();
+  OutputsCommand();
 }
 
-void MDApplication::InitConfigurationCommandom()
+void MDApplication::InitConfigurationCommand()
 {
   auto& init_node = _parser->GetJsonNode("init_configuration");
   std::vector<std::string> inits;
@@ -91,37 +80,18 @@ void MDApplication::InitConfigurationCommandom()
     cfg.Add<Json::Value*>("_json_node", &init_child_node);
     if (inits[0] == "read_data")
     {
-      //_cfg->Add<Json::Value*>("read_data", &init_child_node);
-      //cfg.Add<Application*>("_app", this);
-      //cfg.Add<Json::Value*>("_json_node", &init_child_node);
       _init_condition = std::make_shared<ModelFileInitCondition>(cfg);
-      //_init_condition->Execute();
       _parameter->SetParameter(PARA_INIT_WAY, (std::string)"read_data");   
-
-
-      //_parameters = std::make_shared<ReadData>(cfg);
-      //_parameters->Execute();
     }
     else
     {
-      //_cfg->Add<Json::Value*>("inbuild", &init_child_node);
-      //cfg.Add<Json::Value*>("_json_node", &init_child_node);
-      //cfg.Add<Application*>("_app", this);
       _init_condition = std::make_shared<LJInitCondition>(cfg); // 调用一次这个就可以初始化
-      //_init_condition->Execute(); // 这里是初始化了各个参数；
-      _parameter->SetParameter(PARA_INIT_WAY, (std::string) "inbuild");      
-
-      //_init_condition->InitParameter();
-      //_init_condition->Execute();
-      //_input->InitConfigurationInBuild();
-
-      //_parameters = std::make_shared<InBuild>(cfg);
-      //_parameters->Execute();
+      _parameter->SetParameter(PARA_INIT_WAY, (std::string) "inbuild");     
     }
   }
 }
 
-void MDApplication::HyperParametersCommandom()
+void MDApplication::HyperParametersCommand()
 {
   auto& parameter_node = _parser->GetJsonNode("hyper_parameters");
   std::vector<std::string> parameters;
@@ -162,7 +132,7 @@ void MDApplication::HyperParametersCommandom()
   }
 }
 
-void MDApplication::ExecutionCommandom()
+void MDApplication::ExecutionCommand()
 {
   Configuration cfg;
   auto& execution_node = _parser->GetJsonNode("execution");
@@ -181,7 +151,6 @@ void MDApplication::ExecutionCommandom()
   }
   else if (ensemble == "NVT")
   {
-    //_run = std::make_shared<ExecutionTest>(cfg);
     _run = std::make_shared<ExecutionNVT>(cfg);
   }
   else if (ensemble == "TEST")
@@ -208,7 +177,7 @@ void MDApplication::ExecutionCommandom()
   // }
 }
 
-void MDApplication::OutputsCommandom()
+void MDApplication::OutputsCommand()
 {
   auto& output_node = _parser->GetJsonNode("outputs");
   std::vector<std::string> outputs;
@@ -220,7 +189,7 @@ void MDApplication::OutputsCommandom()
     auto& output_child_node = output_node[output_string];
     cfg.Add<Application*>("_app", this);
     cfg.Add<Json::Value*>("_json_node", &output_child_node);
-    if (output == "thermo_out")
+    if (output == "thermo_out") 
     {
         _Output = std::make_shared<ThermoOutput>(cfg);
         _owh.push_back(_Output);
