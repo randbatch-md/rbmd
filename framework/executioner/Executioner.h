@@ -4,7 +4,7 @@
 #include "Timer.h"
 #include "Execution.h"
 #include "Para.h"
-//#include "System.h"
+
 class Application;
 
 class Executioner : public Object
@@ -35,7 +35,6 @@ private:
 protected:
   Application& _app;
   Para& _para;
-  //System& _system;
   Execution& _run;
   Timer& _timer;
   int _num_steps;

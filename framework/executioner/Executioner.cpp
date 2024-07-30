@@ -9,7 +9,6 @@ Executioner::Executioner(const Configuration& cfg)
   : Object(cfg)
   , _app(*(Get<Application*>("_app")))
   , _para(*(_app.GetParameter()))
-  //, _system(*(_app.GetSystem()))
   , _run(*(_app.GetRun()))
   , _timer(_run.GetTimer())
   , _dt(_para.GetParameter<Real>(PARA_TIMESTEP))
@@ -25,7 +24,6 @@ Executioner::Executioner(const Configuration& cfg)
 
 void Executioner::Init() 
 {
-  //_system.Init();
   _run.Init();
 
   for (auto& output : _app.GetOutputWarehouse())
@@ -82,11 +80,9 @@ void Executioner::PreStep()
 
 void Executioner::TakeStep() 
 {
-  //TODO: 求解前增加step，还是求解后增加step?
   _current_step++;
   _current_time += _dt;
   _run.Execute();
-  //_system.Evolve();
 }
 
 void Executioner::PostStep() {}

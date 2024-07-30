@@ -22,7 +22,6 @@ void ModelFileInitCondition::Execute()
 {
   try
   {
-    //SetParameters();
     InitField();
     ReadDataFile(_file);
     _file.close();

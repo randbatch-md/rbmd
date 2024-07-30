@@ -91,7 +91,7 @@ ExecutionMD::ExecutionMD(const Configuration& cfg)
 void ExecutionMD::Init()
 {
   _position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
-  InitPointLocator(); //
+  InitPointLocator(); 
   SetForceFunction();
   SetTopology();
 
@@ -189,19 +189,6 @@ void ExecutionMD::InitERF()
   }
 }
 
-//void ExecutionMD::InitField()
-//{
-//  _para.AddField(field::charge, ArrayHandle<Real>{});
-//  _para.AddField(field::velocity, ArrayHandle<Vec3f>{});
-//  _para.AddField(field::mass, ArrayHandle<Real>{});
-//  _para.AddField(field::molecule_id, ArrayHandle<Id>{});
-//  _para.AddField(field::atom_id, ArrayHandle<Id>{});
-//  _para.AddField(field::position, ArrayHandle<Vec3f>{});
-//  _para.AddField(field::special_offsets, ArrayHandle<Id>{});
-//  _para.AddField(field::special_weights, ArrayHandle<Real>{});
-//  _para.AddField(field::special_ids, ArrayHandle<Id>{});
-//}
-
 void ExecutionMD::UpdateVerletList() 
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
@@ -295,24 +282,18 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorRBE(Real& _Vlength, 
   ArrayHandle<Real> density_real;
   ArrayHandle<Real> density_image;
 
-  //auto sum = 0.0f;
-  //vtkm::cont::Timer timer;
-  //#pragma omp parallel for
   for (Id i = 0; i < p_number; i++)
   {
     auto kl = _psample.ReadPortal().Get(i);
     kl = 2 * vtkm::Pi() * kl / _Vlength;
     RunWorklet::ComputeChargeStructureFactorComponent(
       kl, _position, _charge, density_real, density_image);
-    //timer.Start();
     Real value_Re =
       vtkm::cont::Algorithm::Reduce(density_real, vtkm::TypeTraits<Real>::ZeroInitialization());
     Real value_Im =
       vtkm::cont::Algorithm::Reduce(density_image, vtkm::TypeTraits<Real>::ZeroInitialization());
-    //sum += timer.GetElapsedTime();
     rhok.push_back({ value_Re, value_Im });
   }
-  //std::cout << "timer: " << sum << std::endl;
   return rhok;
 }
 
@@ -415,9 +396,8 @@ void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
                                                      _position,
                                                      _charge,
                                                      _psample,
-                                                     //psamplekey,
-                                                     /*rhok_Re,*/_rhok_Re,
-                                                     /*rhok_Im*/_rhok_Im);
+                                                     _rhok_Re,
+                                                     _rhok_Im);
  
 
   vtkm::cont::ArrayHandle<Id> psamplekey_out;
@@ -425,10 +405,8 @@ void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
   vtkm::cont::ArrayHandle<Real> rhok_Im_reduce;
 
    
-  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
-    /*psamplekey,*/ _psamplekey, /*rhok_Re,*/ _rhok_Re, psamplekey_out, rhok_Re_reduce, vtkm::Add());
-  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
-    /*psamplekey,*/ _psamplekey, /*rhok_Im,*/ _rhok_Im, psamplekey_out, rhok_Im_reduce, vtkm::Add());
+  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(_psamplekey, _rhok_Re, psamplekey_out, rhok_Re_reduce, vtkm::Add());
+  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(_psamplekey, _rhok_Im, psamplekey_out, rhok_Im_reduce, vtkm::Add());
  
 
 
@@ -510,22 +488,6 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   
   _EleNearPairtimer.Start();
 
-  // 当前默认使用ERF 注意：这里要看NearForceRBLERFSpecialBonds和NearForceRBLERF
-  //if (_use_erf == true)
-  //{
-   // RunWorklet::NearForceRBLERF(rs_num,
-   //                                pice_num,
-   //                                _unit_factor._qqr2e,
-   //                                _atoms_id,
-   //                                _locator,
-   //                                _topology,
-   //                                _force_function,
-   //                                _static_table,
-   //                                id_verletlist_group,
-   //                                num_verletlist_group,
-   //                                offset_verletlist_group,
-   //                                corr_force);
-  // 这里的判断待定！！
   if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
   {
     RunWorklet::NearForceRBLERFSpecialBonds(rs_num,
@@ -655,32 +617,15 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
 
   RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
-  // 默认使用erf
-  //if (_use_erf == true)
-  //{
-    //RunWorklet::NearForceVerletERF(cut_off,
-    //                                  _atoms_id,
-    //                                  _locator,
-    //                                  _topology,
-    //                                  _force_function,
-    //                                  _static_table,
-    //                                  id_verletlist_group,
-    //                                  num_verletlist,
-    //                                  offset_verletlist_group,
-    //                                  nearforce);
-  //}
-  //else
-  //{
-    RunWorklet::NearForceVerlet(cut_off,
-                                   _atoms_id,
-                                   _locator,
-                                   _topology,
-                                   _force_function,
-                                   id_verletlist_group,
-                                   num_verletlist,
-                                   offset_verletlist_group,
-                                   nearforce);
-  //}
+  RunWorklet::NearForceVerlet(cut_off,
+                                 _atoms_id,
+                                 _locator,
+                                 _topology,
+                                 _force_function,
+                                 id_verletlist_group,
+                                 num_verletlist,
+                                 offset_verletlist_group,
+                                 nearforce);
 }
 
 void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
@@ -750,7 +695,6 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
   Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
-  //Id cutoff_num = rs_num + random_num;
   Id cutoff_num = rc_num + random_num;
   Id verletlist_num = N * cutoff_num;
 

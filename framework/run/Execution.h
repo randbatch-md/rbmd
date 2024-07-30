@@ -21,11 +21,6 @@ public:
   virtual void SetParameters(){};
   auto& GetTimer() { return this->_timer; }
 
-
-
-
-
-
 protected:
   Application& _app;
   Para& _para;
