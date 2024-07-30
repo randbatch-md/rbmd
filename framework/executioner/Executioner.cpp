@@ -52,15 +52,19 @@ void Executioner::Execute()
 
 void Executioner::PostExecute()
 {
-  console::Success("运行完成.  运行时间:  ", _timer.GetElapsedTime());
-  console::Info("当前步:", _current_step-1, "总步数:", _num_steps);
-  console::Info("当前时间:", _current_time-_dt, "结束时间:",  _end_time);
-  std::ofstream log_file("LogFile.csv", std::ios::app);
+  console::Success("运行完成.  运行时间: ", _timer.GetElapsedTime());
+  console::Info("当前步: ", _current_step-1, "总步数: ", _num_steps);
+  console::Info("当前时间: ", _current_time-_dt, "结束时间: ",  _end_time);
+  std::ofstream log_file("rbmd.log",std::ios::app);
   try
   {
-    log_file << "运行完成."<< std::endl <<"运行时间:   " << _timer.GetElapsedTime() << std::endl
-             << "当前步:   " << _current_step-1 << std::endl << "总步数:   " << _num_steps << std::endl
-             << "当前时间:   " << _current_time-_dt << std::endl<< "结束时间:   " << _end_time;
+    log_file << fmt::format(u8"运行完成.\n运行时间:   {0}\n当前步:   {1}\n总步数:   {2}\n当前时间: "
+                            u8"  {3}\n结束时间:   {4}\n",
+                            _timer.GetElapsedTime(),
+                            _current_step - 1,
+                            _num_steps,
+                            _current_time - _dt,
+                            _end_time);
     log_file.close();
   }
   catch (const std::exception& e)
