@@ -46,6 +46,7 @@ Application::Application(int argc, char** argv)
     if (4 == argc)
     {
       _device.reset(new vtkm::cont::DeviceAdapterTagKokkos);
+      _init_global = std::make_unique<InitGlobal>(std::string(argv[iarg]),argc, argv);
     }
     else
     {
@@ -75,7 +76,6 @@ Application::Application(int argc, char** argv)
     }
   
   _command_line = std::make_unique<CommandLine>(argc, argv);
-  _init_global = std::make_unique<InitGlobal>(argc, argv);
 }
 
 Application::~Application() {}
