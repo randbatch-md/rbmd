@@ -11,7 +11,6 @@ void ExecutionNPT::Init() {}
 
 void ExecutionNPT::Execute()
 {
-  //_timer.Start();
   
 }
 

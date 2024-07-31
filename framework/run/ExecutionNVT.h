@@ -18,9 +18,9 @@ private:
   void virtual TimeIntegration();
   vtkm::cont::ArrayHandle<Vec3f> LJForce();
   vtkm::cont::ArrayHandle<Vec3f> EleNearForce();
-  vtkm::cont::ArrayHandle<Vec3f> NearForce(); // NearForce: EleNearForce and LJforce
-  vtkm::cont::ArrayHandle<Vec3f> NearForceLJ(); // NearForce: EleNearForce and LJforce
-  vtkm::cont::ArrayHandle<Vec3f> NearForceEAM(); // NearForce: EleNearForce and LJforce
+  vtkm::cont::ArrayHandle<Vec3f> NearForce(); 
+  vtkm::cont::ArrayHandle<Vec3f> NearForceLJ(); 
+  vtkm::cont::ArrayHandle<Vec3f> NearForceEAM();
 
 
   vtkm::cont::ArrayHandle<Vec3f> BondForce();
@@ -34,7 +34,6 @@ private:
   void SetForceFunction() override;
   void SetTopology() override;
   void InitParameters() override;
-  //void InitField() override;
   void ComputeForce();
   void ComputeAllForce();
   void UpdateVelocity();
@@ -102,8 +101,6 @@ private:
     std::vector<Real> rhor;
   };
   Funcfl file;
-
-  // potentials as array data
   Id nrho, nr;
   std::vector<Real> frho;
   std::vector<Real> z2r;
@@ -113,14 +110,11 @@ private:
   std::vector<Id2> type2rhor;
   std::vector<Id2> type2z2r;
   std::vector<Vec2f> scale;
-
-  // potentials in spline form used for force computation
   Real dr, rdr, drho, rdrho, rhomax, rhomin;
 
   std::vector<Vec7f> frho_spline;
   std::vector<Vec7f> rhor_spline;
   std::vector<Vec7f> z2r_spline;
-  //  per-atom arrays
   std::vector<Real> rho;
   std::vector<Real> fp;
   std::vector<Id> numforce;

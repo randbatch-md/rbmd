@@ -28,7 +28,7 @@ class Application
 {
 public:
   Application(int argc, char** argv);
-  Application();
+
   virtual ~Application();
 
   virtual void PrintLogo();
@@ -42,6 +42,8 @@ public:
   void SetupDevice();
   void OutputVersion();
   void HelpMessages();
+  void VersionMessages();
+
   void ErrerMessages();
 
   void AddOutput(std::shared_ptr<Output> output);

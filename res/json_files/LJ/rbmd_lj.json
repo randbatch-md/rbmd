@@ -1,0 +1,78 @@
+﻿{
+  "init_configuration": {
+    "inbuild": {
+      "dims": [ 10, 10, 10 ],
+      "x_range": [ 0.0, 10 ],
+      "y_range": [ 0.0, 10 ],
+      "z_range": [ 0.0, 10 ],
+      "velocity_type": "GAUSS",
+      "unit": "LJ"
+    }
+  },
+
+  "hyper_parameters": {
+    "force_field": {
+      "type": "CVFF"
+    },
+
+    "neighbor": {
+      "type": "RBL", //RBL,VERLET-LIST
+      "cut_off": 5,
+      "r_core": 2.5,
+      "neighbor_sample_num": 50
+    },
+
+    "coulomb": {
+      "type": "RBE", //  RBE,EWALD
+      "coulomb_sample_num": 100,
+      "alpha": 0.1,
+      "kmax": 2
+    },
+
+    "extend": {
+      //"fix_shake": false
+    }
+  },
+
+  "execution": {
+    "ensemble": "NVT", 
+    "temperature": [ 1.0, 1.0, 0.1 ], 
+    "pressure": [ 1.0, 1.0, 1000 ], 
+    "temp_ctrl_type": "TEMP_RESCALE", 
+    "press_ctrl_type": "Parrinello-Rahman",
+    "timestep": 1e-02, 
+    "num_steps": 10000
+  },
+
+  "outputs": {
+
+    "thermo_out": { 
+      "interval": 1
+    },
+
+    "rdf_out": {
+      "interval": 10,
+      "radius": 5,
+      "dr": 0.01,
+      "statistics_rdf_steps": 1000,
+      "atoms_pair": [ [ 0, 0 ] ]
+    },
+
+    "msd_out": {
+      "interval": 10,
+      "start_step": 0,
+      "end_step": 10000
+    },
+
+    "vacf_out": {
+      "interval": 10,
+      "start_step": 0,
+      "end_step": 10000
+    },
+    
+    "trajectory_out": {
+      "interval": 100
+    }
+
+  }
+}

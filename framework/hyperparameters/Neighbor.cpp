@@ -18,6 +18,6 @@ void Neighbor::Execute()
   }
   else
   {
-    _para.SetParameter(PARA_R_CORE, Get<Real>("cut_off")); //Get<Real>("cut_off"));
+    _para.SetParameter(PARA_R_CORE, Get<Real>("cut_off")); 
   }
 }
