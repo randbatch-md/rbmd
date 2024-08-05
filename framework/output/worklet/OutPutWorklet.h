@@ -39,13 +39,15 @@ void EAM_PairEnergy(const Real& eam_cut_off,
                     vtkm::cont::ArrayHandle<Real>& pair_energy);
 
 void ComputePotentialEnergy(const Real& cutoff,
-                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                             const ContPointLocator& locator,
-                             const ContTopology& topology,
-                             const ContForceFunction& force_function,
-                             vtkm::cont::ArrayHandle<Real>& potential_energy);
+                            const Vec3f& box,
+                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                            const ContPointLocator& locator,
+                            const ContTopology& topology,
+                            const ContForceFunction& force_function,
+                            vtkm::cont::ArrayHandle<Real>& potential_energy);
 
 void ComputeSpecialBondsLJPotential(const Real& cutoff,
+                                    const Vec3f& box,
                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                     const ContPointLocator& locator,
                                     const ContTopology& topology,
@@ -56,6 +58,7 @@ void ComputeSpecialBondsLJPotential(const Real& cutoff,
 
 void ComputeNearElePotential(const Real& cutoff,
                              const Real& alpha,
+                             const Vec3f& box,
                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                              const ContPointLocator& locator,
                              const ContTopology& topology,

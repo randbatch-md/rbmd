@@ -63,10 +63,6 @@ set(device_src
 output/ThermoOutput.cpp
 output/TempOutput.cpp
 output/RDFOutput.cpp
-output/AtomsTableOutput.cpp
-output/AtomsFileOutput.cpp
-#system/MolecularSystem.cpp
-#system/AtomicSystem.cpp
 output/MSDOutput.cpp
 output/VACFOutput.cpp
 output/worklet/OutPutWorklet.cpp

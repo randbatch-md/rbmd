@@ -40,16 +40,7 @@ namespace RunWorklet
                             vtkm::cont::ArrayHandle<Vec3f>& LJforce);
 
    void NearForceVerlet(const Real& cut_off,
-                           const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                           const ContPointLocator& locator,
-                           const ContTopology& topology,
-                           const ContForceFunction& force_function,
-                           const GroupVecType& Group_j,
-                           const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-                           const CoordOffsetType& coord_offset_j,
-                           vtkm::cont::ArrayHandle<Vec3f>& nearforce);
-
-   void LJForceVerlet(const Real& cut_off,
+                        const Vec3f& box,
                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                         const ContPointLocator& locator,
                         const ContTopology& topology,
@@ -57,7 +48,18 @@ namespace RunWorklet
                         const GroupVecType& Group_j,
                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                         const CoordOffsetType& coord_offset_j,
-                        vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+                        vtkm::cont::ArrayHandle<Vec3f>& nearforce);
+
+   void LJForceVerlet(const Real& cut_off,
+                      const Vec3f& box,
+                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                      const ContPointLocator& locator,
+                      const ContTopology& topology,
+                      const ContForceFunction& force_function,
+                      const GroupVecType& Group_j,
+                      const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                      const CoordOffsetType& coord_offset_j,
+                      vtkm::cont::ArrayHandle<Vec3f>& LJforce);
 
    void EAMfpVerlet(const Real& cut_off,
                     const Vec3f& box,
@@ -111,21 +113,8 @@ namespace RunWorklet
                   const ContTopology& topology,
                   const ContForceFunction& force_function,
                   vtkm::cont::ArrayHandle<Vec3f>& eam_force);
-    
-    void NearForceRBLERF(const Id& rs_num,
-                         const Id& pice_num,
-                         const Real& qqr2e,
-                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                         const ContPointLocator& locator,
-                         const ContTopology& topology,
-                         const ContForceFunction& force_function,
-                         const ContStaticTable& static_table,
-                         const GroupVecType& id_verletlist_group,
-                         const GroupNumType& num_verletlist,
-                         const CoordOffsetType& offset_verletlist_group,
-                         vtkm::cont::ArrayHandle<Vec3f>& corr_force);
-
-     void NearForceRBLERF_box(const Id& rs_num,
+   
+     void NearForceRBLERF(const Id& rs_num,
                          const Id& pice_num,
                          const Real& qqr2e,
                          const Vec3f& box,
@@ -142,6 +131,7 @@ namespace RunWorklet
     void NearForceRBLERFSpecialBonds(const Id& rs_num,
                                      const Id& pice_num,
                                      const Real& qqr2e,
+                                     const Vec3f& box,
                                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                      const ContPointLocator& locator,
                                      const ContTopology& topology,
@@ -153,22 +143,6 @@ namespace RunWorklet
                                      const GroupIdIdType& group_ids,
                                      const GroupRealIdType& group_weights,
                                      vtkm::cont::ArrayHandle<Vec3f>& corr_force);
-
-    void NearForceRBLERFSpecialBonds_box(const Id& rs_num,
-                                          const Id& pice_num,
-                                          const Real& qqr2e,
-                                          const Vec3f& box,
-                                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                                          const ContPointLocator& locator,
-                                          const ContTopology& topology,
-                                          const ContForceFunction& force_function,
-                                          const ContStaticTable& static_table,
-                                          const GroupVecType& id_verletlist_group,
-                                          const GroupNumType& num_verletlist,
-                                          const CoordOffsetType& offset_verletlist_group,
-                                          const GroupIdIdType& group_ids,
-                                          const GroupRealIdType& group_weights,
-                                          vtkm::cont::ArrayHandle<Vec3f>& corr_force);
 
     void NearForceRBL(const Id& rs_num,
                       const Id& pice_num,
@@ -184,6 +158,7 @@ namespace RunWorklet
 
     void LJForceRBL(const Id& rs_num,
                     const Id& pice_num,
+                    const Vec3f& box,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                     const ContPointLocator& locator,
                     const ContTopology& topology,
@@ -330,7 +305,7 @@ namespace RunWorklet
                                                vtkm::cont::ArrayHandle<Real>& Density_Real,
                                                vtkm::cont::ArrayHandle<Real>& Density_Image);
 
-    void ComputePnumberChargeStructureFactorbox(const Vec3f& _box,
+    void ComputePnumberChargeStructureFactor(const Vec3f& _box,
                                                 const Id& pnumber,
                                                 const Id& pos_number,
                                                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

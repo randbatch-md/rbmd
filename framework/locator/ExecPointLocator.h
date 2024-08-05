@@ -118,7 +118,7 @@ public:
     }
   }
              
-  // 周期性算最小距离
+  // Periodic minimum mirror distance
   VTKM_EXEC Vec3f MinDistance(const Vec3f& p1, const Vec3f& p2, const Real& _vlength) const
   {
     Vec3f vec = p1 - p2;
@@ -139,7 +139,7 @@ public:
     }
     return vec;
   }
-  //
+
   VTKM_EXEC Vec3f MinDistanceVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
   {
     Vec3f p12 = p1 - p2;
