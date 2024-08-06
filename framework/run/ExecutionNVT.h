@@ -79,6 +79,7 @@ private:
   Real _cut_off;
   Real _nosehooverxi;
   Real _Vlength;
+  Vec3f _box;
   Real _Volume;
   Real _alpha;
   Real _tempT_sum;

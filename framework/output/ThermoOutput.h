@@ -41,6 +41,7 @@ private:
   Real _spec_far_ele_potential_energy_avr;
   Real _cut_off;
   Real _Vlength;
+  Vec3f _box;
   Real _volume;
   Real _alpha;
   Real _bond_energy;
