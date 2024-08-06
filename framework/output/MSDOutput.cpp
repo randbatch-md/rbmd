@@ -24,6 +24,7 @@ void MSDOutput::Init()
   _temp_MSD_position.Allocate(_position.GetNumberOfValues());
  
   _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  _box = _para.GetParameter<Vec3f>(PARA_BOX);
 }
 
 void MSDOutput::Execute() 
@@ -98,7 +99,7 @@ void MSDOutput::ExecuteMSD()
     position_flag.AllocateAndFill(_position.GetNumberOfValues(),0);
   }
   MSD_vector.AllocateAndFill(_position.GetNumberOfValues(),0);
-  OutPut::ComputeMSD(_Vlength, _original_position, _position, position_flag, MSD_vector);
+  OutPut::ComputeMSD(_box, _original_position, _position, position_flag, MSD_vector);
 
   vtkm::Vec4f MSD_value_total = vtkm::cont::Algorithm::Reduce(MSD_vector, vtkm::TypeTraits<vtkm::Vec4f>::ZeroInitialization());  
   _MSD_value_ave = MSD_value_total / n;

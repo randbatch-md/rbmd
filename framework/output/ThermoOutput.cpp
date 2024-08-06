@@ -33,6 +33,7 @@ ThermoOutput::ThermoOutput(const Configuration& cfg)
   , _alpha(0.0)
   , _bond_energy(0.0)
   , _angle_energy(0.0)
+  , _dihedrals_energy(0.0)
   , _rho(0.0)
   , _tempT_sum(0.0)
   , _tempT(0.0)
@@ -67,6 +68,7 @@ void ThermoOutput::Init()
   _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   _volume = _para.GetParameter<Real>(PARA_VOLUME);
   _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  _box = _para.GetParameter<Vec3f>(PARA_BOX);
   _rho = _para.GetParameter<Real>(PARA_RHO);
   if (_para.GetParameter<bool>(PARA_FAR_FORCE))
   {
@@ -126,6 +128,11 @@ void ThermoOutput::ComputePotentialEnergy()
   ArrayHandle<Real> lj_potential_energy;
   auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
   auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
+  auto N = position.GetNumberOfValues();
+  auto unit_factor = _para.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
+  _lj_potential_energy_avr = 0.0;
+  _near_ele_potential_energy_avr = 0.0;
+  _far_ele_potential_energy_avr = 0.0;
   
   ContForceFunction force_function;
 
@@ -135,12 +142,97 @@ void ThermoOutput::ComputePotentialEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
-  if (_para.GetParameter<std::string>(PARA_INIT_WAY) == "inbuild")
+auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
+  if ("LJ/CUT" == force_field)
   {
-    OutPut::ComputePotentialEnergy(_cut_off, atoms_id,  locator, topology, force_function, lj_potential_energy);  
+    OutPut::ComputePotentialEnergy(
+      _cut_off, _box, atoms_id, locator, topology, force_function, lj_potential_energy);
+    auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+      lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+    _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
   }
-  else
+
+  else if ("LJ/CUT/COUL/LONG" == force_field)
   {
+    OutPut::ComputePotentialEnergy(
+      _cut_off, _box, atoms_id, locator, topology, force_function, lj_potential_energy);
+    auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+      lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+    _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
+
+    if (_para.GetParameter<bool>(PARA_FAR_FORCE))
+    {
+      //1:near_ele_potential_energy
+      ArrayHandle<Real> near_ele_potential_energy;
+      OutPut::ComputeNearElePotential(_cut_off,
+                                      _alpha,
+                                      _box,
+                                      atoms_id,
+                                      locator,
+                                      topology,
+                                      force_function,
+                                      near_ele_potential_energy);
+      auto near_ele_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+        near_ele_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+      _near_ele_potential_energy_avr = near_ele_potential_energy_total / N;
+      _near_ele_potential_energy_avr = _near_ele_potential_energy_avr * unit_factor._qqr2e;
+
+
+
+      //2:self_potential_energy_avr
+      ArrayHandle<Real> _self_energy;
+      auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+      OutPut::ComputeSqCharge(charge, _self_energy);
+      auto self_potential_energy_total = -vtkm::Sqrt(_alpha / vtkm::Pi()) *
+        vtkm::cont::Algorithm::Reduce(_self_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+      _self_potential_energy_avr = self_potential_energy_total / N;
+      _self_potential_energy_avr = _self_potential_energy_avr * unit_factor._qqr2e;
+
+      //3:_far_ele_potential_energy_avr
+      //Real Volume = vtkm::Pow(_Vlength, 3);
+      Real Volume = _box[0] * _box[1] * _box[2];
+      ArrayHandle<Real> Density_Real;
+      ArrayHandle<Real> Density_Image;
+      Real far_ele_potential_energy_total = 0.0;
+      for (Id i = -_Kmax; i <= _Kmax; i++)
+      {
+        for (Id j = -_Kmax; j <= _Kmax; j++)
+        {
+          for (Id k = -_Kmax; k <= _Kmax; k++)
+          {
+            if (!(i == 0 && j == 0 && k == 0))
+            {
+              Vec3f K = { Real(i), Real(j), Real(k) };
+              //K = 2 * vtkm::Pi() * K / _Vlength;
+              K = { Real(2 * vtkm::Pi() * K[0] / _box[0]),
+                    Real(2 * vtkm::Pi() * K[1] / _box[1]),
+                    Real(2 * vtkm::Pi() * K[2] / _box[2]) };
+              Real Range_K = vtkm::Magnitude(K);
+              OutPut::ComputeDensity(K, position, charge, Density_Real, Density_Image);
+              Real Value_Re = vtkm::cont::Algorithm::Reduce(
+                Density_Real, vtkm::TypeTraits<Real>::ZeroInitialization());
+              Real Value_Im = vtkm::cont::Algorithm::Reduce(
+                Density_Image, vtkm::TypeTraits<Real>::ZeroInitialization());
+              Real Range_density2 = vtkm::Pow(Value_Re, 2) + vtkm::Pow(Value_Im, 2);
+
+              far_ele_potential_energy_total +=
+                vtkm::Exp(-Range_K * Range_K / (4 * _alpha)) * Range_density2 / (Range_K * Range_K);
+            }
+          }
+        }
+      }
+
+      far_ele_potential_energy_total = far_ele_potential_energy_total * (2 * vtkm::Pi() / Volume);
+      _far_ele_potential_energy_avr = far_ele_potential_energy_total / N;
+      _far_ele_potential_energy_avr = _far_ele_potential_energy_avr * unit_factor._qqr2e;
+
+      _far_ele_potential_energy_avr = _far_ele_potential_energy_avr + _self_potential_energy_avr;
+    }
+  }
+
+  else if ("CVFF" == force_field)
+  {
+    // lj_potential_energy
     auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
     auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
     auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
@@ -149,6 +241,7 @@ void ThermoOutput::ComputePotentialEnergy()
       vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
 
     OutPut::ComputeSpecialBondsLJPotential(_cut_off,
+                                           _box,
                                            atoms_id,
                                            locator,
                                            topology,
@@ -156,89 +249,89 @@ void ThermoOutput::ComputePotentialEnergy()
                                            ids_group,
                                            weight_group,
                                            lj_potential_energy);
-  }
-  auto lj_potential_energy_total =
-    vtkm::cont::Algorithm::Reduce(lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
-  _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
+    auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+      lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+    _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
 
-  //TODO: turn to parameter
-  auto N = position.GetNumberOfValues();
-
-  auto unit_factor = _para.GetParameter<UnitFactor>(PARA_UNIT_FACTOR);
-  // self potential energy
-  ArrayHandle<Real> _self_energy;
-  auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
-  OutPut::ComputeSqCharge(charge, _self_energy);
-  auto self_potential_energy_total = -vtkm::Sqrt(_alpha / vtkm::Pi()) *
-    vtkm::cont::Algorithm::Reduce(_self_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
-  _self_potential_energy_avr = self_potential_energy_total / N;
-  _self_potential_energy_avr = _self_potential_energy_avr * unit_factor._qqr2e;
-
-  //_PotentialTimer.Start();
-  ArrayHandle<Real> near_ele_potential_energy;
-  OutPut::ComputeNearElePotential(
-    _cut_off, _alpha, atoms_id, locator, topology, force_function, near_ele_potential_energy);
-
-  auto near_ele_potential_energy_total = vtkm::cont::Algorithm::Reduce(
-    near_ele_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
-  _near_ele_potential_energy_avr =
-    near_ele_potential_energy_total / position.GetNumberOfValues();
-  _near_ele_potential_energy_avr = _near_ele_potential_energy_avr * unit_factor._qqr2e;
-
-  _spec_far_ele_potential_energy_avr = 0.0;
-
-  if (_para.GetParameter<std::string>(PARA_INIT_WAY) != "inbuild")
-  {
-    SpecialFarCoulEnergy();
-  }
-
-  _near_ele_potential_energy_avr = _near_ele_potential_energy_avr - _spec_far_ele_potential_energy_avr;
-
-  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
-  {
-    Real Volume = vtkm::Pow(_Vlength, 3);
-    ArrayHandle<Real> Density_Real;
-    ArrayHandle<Real> Density_Image;
-    Real far_ele_potential_energy_total = 0.0;
-    for (Id i = -_Kmax; i <= _Kmax; i++)
+    // FAR_FORCE
+    if (_para.GetParameter<bool>(PARA_FAR_FORCE))
     {
-      for (Id j = -_Kmax; j <= _Kmax; j++)
-      {
-        for (Id k = -_Kmax; k <= _Kmax; k++)
-        {
-          if (!(i == 0 && j == 0 && k == 0))
-          {
-            Vec3f K = { Real(i), Real(j), Real(k) };
-            K = 2 * vtkm::Pi() * K / _Vlength;
-            Real Range_K = vtkm::Magnitude(K);
-            OutPut::ComputeDensity(K, position, charge, Density_Real, Density_Image);
-            Real Value_Re = vtkm::cont::Algorithm::Reduce(
-              Density_Real, vtkm::TypeTraits<Real>::ZeroInitialization());
-            Real Value_Im = vtkm::cont::Algorithm::Reduce(
-              Density_Image, vtkm::TypeTraits<Real>::ZeroInitialization());
-            Real Range_density2 = vtkm::Pow(Value_Re, 2) + vtkm::Pow(Value_Im, 2);
+      //1:near_ele_potential_energy
+      ArrayHandle<Real> near_ele_potential_energy;
+      OutPut::ComputeNearElePotential(_cut_off,
+                                      _alpha,
+                                      _box,
+                                      atoms_id,
+                                      locator,
+                                      topology,
+                                      force_function,
+                                      near_ele_potential_energy);
+      auto near_ele_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+        near_ele_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+      _near_ele_potential_energy_avr = near_ele_potential_energy_total / N;
+      _near_ele_potential_energy_avr = _near_ele_potential_energy_avr * unit_factor._qqr2e;
 
-            far_ele_potential_energy_total +=
-              vtkm::Exp(-Range_K * Range_K / (4 * _alpha)) * Range_density2 / (Range_K * Range_K);
+      _spec_far_ele_potential_energy_avr = 0.0;
+      SpecialFarCoulEnergy();
+      _near_ele_potential_energy_avr =
+        _near_ele_potential_energy_avr - _spec_far_ele_potential_energy_avr;
+
+      //2:self_potential_energy_avr
+      ArrayHandle<Real> _self_energy;
+      auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+      OutPut::ComputeSqCharge(charge, _self_energy);
+      auto self_potential_energy_total = -vtkm::Sqrt(_alpha / vtkm::Pi()) *
+        vtkm::cont::Algorithm::Reduce(_self_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+      _self_potential_energy_avr = self_potential_energy_total / N;
+      _self_potential_energy_avr = _self_potential_energy_avr * unit_factor._qqr2e;
+
+      //3:_far_ele_potential_energy_avr
+      //Real Volume = vtkm::Pow(_Vlength, 3);
+      Real Volume = _box[0] * _box[1] * _box[2];
+      ArrayHandle<Real> Density_Real;
+      ArrayHandle<Real> Density_Image;
+      Real far_ele_potential_energy_total = 0.0;
+      for (Id i = -_Kmax; i <= _Kmax; i++)
+      {
+        for (Id j = -_Kmax; j <= _Kmax; j++)
+        {
+          for (Id k = -_Kmax; k <= _Kmax; k++)
+          {
+            if (!(i == 0 && j == 0 && k == 0))
+            {
+              Vec3f K = { Real(i), Real(j), Real(k) };
+              //K = 2 * vtkm::Pi() * K / _Vlength;
+              K = { Real(2 * vtkm::Pi() * K[0] / _box[0]),
+                    Real(2 * vtkm::Pi() * K[1] / _box[1]),
+                    Real(2 * vtkm::Pi() * K[2] / _box[2]) };
+              Real Range_K = vtkm::Magnitude(K);
+              OutPut::ComputeDensity(K, position, charge, Density_Real, Density_Image);
+              Real Value_Re = vtkm::cont::Algorithm::Reduce(
+                Density_Real, vtkm::TypeTraits<Real>::ZeroInitialization());
+              Real Value_Im = vtkm::cont::Algorithm::Reduce(
+                Density_Image, vtkm::TypeTraits<Real>::ZeroInitialization());
+              Real Range_density2 = vtkm::Pow(Value_Re, 2) + vtkm::Pow(Value_Im, 2);
+
+              far_ele_potential_energy_total +=
+                vtkm::Exp(-Range_K * Range_K / (4 * _alpha)) * Range_density2 / (Range_K * Range_K);
+            }
           }
         }
       }
+
+      far_ele_potential_energy_total = far_ele_potential_energy_total * (2 * vtkm::Pi() / Volume);
+      _far_ele_potential_energy_avr = far_ele_potential_energy_total / N;
+      _far_ele_potential_energy_avr = _far_ele_potential_energy_avr * unit_factor._qqr2e;
+
+      _far_ele_potential_energy_avr = _far_ele_potential_energy_avr + _self_potential_energy_avr;
     }
-
-    far_ele_potential_energy_total = far_ele_potential_energy_total * (2 * vtkm::Pi() / Volume);
-    _far_ele_potential_energy_avr = far_ele_potential_energy_total / N;
-    _far_ele_potential_energy_avr = _far_ele_potential_energy_avr * unit_factor._qqr2e;
-
-    _far_ele_potential_energy_avr = _far_ele_potential_energy_avr + _self_potential_energy_avr;
-    _potential_energy_avr = _lj_potential_energy_avr + _far_ele_potential_energy_avr +
-    _near_ele_potential_energy_avr;
-  }
-  else
-  {
-    _potential_energy_avr = _lj_potential_energy_avr + _near_ele_potential_energy_avr;
   }
 
-  _potential_energy = _potential_energy_avr + _bond_energy + _angle_energy;
+
+  //TOTAL:
+
+  _potential_energy_avr = _lj_potential_energy_avr + _far_ele_potential_energy_avr + _near_ele_potential_energy_avr;
+  _potential_energy = _potential_energy_avr + _bond_energy + _angle_energy + _dihedrals_energy; //
 
   _kinteic_energy = _tempT_sum / N * 0.5;
 
@@ -252,8 +345,8 @@ void ThermoOutput::SpecialFarCoulEnergy()
   auto position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
   auto N = position.GetNumberOfValues();
 
-  Real Volume = vtkm::Pow(_Vlength, 3);
-
+  //Real Volume = vtkm::Pow(_Vlength, 3);
+  Real Volume = _box[0] * _box[1] * _box[2];
   ArrayHandle<Real> Spec_far_coul_energy;
   Real _spec_far_ele_potential_energy_total = 0.0;
   auto atoms_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
@@ -278,7 +371,7 @@ void ThermoOutput::SpecialFarCoulEnergy()
   auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
   auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
   OutPut::ComputeSpecialBondsCoul(
-    _Vlength, atoms_id, groupVecArray, locator, topology, force_function,ids_group,weight_group, Spec_far_coul_energy);
+    _box, atoms_id, groupVecArray, locator, topology, force_function,ids_group,weight_group, Spec_far_coul_energy);
 
   _spec_far_ele_potential_energy_total = vtkm::cont::Algorithm::Reduce(
     Spec_far_coul_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
@@ -399,6 +492,7 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
   //
   auto cut_off = _para.GetParameter<Real>(EAM_PARA_CUTOFF);
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
   auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
@@ -416,8 +510,7 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
 
   //1:compute EAM_rho;
   ArrayHandle<Real> EAM_rho;
-  OutPut::EAM_rho(
-    cut_off, Vlength, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
+  OutPut::EAM_rho(cut_off, box, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
 
   //2: embedding_energy_atom
   ArrayHandle<Real> embedding_energy_atom;
@@ -430,7 +523,7 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
   //3: pair_energy_atom
   ArrayHandle<Real> pair_energy_atom;
   OutPut::EAM_PairEnergy(
-    cut_off, Vlength, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
+    cut_off, box, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
 
   auto pair_energy_atom_total =
     vtkm::cont::Algorithm::Reduce(pair_energy_atom, vtkm::TypeTraits<Real>::ZeroInitialization());

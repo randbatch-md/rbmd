@@ -22,7 +22,7 @@ public:
   virtual void InitParameters();
 
 protected:
-  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Real& _Vlength, IdComponent& Kmax);
+  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Vec3f& _box, IdComponent& Kmax);
   std::vector<Vec2f> ComputeChargeStructureFactorRBE(Real& _Vlength, ArrayHandle<Vec3f>& _psample);
   void ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                           IdComponent& RBE_P,
@@ -49,9 +49,9 @@ protected:
   virtual void SetCharge(){};
   void InitERF();
 
-  void  ComputeNewChargeStructureFactorRBE(Real& _Vlength,
-                                                        ArrayHandle<Vec3f>& _psample,
-                                                        ArrayHandle<Vec2f>& new_rhok);
+  void ComputeNewChargeStructureFactorRBE(Vec3f& _box,
+                                          ArrayHandle<Vec3f>& _psample,
+                                          ArrayHandle<Vec2f>& new_rhok);
   void InitPointLocator();
 
 protected:
