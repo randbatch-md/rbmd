@@ -45,6 +45,44 @@ public:
       _sum_gauss = Compute_S();
   }
  
+  VTKM_EXEC Vec6f ComputeLJVirial(const Vec3f& r_ij,
+                                  const Real& eps_i,
+                                  const Real& eps_j,
+                                  const Real& sigma_i,
+                                  const Real& sigma_j,
+                                  const Real& cut_off) const
+  {
+      Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+
+      const Real small_value = 0.0001;
+      Vec3f force{ 0, 0, 0 };
+      const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+      const Real cut_off_2 = cut_off * cut_off;
+
+      if (dis_2 < cut_off_2 && dis_2 > small_value)
+      {
+        Real sigma_ij = (sigma_i + sigma_j) / 2;
+
+        Real sigmaij_6 = sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij;
+        Real dis_6 = dis_2 * dis_2 * dis_2;
+        Real sigmaij_dis_6 = sigmaij_6 / dis_6;
+        Real eps_ij = vtkm::Sqrt(eps_i * eps_j);
+        auto fpair = 0.5 * 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6) * r_ij / dis_2;
+
+        //auto forcelj = 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6;
+        //auto fpair = forcelj / dis_2;
+
+        //compute virial
+        virial[0] = r_ij[0] * fpair[0]; //xx
+        virial[1] = r_ij[1] * fpair[1]; //yy
+        virial[2] = r_ij[2] * fpair[2]; //zz
+        virial[3] = r_ij[0] * fpair[1]; //xy
+        virial[4] = r_ij[0] * fpair[2]; //xz
+        virial[5] = r_ij[1] * fpair[2]; //yz
+      }
+      return virial;
+  }
+
   VTKM_EXEC vtkm::Vec3f ComputeLJForce(const Vec3f& r_ij,
                                        const Real& eps_i,
                                        const Real& eps_j,

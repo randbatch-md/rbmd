@@ -308,6 +308,8 @@ void ExecutionMD::InitParameters()
     _unit_factor._fmt2v = 4.186 * vtkm::Pow(10.0, -4);
     _unit_factor._mvv2e = 1.0 / (4.186 * vtkm::Pow(10.0, -4));
     _unit_factor._qqr2e = 332.06371;
+    _unit_factor._boltz = 0.0019872067;
+    _unit_factor._nktv2p = 68568.415;
   }
   else if (_unit == "LJ")
   {
@@ -315,6 +317,8 @@ void ExecutionMD::InitParameters()
     _unit_factor._fmt2v = 1.0;
     _unit_factor._mvv2e = 1.0;
     _unit_factor._qqr2e = 1.0;
+    _unit_factor._boltz = 1.0;
+    _unit_factor._nktv2p = 1.0;
   }
   else if (_unit == "METAL")
   {
@@ -322,6 +326,8 @@ void ExecutionMD::InitParameters()
     _unit_factor._fmt2v = 1.0 / 1.0364269e-4;
     _unit_factor._mvv2e = 1.0364269e-4;
     _unit_factor._qqr2e = 14.399645;
+    _unit_factor._boltz = 8.617343e-5;
+    _unit_factor._nktv2p = 1.6021765e6;
   }
   _para.SetParameter(PARA_UNIT_FACTOR, _unit_factor);
 }

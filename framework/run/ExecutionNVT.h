@@ -53,6 +53,20 @@ private:
   void SetEAM();
   void InitStyle();
 
+       //
+  void ComputeVirial();
+  void ComputeVirial_r();
+  void Compute_Pressure_Scalar();
+  void Compute_Temp_Scalar();
+  void Couple();
+  void fix_press_berendsen();
+  void fix_press_berendsen_scale();
+  void x2lamda(Id n);
+  void lamda2x(Id n);
+  void set_global_box();
+  void remap();
+  void ApplyPbc();
+
 private:
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
@@ -62,6 +76,9 @@ private:
   ArrayHandle<Vec3f> _spec_coul_force;
   Real _dt;
   Real _kbT ,_Tdamp;
+  Real _Pstart, _Pstop, _Pperiod, _Ptarget;
+  Real _bulkmodulus, _scale_factor, _pressure_coupling;
+
   std::string _farforce_type;
   std::string _nearforce_type;
   std::string _temp_con_type;
@@ -121,4 +138,27 @@ private:
   std::vector<Id> numforce;
 
   std::vector<Id> map; // mapping from atom types to elements
+
+      //
+  ArrayHandle<Vec6f> _virial_atom;
+  Real _lj_potential_energy;
+  Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
+  Real _pressure_scalar; // computed global pressure scalar
+
+  //
+  Vec3f p_start, p_stop;
+  Vec3f p_period, p_target;
+
+  Vec3f p_current, dilation;
+  Real bulkmodulus;
+
+  //
+  Vec6f h, h_inv; // shape matrix in Voigt ordering
+
+  // orthogonal box
+
+  Real xprd, yprd, zprd;                // global box dimensions
+  Real xprd_half, yprd_half, zprd_half; // half dimensions
+  Vec3f prd;                            // array form of dimensions
+  Vec3f prd_half;                       // array form of half dimensions
 };

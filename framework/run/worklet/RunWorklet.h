@@ -338,4 +338,16 @@ namespace RunWorklet
                                       const ContTopology& topology,
                                       const ContPointLocator& locator,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce);
-}
+
+     void LJVirialPBC(const Real& cut_off,
+                     const Vec3f& box,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const ContPointLocator& locator,
+                     const ContTopology& topology,
+                     const ContForceFunction& force_function,
+                     vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
+
+     void fix_press_berendsen(const Real& scale_factor,
+                              vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                              const ContPointLocator& locator);
+ }
