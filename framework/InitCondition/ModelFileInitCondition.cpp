@@ -22,7 +22,6 @@ void ModelFileInitCondition::Execute()
 {
   try
   {
-    //SetParameters();
     InitField();
     ReadDataFile(_file);
     _file.close();
@@ -175,9 +174,11 @@ void ModelFileInitCondition::Header(std::ifstream& file)
   auto xLength = x_high - x_low;
   auto yLength = y_high - y_low;
   auto zLength = z_high - z_low;
+  Vec3f box = { xLength, yLength, zLength };
+  _para.SetParameter(PARA_BOX, box);
   _para.SetParameter(PARA_VLENGTH, xLength);
-  _para.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
-  _para.SetParameter(PARA_RHO, _header._num_atoms / (xLength * yLength * zLength));
+  _para.SetParameter(PARA_VOLUME, box[0] * box[1] * box[2]);
+  _para.SetParameter(PARA_RHO, _header._num_atoms / (box[0] * box[1] * box[2]));
   _para.SetParameter(NTYPES, _header._num_atoms_type);
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto bin_number = Id3{

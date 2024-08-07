@@ -7,7 +7,7 @@
 #include "RBEPSample.h"
 #include "run/worklet/MolecularWorklet.h"
 #include "run/worklet/RunWorklet.h"
-#include <cmath> // erfc(x)
+#include <cmath> 
 #include <fstream>
 #include <vtkm/Math.h>
 #include <vtkm/Pair.h>
@@ -44,7 +44,7 @@ void ExecutionNVT::Init()
 
   InitialCondition();
 
-  ComputeForce(); // Presolve force
+  ComputeForce(); 
 }
 
 void ExecutionNVT::PreSolve()
@@ -64,7 +64,6 @@ void ExecutionNVT::PreSolve()
 void ExecutionNVT::Solve()
 {
   // stage1:
-  //ComputeForce();   // Only compute once during evaluation
   UpdateVelocity();
 
   // stage2:
@@ -116,31 +115,29 @@ void ExecutionNVT::ComputeForce()
 
 void ExecutionNVT::ComputeAllForce()
 {
-  // FarNearLJforce
-  //RunWorklet::SumFarNearLJForce(EleNewForce(), EleNearForce(), LJForce(), _all_force); //RBE + LJ
-  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
-  {
-    RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force); //RBE + LJ
-  }
-  else if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
-  {
-    NearForceEAM();
-  }
-  else
+  auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
+  if ("LJ/CUT" == force_field)
   {
     NearForceLJ();
   }
 
-  if (_init_way == "read_data" && _para.GetParameter<std::string>(PARA_FILE_TYPE) != "EAM")
-  { 
+  else if ("LJ/CUT/COUL/LONG" == force_field)
+  {
+    RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force);
+  }
+
+  else if ("CVFF" == force_field)
+  {
+    RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force);
+
     Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
-    
+
     //all force with bondforce
     Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
-    
+
     //all force with angleforce
     Invoker{}(MolecularWorklet::AddForceWorklet{}, AngleForce(), _all_force);
-    
+
     if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
         _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
     {
@@ -148,19 +145,17 @@ void ExecutionNVT::ComputeAllForce()
       Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
     }
   }
+
+  else if ("EAM" == force_field)
+  {
+    NearForceEAM();
+  }
 }
 
 void ExecutionNVT::UpdateVelocity()
 {
   try
   {
-    //auto n = _position.GetNumberOfValues();
-    //
-    //_old_velocity.Allocate(n);
-    //for (int i = 0; i < n; i++)
-    //{
-    //  _old_velocity.WritePortal().Set(i, _velocity.ReadPortal().Get(i));
-    //}
     vtkm::cont::ArrayCopy(_velocity, _old_velocity);
 
     RunWorklet::UpdateVelocity(_dt, _unit_factor._fmt2v, _all_force, _mass, _velocity);
@@ -173,14 +168,6 @@ void ExecutionNVT::UpdateVelocity()
 
 void ExecutionNVT::UpdatePosition()
 {
-  //auto n = _position.GetNumberOfValues();
-  // store old position
-  //_old_position.Allocate(n);
-  //for (int i = 0; i < n; i++)
-  //{
-  //  _old_position.WritePortal().Set(i, _position.ReadPortal().Get(i));
-  //}
-
   vtkm::cont::ArrayCopy(_position, _old_position);
 
   if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "null" || _init_way == "inbuild")
@@ -210,7 +197,6 @@ void ExecutionNVT::UpdateVelocityByTempConType()
     //As long as the coefficent is not too large, such as larger than 100 * dt.
     RunWorklet::UpdateVelocityNoseHoover(
       _dt, _unit_factor._fmt2v, _nosehooverxi, _all_force, _mass, _velocity);
-    //Real tauT = 20.0 * _dt;
     Real tauT = vtkm::Pow(10.0, -1) * _dt;
     _nosehooverxi += 0.5 * _dt * (_tempT / _kbT - 1.0) / tauT;
   }
@@ -227,7 +213,7 @@ void ExecutionNVT::UpdateVelocityByTempConType()
     //The selection of dt_divide_taut determines the temperature equilibrium time.
     
     //Real dt_divide_taut = 0.02; for PEO
-    //Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ 默认是这个？？？？？？
+    //Real dt_divide_taut = 0.1; // 注意：不同系统相差很大 LJ
     auto dt_divide_taut = _dt / _Tdamp;
     Real coeff_Berendsen = vtkm::Sqrt(1.0 + dt_divide_taut * (_kbT / _tempT - 1.0));
     RunWorklet::UpdateVelocityRescale(coeff_Berendsen, _velocity);
@@ -263,16 +249,6 @@ void ExecutionNVT::SetCenterTargetPositions()
   }
   else
   {
-    /*auto atom_id_center = _para.GetFieldAsArrayHandle<Id>(field::atom_id_center);
-    auto atom_id_target = _para.GetFieldAsArrayHandle<Id>(field::atom_id_target);
-    auto center_position = _para.GetFieldAsArrayHandle<Vec3f>(field::center_position);
-    auto target_position = _para.GetFieldAsArrayHandle<Vec3f>(field::target_position);
-
-    Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_center, _position, center_position);
-    Invoker{}(MolecularWorklet::GetPositionByTypeWorklet{}, atom_id_target, _position, target_position);*/
-    //std::map<Id, ArrayHandle<Vec3f>> atom_pair_position;
-    //std::map<Id, ArrayHandle<Id>> atom_pair_id;
-    //auto atom_pair_type = _para.GetParameter<std::vector<int>>(PARA_ATOMS_PAIR_TYPE);
     auto rdf_id = _para.GetFieldAsArrayHandle<Id>(field::atom_pair_id);
     auto atoms_pair_type_offsets = _para.GetFieldAsArrayHandle<Id>(field::atoms_pair_type_offsets);
     vtkm::cont::ArrayHandle<Vec3f> atom_type_position;
@@ -286,14 +262,17 @@ void ExecutionNVT::SetCenterTargetPositions()
 void ExecutionNVT::PreForce()
 {
   _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  _box = _para.GetParameter<Vec3f>(PARA_BOX);
+  Vec3f sigma = { static_cast<Real>(vtkm::Sqrt(_alpha / 2.0) * _box[0] / vtkm::Pi()),
+                  static_cast<Real>(vtkm::Sqrt(_alpha / 2.0) * _box[1] / vtkm::Pi()),
+                  static_cast<Real>(vtkm::Sqrt(_alpha / 2.0) * _box[2] / vtkm::Pi()) };
   _dt = _executioner->Dt();
   // prepare for RBE force
   auto velocity_type = _para.GetParameter<std::string>(gtest::velocity_type);
   auto random = (velocity_type != "TEST") ? true : false;
-  RBEPSAMPLE rbe_presolve_psample = { _alpha, _Vlength, _RBE_P };
+  RBEPSAMPLE rbe_presolve_psample = { _alpha, _Vlength, _box, _RBE_P };
   rbe_presolve_psample._RBE_random = random;
-  _psample = rbe_presolve_psample.Fetch_P_Sample(
-    Real(0.0), (vtkm::Sqrt(_alpha / 2.0) * _Vlength / vtkm::Pi()));
+  _psample = rbe_presolve_psample.Fetch_P_Sample(Real(0.0), sigma);
 
   // prepare for Langevin dynamics
   RBEPSAMPLE sample_presolve_1d;
@@ -317,7 +296,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::LJForce()
   }
   else if (_nearforce_type == "ORIGINAL")
   {
-    //ComputeOriginalLJForce(_LJforce);
     ComputeSpecialBondsLJForce(_LJforce);
   }
   return _LJforce;
@@ -412,7 +390,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
   vtkm::cont::ArrayHandle<Vec3f> forcebond;
   vtkm::cont::ArrayHandle<Real> bond_energy;
   auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
-  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _Vlength },
+  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _box },
             bond_type,
             bondlist_group,
             bond_coeffs_k,
@@ -483,7 +461,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
   vtkm::cont::ArrayHandle<Vec3f> force_angle;
   vtkm::cont::ArrayHandle<Real> angle_energy;
   auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
-  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _Vlength },
+  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _box },
             angle_type,
             anglelist_group,
             angle_coeffs_k,
@@ -560,12 +538,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
   vtkm::cont::ArrayHandle<Real> dihedrals_energy;
   auto&& forcedihedrals_group = vtkm::cont::make_ArrayHandleGroupVec<4>(force_dihedrals);
 
-  //auto a1 = dihedrals_type.GetNumberOfValues();
-  //auto a2 = dihedralslist_group.GetNumberOfValues();
-  //auto a3 = dihedrals_coeffs_k.GetNumberOfValues();
-  //auto a4 = dihedrals_coeffs_sign.GetNumberOfValues();
-  //auto a5 = dihedrals_coeffs_multiplicity.GetNumberOfValues();
-  Invoker{}(MolecularWorklet::ComputeDihedralHarmonicWorklet{ _Vlength },
+  Invoker{}(MolecularWorklet::ComputeDihedralHarmonicWorklet{ _box },
             dihedrals_type,
             dihedralslist_group,
             dihedrals_coeffs_k,
@@ -618,6 +591,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
 {
   auto vLength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto source_array = _para.GetFieldAsArrayHandle<Id>(field::special_source_array);
   auto offsets_array = _para.GetFieldAsArrayHandle<Id>(field::special_offsets_array);
   auto groupVecArray = vtkm::cont::make_ArrayHandleGroupVecVariable(source_array, offsets_array);
@@ -631,7 +605,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
     auto weight_group =
       vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
 
-    RunWorklet::ComputeSpecialCoulGeneral(vLength,
+    RunWorklet::ComputeSpecialCoulGeneral(box,
                                              _atoms_id,
                                              groupVecArray,
                                              _force_function,
@@ -643,7 +617,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
   }
   else
   {  
-    RunWorklet::ComputeSpecialCoul(vLength, _atoms_id, groupVecArray, _force_function, _topology, _locator, _spec_coul_force);
+    RunWorklet::ComputeSpecialCoul(box, _atoms_id, groupVecArray, _force_function, _topology, _locator, _spec_coul_force);
   }
   return _spec_coul_force;
 }
@@ -723,7 +697,8 @@ void ExecutionNVT::SetForceFunction()
     auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
     auto volume = _para.GetParameter<Real>(PARA_VOLUME);
     auto vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-    _force_function.SetParameters(cut_off, _alpha, volume, vlength, _Kmax);
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+    _force_function.SetParameters(cut_off, _alpha, volume, vlength, box, _Kmax);
   }
 
   if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "EAM")
@@ -773,44 +748,10 @@ void ExecutionNVT::InitParameters()
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
 }
 
-//void ExecutionNVT::InitField()
-//{
-//  ExecutionMD::InitField();
-//  _para.AddField(field::position_flag, ArrayHandle<Id3>{});
-//  _para.AddField(field::bond_atom_id, ArrayHandle<Id>{});
-//  _para.AddField(field::bond_type, ArrayHandle<Id>{});
-//  _para.AddField(field::bond_coeffs_k, ArrayHandle<Real>{});
-//  _para.AddField(field::bond_coeffs_equilibrium, ArrayHandle<Real>{});
-//  _para.AddField(field::angle_atom_id, ArrayHandle<Id>{});
-//  _para.AddField(field::angle_type, ArrayHandle<Id>{});
-//  _para.AddField(field::angle_coeffs_k, ArrayHandle<Real>{});
-//  _para.AddField(field::angle_coeffs_equilibrium, ArrayHandle<Real>{});
-//  _para.AddField(field::atom_id_center, ArrayHandle<Id>{});
-//  _para.AddField(field::atom_id_target, ArrayHandle<Id>{});
-//  _para.AddField(field::pts_type, ArrayHandle<Id>{});
-//  _para.AddField(field::center_position, ArrayHandle<Vec3f>{});
-//  _para.AddField(field::target_position, ArrayHandle<Vec3f>{});
-//  _para.AddField(field::epsilon, ArrayHandle<Real>{});
-//  _para.AddField(field::sigma, ArrayHandle<Real>{});
-//  _para.AddField(field::signal_atoms_id, ArrayHandle<Id>{});
-//  _para.AddField(field::special_source_array, ArrayHandle<Id>{});
-//  _para.AddField(field::special_offsets_array, ArrayHandle<Id>{});
-//
-//  _para.AddField(field::dihedrals_atom_id, ArrayHandle<Id>{});
-//  _para.AddField(field::dihedrals_type, ArrayHandle<Id>{});
-//  _para.AddField(field::dihedrals_coeffs_k, ArrayHandle<Real>{});
-//  _para.AddField(field::dihedrals_coeffs_sign, ArrayHandle<vtkm::IdComponent>{});
-//  _para.AddField(field::dihedrals_coeffs_multiplicity, ArrayHandle<vtkm::IdComponent>{});
-//
-//  _para.AddField(field::position_flag, ArrayHandle<Id3>{});
-//}
-
 void ExecutionNVT::TimeIntegration() {}
 
 void ExecutionNVT::ConstraintA()
 {
-  //vtkm::cont::Timer timer4ConstraintA;
-  //timer4ConstraintA.Start();
   auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
   auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
 
@@ -824,8 +765,7 @@ void ExecutionNVT::ConstraintA()
   auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
 
   Invoker{}(
-    MolecularWorklet::NewConstraintAWaterBondAngleWorklet{
-      _Vlength, _dt, _unit_factor._fmt2v, range },
+    MolecularWorklet::NewConstraintAWaterBondAngleWorklet{ _box, _dt, _unit_factor._fmt2v, range },
     anglelist_group,
     _old_position,
     _old_velocity,
@@ -840,8 +780,6 @@ void ExecutionNVT::ConstraintA()
 
 void ExecutionNVT::ConstraintB()
 {
-  //vtkm::cont::Timer timer4ConstraintB;
-  //timer4ConstraintB.Start();
   auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
   auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
 
@@ -853,8 +791,7 @@ void ExecutionNVT::ConstraintB()
   };
 
   Invoker{}(
-    MolecularWorklet::NewConstraintBWaterBondAngleWorklet{
-      _Vlength, _dt, _unit_factor._fmt2v, range },
+    MolecularWorklet::NewConstraintBWaterBondAngleWorklet{ _box, _dt, _unit_factor._fmt2v, range },
     anglelist_group,
     _position,
     _old_velocity,
@@ -869,48 +806,34 @@ void ExecutionNVT::ConstraintB()
 
 void ExecutionNVT::ReadPotentialFile(std::ifstream& input_file)
 {
-  // 检查文件是否打开成功
   if (!input_file.is_open())
   {
     std::cerr << "Unable to open the file." << std::endl;
   }
-
-  // 跳过前两行
   for (int i = 0; i < 2; ++i)
   {
     input_file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
-
-  // 开始读取第三行的值
   input_file >> file.nrho >> file.drho >> file.nr >> file.dr >> file.cut_off;
 
-  //
   file.frho.resize(file.nrho + 1);
   file.zr.resize(file.nr + 1);
   file.rhor.resize(file.nrho + 1);
-
-  // 读取并保存 frho 数组
 
   for (int i = 0; i < file.nrho; ++i)
   {
     input_file >> file.frho[i];
   }
 
-  // 读取并保存 zr 数组
-
   for (int i = 0; i < file.nr; ++i)
   {
     input_file >> file.zr[i];
   }
 
-  // 读取并保存 rhor 数组
-
   for (int i = 0; i < file.nrho; ++i)
   {
     input_file >> file.rhor[i];
   }
-
-  // 关闭文件
   input_file.close();
 }
 
@@ -920,7 +843,6 @@ void ExecutionNVT::file2array()
 {
   Id i, j, k, m, n;
   Real sixth = 1.0 / 6.0;
-  // auto ntypes = _header._num_atoms_type;
 
   Real rmax;
   dr = drho = rmax = rhomax = 0.0;
@@ -1014,7 +936,7 @@ void ExecutionNVT::interpolate(Id n, Real delta, std::vector<Real>& f, std::vect
   }
 
   spline[1][5] = spline[2][6] -
-    spline[1][6]; //f'(x) = (f(x + h) - f(x)) / h    [5] 为一阶导数的系数， 能量表达式的系数
+    spline[1][6]; //f'(x) = (f(x + h) - f(x)) / h    [5] is the coefficient of the first derivative(energy expression)
   spline[2][5] = 0.5 * (spline[3][6] - spline[1][6]);
   spline[n - 1][5] = 0.5 * (spline[n][6] - spline[n - 2][6]);
   spline[n][5] = spline[n][6] - spline[n - 1][6];
@@ -1023,27 +945,28 @@ void ExecutionNVT::interpolate(Id n, Real delta, std::vector<Real>& f, std::vect
   {
     spline[m][5] =
       ((spline[m - 2][6] - spline[m + 2][6]) + 8.0 * (spline[m + 1][6] - spline[m - 1][6])) /
-      12.0; //使用更远的样本点以获得更准确的估计
+      12.0; //further sample points for a more accurate estimate
   }
 
   for (int m = 1; m <= n - 1; m++)
   {
     spline[m][4] = 3.0 * (spline[m + 1][6] - spline[m][6]) - 2.0 * spline[m][5] -
-      spline[m + 1][5]; //[4] 为二阶导数的系数
+      spline[m + 1][5]; //[4] is the coefficient of the second derivative
     spline[m][3] = spline[m][5] + spline[m + 1][5] -
-      2.0 * (spline[m + 1][6] - spline[m][6]); // [3]为三阶导数的系数
+      2.0 * (spline[m + 1][6] - spline[m][6]); // [3] is the coefficient of the third derivative
   }
 
   spline[n][4] = 0.0;
-  spline[n][3] = 0.0; //最后一个样本点处的二阶和三阶导数的系数为零,
-    //为了使插值曲线在两端更平滑，可以将边界处的高阶导数系数设置为零。
-    //这是因为样条插值通常在内部样本点上使用高阶多项式插值，而在边界处使用较低阶的多项式以确保平滑性。
+  spline[n][3] = 0.0; //The second and third derivative coefficients at the last sample point are zero,
+                      // To make the interpolation curve smoother at both ends, the higher derivative coefficient at the boundary can be set to zero.
+                      // This is because spline interpolation typically uses higher-order polynomial interpolation
+                      // at the inner sample points and lower-order polynomials at the boundaries to ensure smoothness.
 
   for (int m = 1; m <= n; m++)
   {
-    spline[m][2] = spline[m][5] / delta;       //二次导数的系数。   力表达式的系数
-    spline[m][1] = 2.0 * spline[m][4] / delta; //一次导数的系数
-    spline[m][0] = 3.0 * spline[m][3] / delta; //零次导数（即函数值）的系数。
+    spline[m][2] = spline[m][5] / delta;       //The coefficient of the second derivative(force expression)  
+    spline[m][1] = 2.0 * spline[m][4] / delta; //The coefficient of the first derivative
+    spline[m][0] = 3.0 * spline[m][3] / delta; //The coefficient of the zero derivative (i.e. the value of the function).
   }
 }
 
@@ -1066,7 +989,6 @@ void ExecutionNVT::SetEAM()
   _para.SetParameter(EAM_PARA_DRHO, drho);
   _para.SetParameter(EAM_PARA_NR, nr);
   _para.SetParameter(EAM_PARA_DR, dr);
-  //
 
   _para.AddField(field::rhor_spline, ArrayHandle<Vec7f>{});
   auto rhor_spline_get = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);

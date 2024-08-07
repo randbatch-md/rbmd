@@ -40,27 +40,29 @@ namespace RunWorklet
                             vtkm::cont::ArrayHandle<Vec3f>& LJforce);
 
    void NearForceVerlet(const Real& cut_off,
-                           const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                           const ContPointLocator& locator,
-                           const ContTopology& topology,
-                           const ContForceFunction& force_function,
-                           const GroupVecType& Group_j,
-                           const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-                           const CoordOffsetType& coord_offset_j,
-                           vtkm::cont::ArrayHandle<Vec3f>& nearforce);
+                         const Vec3f& box,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const GroupVecType& Group_j,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                         const CoordOffsetType& coord_offset_j,
+                         vtkm::cont::ArrayHandle<Vec3f>& nearforce);
 
    void LJForceVerlet(const Real& cut_off,
-                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                        const ContPointLocator& locator,
-                        const ContTopology& topology,
-                        const ContForceFunction& force_function,
-                        const GroupVecType& Group_j,
-                        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-                        const CoordOffsetType& coord_offset_j,
-                        vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+                      const Vec3f& box,
+                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                      const ContPointLocator& locator,
+                      const ContTopology& topology,
+                      const ContForceFunction& force_function,
+                      const GroupVecType& Group_j,
+                      const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                      const CoordOffsetType& coord_offset_j,
+                      vtkm::cont::ArrayHandle<Vec3f>& LJforce);
 
    void EAMfpVerlet(const Real& cut_off,
-                    const Real& Vlength,
+                    const Vec3f& box,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                     const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                     const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
@@ -72,7 +74,7 @@ namespace RunWorklet
                     vtkm::cont::ArrayHandle<Real>& EAM_fp);
 
    void EAMForceVerlet(const Real& cut_off,
-                       const Real& vlength,
+                       const Vec3f& box,
                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                        const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                        const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
@@ -85,7 +87,7 @@ namespace RunWorklet
                        vtkm::cont::ArrayHandle<Vec3f>& force);
 
    void EAM_rho(const Real& eam_cut_off,
-                const Real& Vlength,
+                const Vec3f& box,
                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                 const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                 const ContPointLocator& locator,
@@ -102,7 +104,7 @@ namespace RunWorklet
                vtkm::cont::ArrayHandle<Real>& fp);
 
    void EAM_force(const Real& eam_cut_off,
-                  const Real& Vlength,
+                  const Vec3f& box,
                   const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                   const vtkm::cont::ArrayHandle<Real>& fp,
                   const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
@@ -112,33 +114,35 @@ namespace RunWorklet
                   const ContForceFunction& force_function,
                   vtkm::cont::ArrayHandle<Vec3f>& eam_force);
     
-    void NearForceRBLERF(const Id& rs_num,
-                         const Id& pice_num,
-                         const Real& qqr2e,
-                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                         const ContPointLocator& locator,
-                         const ContTopology& topology,
-                         const ContForceFunction& force_function,
-                         const ContStaticTable& static_table,
-                         const GroupVecType& id_verletlist_group,
-                         const GroupNumType& num_verletlist,
-                         const CoordOffsetType& offset_verletlist_group,
-                         vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+     void NearForceRBLERF(const Id& rs_num,
+                        const Id& pice_num,
+                        const Real& qqr2e,
+                        const Vec3f& box,
+                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                        const ContPointLocator& locator,
+                        const ContTopology& topology,
+                        const ContForceFunction& force_function,
+                        const ContStaticTable& static_table,
+                        const GroupVecType& id_verletlist_group,
+                        const GroupNumType& num_verletlist,
+                        const CoordOffsetType& offset_verletlist_group,
+                        vtkm::cont::ArrayHandle<Vec3f>& corr_force);
 
     void NearForceRBLERFSpecialBonds(const Id& rs_num,
-                                     const Id& pice_num,
-                                     const Real& qqr2e,
-                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                                     const ContPointLocator& locator,
-                                     const ContTopology& topology,
-                                     const ContForceFunction& force_function,
-                                     const ContStaticTable& static_table,
-                                     const GroupVecType& id_verletlist_group,
-                                     const GroupNumType& num_verletlist,
-                                     const CoordOffsetType& offset_verletlist_group,
-                                     const GroupIdIdType& group_ids,
-                                     const GroupRealIdType& group_weights,
-                                     vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+                                      const Id& pice_num,
+                                      const Real& qqr2e,
+                                      const Vec3f& box,
+                                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                      const ContPointLocator& locator,
+                                      const ContTopology& topology,
+                                      const ContForceFunction& force_function,
+                                      const ContStaticTable& static_table,
+                                      const GroupVecType& id_verletlist_group,
+                                      const GroupNumType& num_verletlist,
+                                      const CoordOffsetType& offset_verletlist_group,
+                                      const GroupIdIdType& group_ids,
+                                      const GroupRealIdType& group_weights,
+                                      vtkm::cont::ArrayHandle<Vec3f>& corr_force);
 
     void NearForceRBL(const Id& rs_num,
                       const Id& pice_num,
@@ -154,6 +158,7 @@ namespace RunWorklet
 
     void LJForceRBL(const Id& rs_num,
                     const Id& pice_num,
+                    const Vec3f& box,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                     const ContPointLocator& locator,
                     const ContTopology& topology,
@@ -164,7 +169,7 @@ namespace RunWorklet
                     vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce);
 
     void EAMfp(const Real& rc,
-               const Real& Vlength,
+               const Vec3f& box,
                const Real& rs,
                const Id& rs_num,
                const Id& pice_num,
@@ -179,20 +184,20 @@ namespace RunWorklet
                vtkm::cont::ArrayHandle<Real>& EAM_fp);
 
     void EAMRBLForce(const Real& rc,
-                   const Real& Vlength,
-                   const Real& rs,
-                   const Id& rs_num,
-                   const Id& pice_num,
-                   const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                   const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
-                   const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
-                   const vtkm::cont::ArrayHandle<Real>& EAM_fp,
-                   const ContPointLocator& locator,
-                   const ContForceFunction& force_function,
-                   const GroupVecType& id_verletlist_group,
-                   const GroupNumType& num_verletlist_group,
-                   const CoordOffsetType& offset_verletlist_group,
-                   vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+                     const Vec3f& box,
+                     const Real& rs,
+                     const Id& rs_num,
+                     const Id& pice_num,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                     const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                     const vtkm::cont::ArrayHandle<Real>& EAM_fp,
+                     const ContPointLocator& locator,
+                     const ContForceFunction& force_function,
+                     const GroupVecType& id_verletlist_group,
+                     const GroupNumType& num_verletlist_group,
+                     const CoordOffsetType& offset_verletlist_group,
+                     vtkm::cont::ArrayHandle<Vec3f>& corr_force);
     
     void SumRBLCorrForce(const vtkm::Vec3f corr_value,
                          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& corr_force,
@@ -225,14 +230,14 @@ namespace RunWorklet
                                       const ContForceFunction& force_function,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleNearforce);
 
-    void ComputeSpecialCoul(const Real& Vlength,
+    void ComputeSpecialCoul(const Vec3f& box,
                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                             const GroupVecType& group_vec,
                             const ContForceFunction& force_function,
                             const ContTopology& topology,
                             const ContPointLocator& locator,
                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce);
-    void ComputeSpecialCoulGeneral(const Real& Vlength,
+    void ComputeSpecialCoulGeneral(const Vec3f& box,
                                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                    const GroupVecType& group_vec,
                                    const ContForceFunction& force_function,
@@ -299,7 +304,7 @@ namespace RunWorklet
                                                const vtkm::cont::ArrayHandle<Real>& charge,
                                                vtkm::cont::ArrayHandle<Real>& Density_Real,
                                                vtkm::cont::ArrayHandle<Real>& Density_Image);
-    void ComputePnumberChargeStructureFactor(const Real& _Vlength,
+    void ComputePnumberChargeStructureFactor(const Vec3f& _box,
                                             const Id& pnumber,
                                             const Id& pos_number,
                                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

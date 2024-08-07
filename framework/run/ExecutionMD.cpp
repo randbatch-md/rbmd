@@ -91,7 +91,7 @@ ExecutionMD::ExecutionMD(const Configuration& cfg)
 void ExecutionMD::Init()
 {
   _position = _para.GetFieldAsArrayHandle<Vec3f>(field::position);
-  InitPointLocator(); //
+  InitPointLocator(); 
   SetForceFunction();
   SetTopology();
 
@@ -189,19 +189,6 @@ void ExecutionMD::InitERF()
   }
 }
 
-//void ExecutionMD::InitField()
-//{
-//  _para.AddField(field::charge, ArrayHandle<Real>{});
-//  _para.AddField(field::velocity, ArrayHandle<Vec3f>{});
-//  _para.AddField(field::mass, ArrayHandle<Real>{});
-//  _para.AddField(field::molecule_id, ArrayHandle<Id>{});
-//  _para.AddField(field::atom_id, ArrayHandle<Id>{});
-//  _para.AddField(field::position, ArrayHandle<Vec3f>{});
-//  _para.AddField(field::special_offsets, ArrayHandle<Id>{});
-//  _para.AddField(field::special_weights, ArrayHandle<Real>{});
-//  _para.AddField(field::special_ids, ArrayHandle<Id>{});
-//}
-
 void ExecutionMD::UpdateVerletList() 
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
@@ -239,6 +226,7 @@ void ExecutionMD::ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force)
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
   auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto N = _position.GetNumberOfValues();
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
@@ -275,17 +263,18 @@ void ExecutionMD::ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force)
                                           offset_verletlist_group);
 
   RunWorklet::NearForceRBLERF(rs_num,
-                                 pice_num,
-                                 _unit_factor._qqr2e,
-                                 _atoms_id,
-                                 _locator,
-                                 _topology,
-                                 _force_function,
-                                 _static_table,
-                                 id_verletlist_group,
-                                 num_verletlist_group,
-                                 offset_verletlist_group,
-                                 corr_force);
+                              pice_num,
+                              _unit_factor._qqr2e,
+                              box,
+                              _atoms_id,
+                              _locator,
+                              _topology,
+                              _force_function,
+                              _static_table,
+                              id_verletlist_group,
+                              num_verletlist_group,
+                              offset_verletlist_group,
+                              corr_force);
 }
 
 std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorRBE(Real& _Vlength, ArrayHandle<Vec3f>& _psample)
@@ -295,24 +284,18 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorRBE(Real& _Vlength, 
   ArrayHandle<Real> density_real;
   ArrayHandle<Real> density_image;
 
-  //auto sum = 0.0f;
-  //vtkm::cont::Timer timer;
-  //#pragma omp parallel for
   for (Id i = 0; i < p_number; i++)
   {
     auto kl = _psample.ReadPortal().Get(i);
     kl = 2 * vtkm::Pi() * kl / _Vlength;
     RunWorklet::ComputeChargeStructureFactorComponent(
       kl, _position, _charge, density_real, density_image);
-    //timer.Start();
     Real value_Re =
       vtkm::cont::Algorithm::Reduce(density_real, vtkm::TypeTraits<Real>::ZeroInitialization());
     Real value_Im =
       vtkm::cont::Algorithm::Reduce(density_image, vtkm::TypeTraits<Real>::ZeroInitialization());
-    //sum += timer.GetElapsedTime();
     rhok.push_back({ value_Re, value_Im });
   }
-  //std::cout << "timer: " << sum << std::endl;
   return rhok;
 }
 
@@ -343,7 +326,7 @@ void ExecutionMD::InitParameters()
   _para.SetParameter(PARA_UNIT_FACTOR, _unit_factor);
 }
 
-std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Real& _Vlength,
+std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
                                                                       IdComponent& Kmax)
 {
   std::vector<Vec2f> rhok;
@@ -358,7 +341,10 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Real& _Vlength
         if (!(i == 0 && j == 0 && k == 0))
         {
           Vec3f K = { Real(i), Real(j), Real(k) };
-          K = 2 * vtkm::Pi() * K / _Vlength;
+          //
+          K = { Real(2 * vtkm::Pi() * K[0] / box[0]),
+                Real(2 * vtkm::Pi() * K[1] / box[1]),
+                Real(2 * vtkm::Pi() * K[2] / box[2]) };
           RunWorklet::ComputeChargeStructureFactorComponent(
             K, _position, _charge, density_real, density_image);
           Real value_Re = vtkm::cont::Algorithm::Reduce(
@@ -381,10 +367,10 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
  
 
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
- 
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   ArrayHandle<Vec2f> new_whole_rhok;
-  ComputeNewChargeStructureFactorRBE(Vlength, psample, new_whole_rhok);
+  ComputeNewChargeStructureFactorRBE(box, psample, new_whole_rhok);
   
   RunWorklet::ComputeNewRBEForce(RBE_P,
                                     _atoms_id,
@@ -397,7 +383,7 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
 
 }
 
-void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
+void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
                                                                 ArrayHandle<Vec3f>& _psample,
                                                                 ArrayHandle<Vec2f>& new_rhok)
 {
@@ -408,16 +394,15 @@ void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
   
 
 
-  RunWorklet::ComputePnumberChargeStructureFactor(_Vlength,
+  RunWorklet::ComputePnumberChargeStructureFactor(_box,
                                                      p_number,
                                                      N,
                                                      _atoms_id,
                                                      _position,
                                                      _charge,
                                                      _psample,
-                                                     //psamplekey,
-                                                     /*rhok_Re,*/_rhok_Re,
-                                                     /*rhok_Im*/_rhok_Im);
+                                                     _rhok_Re,
+                                                     _rhok_Im);
  
 
   vtkm::cont::ArrayHandle<Id> psamplekey_out;
@@ -425,10 +410,8 @@ void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
   vtkm::cont::ArrayHandle<Real> rhok_Im_reduce;
 
    
-  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
-    /*psamplekey,*/ _psamplekey, /*rhok_Re,*/ _rhok_Re, psamplekey_out, rhok_Re_reduce, vtkm::Add());
-  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(
-    /*psamplekey,*/ _psamplekey, /*rhok_Im,*/ _rhok_Im, psamplekey_out, rhok_Im_reduce, vtkm::Add());
+  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(_psamplekey, _rhok_Re, psamplekey_out, rhok_Re_reduce, vtkm::Add());
+  vtkm::cont::Algorithm::ReduceByKey<Id, Real>(_psamplekey, _rhok_Im, psamplekey_out, rhok_Im_reduce, vtkm::Add());
  
 
 
@@ -441,7 +424,8 @@ void  ExecutionMD::ComputeNewChargeStructureFactorRBE(Real& _Vlength,
 void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force)
 {
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
-  auto rhok = ComputeChargeStructureFactorEwald(Vlength, Kmax);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  auto rhok = ComputeChargeStructureFactorEwald(box, Kmax);
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   RunWorklet::ComputeNewFarElectrostatics(
     Kmax, _atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force);
@@ -455,6 +439,7 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
 
   auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto rho_system = _para.GetParameter<Real>(PARA_RHO);
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
@@ -510,27 +495,12 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   
   _EleNearPairtimer.Start();
 
-  // 当前默认使用ERF 注意：这里要看NearForceRBLERFSpecialBonds和NearForceRBLERF
-  //if (_use_erf == true)
-  //{
-   // RunWorklet::NearForceRBLERF(rs_num,
-   //                                pice_num,
-   //                                _unit_factor._qqr2e,
-   //                                _atoms_id,
-   //                                _locator,
-   //                                _topology,
-   //                                _force_function,
-   //                                _static_table,
-   //                                id_verletlist_group,
-   //                                num_verletlist_group,
-   //                                offset_verletlist_group,
-   //                                corr_force);
-  // 这里的判断待定！！
   if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
   {
     RunWorklet::NearForceRBLERFSpecialBonds(rs_num,
                                             pice_num,
                                             _unit_factor._qqr2e,
+                                            box,
                                             _atoms_id,
                                             _locator,
                                             _topology,
@@ -548,6 +518,7 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
     RunWorklet::NearForceRBLERF(rs_num,
                                 pice_num,
                                 _unit_factor._qqr2e,
+                                box,
                                 _atoms_id,
                                 _locator,
                                 _topology,
@@ -568,6 +539,7 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   auto N = _position.GetNumberOfValues();
   vtkm::cont::ArrayHandle<Vec3f> corr_ljforce;
   corr_ljforce.Allocate(N);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
@@ -616,15 +588,16 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
                                           offset_verletlist_group);
 
   RunWorklet::LJForceRBL(rs_num,
-                            pice_num,
-                            _atoms_id,
-                            _locator,
-                            _topology,
-                            _force_function,
-                            id_verletlist_group,
-                            num_verletlist_group,
-                            offset_verletlist_group,
-                            corr_ljforce);
+                         pice_num,
+                         box,
+                         _atoms_id,
+                         _locator,
+                         _topology,
+                         _force_function,
+                         id_verletlist_group,
+                         num_verletlist_group,
+                         offset_verletlist_group,
+                         corr_ljforce);
 
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
@@ -634,6 +607,7 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
 void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto N = _position.GetNumberOfValues();
   auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
@@ -655,37 +629,22 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
 
   RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
-  // 默认使用erf
-  //if (_use_erf == true)
-  //{
-    //RunWorklet::NearForceVerletERF(cut_off,
-    //                                  _atoms_id,
-    //                                  _locator,
-    //                                  _topology,
-    //                                  _force_function,
-    //                                  _static_table,
-    //                                  id_verletlist_group,
-    //                                  num_verletlist,
-    //                                  offset_verletlist_group,
-    //                                  nearforce);
-  //}
-  //else
-  //{
-    RunWorklet::NearForceVerlet(cut_off,
-                                   _atoms_id,
-                                   _locator,
-                                   _topology,
-                                   _force_function,
-                                   id_verletlist_group,
-                                   num_verletlist,
-                                   offset_verletlist_group,
-                                   nearforce);
-  //}
+  RunWorklet::NearForceVerlet(cut_off,
+                              box,
+                              _atoms_id,
+                              _locator,
+                              _topology,
+                              _force_function,
+                              id_verletlist_group,
+                              num_verletlist,
+                              offset_verletlist_group,
+                              nearforce);
 }
 
 void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto N = _position.GetNumberOfValues();
   auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
@@ -708,6 +667,7 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
   RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::LJForceVerlet(cut_off,
+                            box,
                             _atoms_id,
                             _locator,
                             _topology,
@@ -729,6 +689,7 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
 {
   ArrayHandle<Real> fp;
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
   auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
   auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
@@ -750,7 +711,6 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
   Real random_num = _para.GetParameter<Real>(PARA_NEIGHBOR_SAMPLE_NUM);
   Real random_rate = random_num / (rcs_num);
   Id pice_num = std::ceil(1.0 / random_rate);
-  //Id cutoff_num = rs_num + random_num;
   Id cutoff_num = rc_num + random_num;
   Id verletlist_num = N * cutoff_num;
 
@@ -779,7 +739,7 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
                                           offset_verletlist_group);
 
   RunWorklet::EAMfp(rc,
-                    Vlength,
+                    box,
                     rs,
                     rs_num,
                     pice_num,
@@ -794,7 +754,7 @@ void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
                     fp);
 
  RunWorklet::EAMRBLForce(rc,
-                         Vlength,
+                          box,
                          rs,
                          rs_num,                            
                          pice_num,
@@ -818,6 +778,7 @@ void ExecutionMD::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
 {
  ArrayHandle<Real> fp;
  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+ auto box = _para.GetParameter<Vec3f>(PARA_BOX);
  auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
  auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
  auto z2r_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::z2r_spline);
@@ -848,7 +809,7 @@ void ExecutionMD::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
     cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::EAMfpVerlet(cut_off,
-                             Vlength,
+                          box,
                              _atoms_id,
                              rhor_spline,
                              frho_spline,
@@ -860,7 +821,7 @@ void ExecutionMD::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
                              fp);
 
   RunWorklet::EAMForceVerlet(cut_off,
-                                Vlength,
+                             box,
                                _atoms_id,
                                 rhor_spline,
                                 z2r_spline,
@@ -877,6 +838,7 @@ void ExecutionMD::ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force)
 {
   auto cut_off = _para.GetParameter<Real>(EAM_PARA_CUTOFF);
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   auto rhor_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::rhor_spline);
   auto frho_spline = _para.GetFieldAsArrayHandle<Vec7f>(field::frho_spline);
@@ -887,14 +849,14 @@ void ExecutionMD::ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force)
 
   //1:compute _EAM_rho   = density at each atom
   RunWorklet::EAM_rho(
-    cut_off, Vlength, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
+    cut_off, box, _atoms_id, rhor_spline, _locator, _topology, _force_function, EAM_rho);
 
   // 2:compute fp    = derivative of embedding energy at each atom
   RunWorklet::EAM_fp(_atoms_id, EAM_rho, frho_spline, _locator, _topology, _force_function, fp);
 
   // 3:compute force  = EAM_force
   RunWorklet::EAM_force(cut_off,
-                           Vlength,
+                        box,
                            _atoms_id,
                            fp,
                            rhor_spline,

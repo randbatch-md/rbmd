@@ -11,7 +11,6 @@ void ExecutionNVE::Init() {}
 
 void ExecutionNVE::Execute()
 {
-  //_timer.Start();
 
 }
 

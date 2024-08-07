@@ -1,0 +1,88 @@
+﻿{
+  "init_configuration": {
+
+    "read_data": {
+      "file": "rbmd.data",
+      "unit": "REAL", //LJ ,REAL
+      "atom_style": "full", //支持atomic，charge,full
+      "velocity_type": "GAUSS"
+    }
+
+    //"inbuild": {
+    //  "dims": [ 10, 10, 10 ],
+    //  "x_range": [ 0.0, 10 ],
+    //  "y_range": [ 0.0, 10 ],
+    //  "z_range": [ 0.0, 10 ],
+    //  "velocity_type": "GAUSS",
+    //  "unit": "LJ"
+    //}
+  },
+
+  "hyper_parameters": {
+    "force_field": {
+      "type": "CVFF"//,  OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file)
+      //"potential_file": "/path/to/"
+    },
+
+    "neighbor": {
+      "type": "RBL", //RBL,VERLET-LIST
+      "cut_off": 12,
+      "r_core": 6,
+      "neighbor_sample_num": 50
+    },
+
+    "coulomb": {
+      "type": "RBE", //  RBE,EWALD
+      "coulomb_sample_num": 100,
+      "alpha": 0.1,
+      "kmax": 2
+    },
+
+    "extend": {
+      "fix_shake": true,
+      "special_bonds": [ 0, 0, 0 ]
+    }
+  },
+
+  "execution": {
+    "ensemble": "NVT", // "NVE","NVT" ,"NPT"
+    "temperature":[ 298.0, 298.0, 5],  // 5= 10*dt;
+	"pressure" :[1.0,1.0,1000],
+    "temp_ctrl_type": "BERENDSEN", //BERENDSEN ，NOSE_HOOVER                                      
+    "press_ctrl_type": "Parrinello-Rahman", //Berendsen ,stochastic cell rescaling ,Parrinello-Rahman    
+    "timestep": 0.5,
+    "num_steps": 10000 //run 
+  },
+
+  "outputs": {
+
+    "thermo_out": { 
+      "interval": 1
+    },
+
+    "rdf_out": {
+      "interval": 10,
+      "radius": 10,
+      "dr": 0.1,
+      "statistics_rdf_steps": 1000,
+      "atoms_pair": [[ 0, 0 ],[ 1, 1 ]]
+    },
+    
+    "msd_out": {
+      "interval": 1,
+      "start_step": 0,
+      "end_step": 10000
+    },
+    
+    "vacf_out": {
+      "interval": 1,
+      "start_step": 0,
+      "end_step": 10000
+    },
+    
+    "trajectory_out": {
+      "interval": 100
+    }
+
+  }
+}

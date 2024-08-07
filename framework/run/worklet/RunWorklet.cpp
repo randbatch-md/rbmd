@@ -143,8 +143,9 @@ namespace RunWorklet
 
     struct ComputeNearForceVerletWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeNearForceVerletWorklet(const Real& cut_off)
+      ComputeNearForceVerletWorklet(const Real& cut_off, const Vec3f& box)
         : _cut_off(cut_off)
+        , _box(box)
       {
       }
 
@@ -185,7 +186,8 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
           ele_force += force_function.ComputeNearEnergyForce(p_i, p_j, charge_pi, charge_pj);
 
@@ -205,12 +207,14 @@ namespace RunWorklet
         nearforce = LJ_force + ele_force;
       }
       Real _cut_off;
+      Vec3f _box;
     };
 
     struct ComputeLJForceVerletWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeLJForceVerletWorklet(const Real& cut_off)
+      ComputeLJForceVerletWorklet(const Real& cut_off, const Vec3f& box)
         : _cut_off(cut_off)
+        , _box(box)
       {
       }
 
@@ -250,7 +254,8 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
           if (molecular_id_i == molecular_id_j)
             return;
@@ -268,13 +273,14 @@ namespace RunWorklet
         LJforce = LJ_force;
       }
       Real _cut_off;
+      Vec3f _box;
     };
 
     struct ComputeEAMfpVerletWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMfpVerletWorklet(const Real& Vlength,const Real& rc)
-        : _rc(rc) 
-        ,_Vlength(Vlength)
+      ComputeEAMfpVerletWorklet(const Real& rc, const Vec3f& box)
+        : _rc(rc)
+        , _box(box)
       {
       }
 
@@ -306,7 +312,7 @@ namespace RunWorklet
         Real rho = 0;
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           rho += force_function.ComputeEAMrho(_rc, r_ij, rhor_spline);
         };
 
@@ -323,14 +329,14 @@ namespace RunWorklet
         EAM_fp = force_function.ComputeEAMfp(atoms_id, rho, frho_spline);
       }
       Real _rc;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeEAMForceVerletWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMForceVerletWorklet(const Real& cut_off, const Real& Vlength)
+      ComputeEAMForceVerletWorklet(const Real& cut_off, const Vec3f& box)
         : _rc(cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -367,7 +373,7 @@ namespace RunWorklet
         auto function_force =
           [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
           rc_force += force_function.ComputeEAMforce(_rc, atoms_id, pts_id_j, r_ij, EAM_fp, rhor_spline, z2r_spline);
         };
 
@@ -381,14 +387,14 @@ namespace RunWorklet
         force = rc_force;
       }
       Real _rc;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeEAMrhoWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Real& Vlength)
+      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Vec3f& box)
         : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -413,14 +419,14 @@ namespace RunWorklet
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           rho += force_function.ComputeEAMrho(_eam_cut_off, r_ij, rhor_spline);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
         EAM_rho = rho;
       }
       Real _eam_cut_off;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeEAMfpWorklet : vtkm::worklet::WorkletMapField
@@ -450,9 +456,9 @@ namespace RunWorklet
 
     struct ComputeEAMforceWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMforceWorklet(const Real& eam_cut_off, const Real& Vlength)
+      ComputeEAMforceWorklet(const Real& eam_cut_off, const Vec3f& box)
         : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
 
@@ -480,7 +486,7 @@ namespace RunWorklet
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           force += force_function.ComputeEAMforce(
             _eam_cut_off, atoms_id, pts_id_j, r_ij, fp, rhor_spline, z2r_spline);
         };
@@ -488,7 +494,7 @@ namespace RunWorklet
         eam_force = force;
       }
       Real _eam_cut_off;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeLJForceWithPeriodicBCWorklet : vtkm::worklet::WorkletMapField
@@ -677,10 +683,14 @@ namespace RunWorklet
 
     struct ComputeNearForceRBLERFWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeNearForceRBLERFWorklet(const Id& rs_num, const Id& pice_num, const Real& qqr2e)
+      ComputeNearForceRBLERFWorklet(const Id& rs_num,
+                                    const Id& pice_num,
+                                    const Real& qqr2e,
+                                    const Vec3f& box)
         : _rs_num(rs_num)
         , _pice_num(pice_num)
         , _qqr2e(qqr2e)
+        , _box(box)
       {
       }
 
@@ -725,7 +735,8 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
           auto charge_pj = topology.GetCharge(pts_id_j);
           Real dispij = vtkm::Magnitude(r_ij);
@@ -742,7 +753,7 @@ namespace RunWorklet
           }
           if (flag == 2)
           {
-            rcs_force_eleforce += _pice_num * force_function.ComputeNearEnergyForceRcsERF(p_i, p_j, charge_pi, charge_pj, table_pij, rs);
+            force_function.ComputeNearEnergyForceERF_box(r_ij, charge_pi, charge_pj, table_pij);
 
             if (molecular_id_i == molecular_id_j)
               return;
@@ -773,16 +784,19 @@ namespace RunWorklet
       Id _rs_num;
       Id _pice_num;
       Real _qqr2e;
+      Vec3f _box;
     };
 
     struct ComputeNearForceRBLERFSpecialBondsWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeNearForceRBLERFSpecialBondsWorklet(const Id& rs_num,
                                                 const Id& pice_num,
-                                                const Real& qqr2e)
+                                                const Real& qqr2e,
+                                                const Vec3f& box)
         : _rs_num(rs_num)
         , _pice_num(pice_num)
         , _qqr2e(qqr2e)
+        , _box(box)
       {
       }
 
@@ -837,7 +851,8 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
           auto charge_pj = topology.GetCharge(pts_id_j);
           Real dispij = vtkm::Magnitude(r_ij);
@@ -910,6 +925,7 @@ namespace RunWorklet
       Id _rs_num;
       Id _pice_num;
       Real _qqr2e;
+      Vec3f _box;
     };
 
     struct ComputeNearForceRBLWorklet : vtkm::worklet::WorkletMapField
@@ -1010,12 +1026,12 @@ namespace RunWorklet
    struct ComputeEAMfp_Worklet : vtkm::worklet::WorkletMapField
     {
       ComputeEAMfp_Worklet(const Real& rc,
-                           const Real& Vlength,
+                           const Vec3f& box,
                            const Real& rs,
                            const Id& rs_num,
                            const Id& pice_num)
         : _rc(rc)
-        , _Vlength(Vlength)
+        , _box(box)
         , _rs(rs)
         , _rs_num(rs_num)
         , _pice_num(pice_num)
@@ -1052,7 +1068,7 @@ namespace RunWorklet
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
         {
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           if (flag == 1)
           {
             rho += force_function.ComputeEAMrho(_rc, r_ij, rhor_spline);
@@ -1080,7 +1096,7 @@ namespace RunWorklet
         EAM_fp = force_function.ComputeEAMfp(atoms_id, rho, frho_spline);
       }
       Real _rc;
-      Real _Vlength;
+      Vec3f _box;
       Real _rs;
       Id _rs_num;
       Id _pice_num;
@@ -1089,12 +1105,12 @@ namespace RunWorklet
     struct ComputeEAMRBLWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeEAMRBLWorklet(const Real& rc,
-                              const Real& Vlength,
-                              const Real& rs,
-                              const Id& rs_num,
-                              const Id& pice_num)
+                           const Vec3f& box,
+                           const Real& rs,
+                           const Id& rs_num,
+                           const Id& pice_num)
         : _rc(rc)
-        , _Vlength(Vlength)
+        , _box(box)
         , _rs(rs)
         , _rs_num(rs_num)
         , _pice_num(pice_num)
@@ -1135,7 +1151,7 @@ namespace RunWorklet
 
          auto function_force = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
          {
-           auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+           auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
            if (flag == 1)
            {
              rc_force += force_function.ComputeEAMforce(
@@ -1167,7 +1183,7 @@ namespace RunWorklet
          corr_force = rc_force + rcs_force;
       }
       Real _rc;
-      Real _Vlength;
+      Vec3f _box;
       Real _rs;
       Id _rs_num;
       Id _pice_num;
@@ -1175,9 +1191,10 @@ namespace RunWorklet
 
     struct ComputeLJForceRBLWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeLJForceRBLWorklet(const Id& rs_num, const Id& pice_num)
+      ComputeLJForceRBLWorklet(const Id& rs_num, const Id& pice_num, const Vec3f& box)
         : _rs_num(rs_num)
         , _pice_num(pice_num)
+        , _box(box)
       {
       }
 
@@ -1220,7 +1237,8 @@ namespace RunWorklet
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
           if (flag == 1)
           {
@@ -1254,6 +1272,7 @@ namespace RunWorklet
       }
       Id _rs_num;
       Id _pice_num;
+      Vec3f _box;
     };
 
     struct SumRBLCorrForceWorklet : vtkm::worklet::WorkletMapField
@@ -1340,8 +1359,8 @@ namespace RunWorklet
 
     struct ComputeSpecialCoulWorklet : vtkm ::worklet::WorkletMapField
        {
-         ComputeSpecialCoulWorklet(const Real Vlength)
-           : _Vlength(Vlength)
+          ComputeSpecialCoulWorklet(const Vec3f box)
+            : _box(box)
          {
          }
 
@@ -1380,7 +1399,7 @@ namespace RunWorklet
 
                auto atoms_charge_j = topology.GetCharge(id);
                auto atoms_coord_j = locator.GetPtsPosition(id);
-               Vec3f rij = locator.MinDistanceIf(atoms_coord_i, atoms_coord_j, _Vlength);
+               Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
                Real dis_ij = vtkm::Magnitude(rij);
                Real dis_ij3 = vtkm::Pow(dis_ij, 3);
                Real force_component = -332.06371 * charge_p_i * atoms_charge_j / dis_ij3;
@@ -1388,13 +1407,13 @@ namespace RunWorklet
              }
            }
          }
-         Real _Vlength;
+         Vec3f _box;
        };
 
     struct ComputeSpecialCoulGeneralWorklet : vtkm ::worklet::WorkletMapField
        {
-      ComputeSpecialCoulGeneralWorklet(const Real Vlength)
-        : _Vlength(Vlength)
+         ComputeSpecialCoulGeneralWorklet(const Vec3f box)
+           : _box(box)
       {
       }
        
@@ -1439,7 +1458,7 @@ namespace RunWorklet
                 
                 auto atoms_charge_j = topology.GetCharge(id);
                 auto atoms_coord_j = locator.GetPtsPosition(id);
-                Vec3f rij = locator.MinDistanceIf(atoms_coord_i, atoms_coord_j, _Vlength);
+                Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
                 Real dis_ij = vtkm::Magnitude(rij);
                 Real dis_ij3 = vtkm::Pow(dis_ij, 3);
                 Real force_component = -332.06371 * charge_p_i * atoms_charge_j / dis_ij3;
@@ -1457,7 +1476,7 @@ namespace RunWorklet
               }
             } 
          }
-         Real _Vlength;
+         Vec3f _box;
        };
 
     struct ComputeNewRBEForceWorklet : vtkm ::worklet::WorkletMapField
@@ -1570,8 +1589,10 @@ namespace RunWorklet
 
     struct ComputePnumberChargeStructureFactorWorklet : vtkm ::worklet::WorkletMapField
     {
-      ComputePnumberChargeStructureFactorWorklet(const Real& Vlength, const Id& pnumber, const Id& pos_number)
-        : _Vlength(Vlength)
+      ComputePnumberChargeStructureFactorWorklet(const Vec3f& box,
+                                                 const Id& pnumber,
+                                                 const Id& pos_number)
+        : _box(box)
         , _pnumber(pnumber)
         , _pos_num(pos_number)
       {
@@ -1606,7 +1627,10 @@ namespace RunWorklet
         for (Id i = 0; i < _pnumber; i++)
         {
           auto kl = psample.Get(i);
-          kl = 2 * vtkm::Pi() * kl / _Vlength;
+          for (Id j = 0; j < 3; j++)
+          {
+                kl[j] = 2 * vtkm::Pi() * kl[j] / _box[j];
+          }
 
           auto index = atoms_id + i * _pos_num;
           //psamplekey_group.Set(index,i);
@@ -1621,7 +1645,7 @@ namespace RunWorklet
       }
 
 
-      Real _Vlength;
+      Vec3f _box;
       Id _pnumber;
       Id _pos_num;
     };
@@ -1917,16 +1941,17 @@ namespace RunWorklet
     }
 
     void NearForceVerlet(const Real& cut_off,
-                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                            const ContPointLocator& locator,
-                            const ContTopology& topology,
-                            const ContForceFunction& force_function,
-                            const GroupVecType& Group_j,
-                            const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-                            const CoordOffsetType& coord_offset_j,
-                            vtkm::cont::ArrayHandle<Vec3f>& nearforce)
+                         const Vec3f& box,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const GroupVecType& Group_j,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                         const CoordOffsetType& coord_offset_j,
+                         vtkm::cont::ArrayHandle<Vec3f>& nearforce)
     {
-      vtkm::cont::Invoker{}(ComputeNearForceVerletWorklet{ cut_off },
+      vtkm::cont::Invoker{}(ComputeNearForceVerletWorklet{ cut_off, box },
                             atoms_id,
                             locator,
                             topology,
@@ -1936,18 +1961,18 @@ namespace RunWorklet
                             coord_offset_j,
                             nearforce);
     }
-
     void LJForceVerlet(const Real& cut_off,
-                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                         const ContPointLocator& locator,
-                         const ContTopology& topology,
-                         const ContForceFunction& force_function,
-                         const GroupVecType& Group_j,
-                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-                         const CoordOffsetType& coord_offset_j,
-                         vtkm::cont::ArrayHandle<Vec3f>& LJforce)
+                       const Vec3f& box,
+                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                       const ContPointLocator& locator,
+                       const ContTopology& topology,
+                       const ContForceFunction& force_function,
+                       const GroupVecType& Group_j,
+                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                       const CoordOffsetType& coord_offset_j,
+                       vtkm::cont::ArrayHandle<Vec3f>& LJforce)
     {
-      vtkm::cont::Invoker{}(ComputeLJForceVerletWorklet{ cut_off },
+      vtkm::cont::Invoker{}(ComputeLJForceVerletWorklet{ cut_off, box },
                             atoms_id,
                             locator,
                             topology,
@@ -1959,7 +1984,7 @@ namespace RunWorklet
     }
 
     void EAMfpVerlet(const Real& cut_off,
-                     const Real& Vlength,
+                     const Vec3f& box,
                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                      const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                      const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
@@ -1970,7 +1995,7 @@ namespace RunWorklet
                      const CoordOffsetType& coord_offset_j,
                      vtkm::cont::ArrayHandle<Real>& EAM_fp)
     {
-      vtkm::cont::Invoker{}(ComputeEAMfpVerletWorklet{ cut_off, Vlength },
+      vtkm::cont::Invoker{}(ComputeEAMfpVerletWorklet{ cut_off, box },
                             atoms_id,
                             rhor_spline,
                             frho_spline,
@@ -1983,7 +2008,7 @@ namespace RunWorklet
     }
 
     void EAMForceVerlet(const Real& cut_off,
-                        const Real& vlength,
+                        const Vec3f& box,
                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                         const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                         const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
@@ -1995,7 +2020,7 @@ namespace RunWorklet
                         const CoordOffsetType& coord_offset_j,
                         vtkm::cont::ArrayHandle<Vec3f>& force)
     {
-      vtkm::cont::Invoker{}(ComputeEAMForceVerletWorklet{ cut_off, vlength },
+      vtkm::cont::Invoker{}(ComputeEAMForceVerletWorklet{ cut_off, box },
                             atoms_id,
                             rhor_spline,
                             z2r_spline,
@@ -2009,7 +2034,7 @@ namespace RunWorklet
     }
 
     void EAM_rho(const Real& eam_cut_off,
-                 const Real& Vlength,
+                 const Vec3f& box,
                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                  const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                  const ContPointLocator& locator,
@@ -2017,7 +2042,7 @@ namespace RunWorklet
                  const ContForceFunction& force_function,
                  vtkm::cont::ArrayHandle<Real>& EAM_rho)
     {
-      vtkm::cont::Invoker{}(ComputeEAMrhoWorklet{ eam_cut_off, Vlength },
+      vtkm::cont::Invoker{}(ComputeEAMrhoWorklet{ eam_cut_off, box },
                             atoms_id,
                             rhor_spline,
                             locator,
@@ -2045,7 +2070,7 @@ namespace RunWorklet
     }
 
     void EAM_force(const Real& eam_cut_off,
-                   const Real& Vlength,
+                   const Vec3f& box,
                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                    const vtkm::cont::ArrayHandle<Real>& fp,
                    const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
@@ -2056,7 +2081,7 @@ namespace RunWorklet
                    vtkm::cont::ArrayHandle<Vec3f>& eam_force)
     {
 
-      vtkm::cont::Invoker{}(ComputeEAMforceWorklet{ eam_cut_off, Vlength },
+      vtkm::cont::Invoker{}(ComputeEAMforceWorklet{ eam_cut_off, box },
                             atoms_id,
                             fp,
                             rhor_spline,
@@ -2067,59 +2092,62 @@ namespace RunWorklet
                             eam_force);
     }
 
-     void NearForceRBLERF(const Id& rs_num,
-                          const Id& pice_num,
-                          const Real& qqr2e,
-                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                          const ContPointLocator& locator,
-                          const ContTopology& topology,
-                          const ContForceFunction& force_function,
-                          const ContStaticTable& static_table,
-                          const GroupVecType& id_verletlist_group,
-                          const GroupNumType& num_verletlist,
-                          const CoordOffsetType& offset_verletlist_group,
-                          vtkm::cont::ArrayHandle<Vec3f>& corr_force)
-     {
-      vtkm::cont::Invoker{}(ComputeNearForceRBLERFWorklet{ rs_num, pice_num, qqr2e },
-                             atoms_id,
-                             locator,
-                             topology,
-                             force_function,
-                             static_table,
-                             id_verletlist_group,
-                             num_verletlist,
-                             offset_verletlist_group,
-                             corr_force);
-     }
+       void NearForceRBLERF(const Id& rs_num,
+                         const Id& pice_num,
+                         const Real& qqr2e,
+                         const Vec3f& box,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const ContStaticTable& static_table,
+                         const GroupVecType& id_verletlist_group,
+                         const GroupNumType& num_verletlist,
+                         const CoordOffsetType& offset_verletlist_group,
+                         vtkm::cont::ArrayHandle<Vec3f>& corr_force)
+    {
+      vtkm::cont::Invoker{}(ComputeNearForceRBLERFWorklet{ rs_num, pice_num, qqr2e, box },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            static_table,
+                            id_verletlist_group,
+                            num_verletlist,
+                            offset_verletlist_group,
+                            corr_force);
+    }
 
-     void NearForceRBLERFSpecialBonds(const Id& rs_num,
-                          const Id& pice_num,
-                          const Real& qqr2e,
-                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                          const ContPointLocator& locator,
-                          const ContTopology& topology,
-                          const ContForceFunction& force_function,
-                          const ContStaticTable& static_table,
-                          const GroupVecType& id_verletlist_group,
-                          const GroupNumType& num_verletlist,
-                          const CoordOffsetType& offset_verletlist_group,
-                          const GroupIdIdType& group_ids,
-                          const GroupRealIdType& group_weights,
-                          vtkm::cont::ArrayHandle<Vec3f>& corr_force)
-     {
-       vtkm::cont::Invoker{}(ComputeNearForceRBLERFSpecialBondsWorklet{ rs_num, pice_num, qqr2e },
-                             atoms_id,
-                             locator,
-                             topology,
-                             force_function,
-                             static_table,
-                             id_verletlist_group,
-                             num_verletlist,
-                             offset_verletlist_group,
-                             group_ids,
-                             group_weights,  
-                             corr_force);
-     }
+      void NearForceRBLERFSpecialBonds(const Id& rs_num,
+                                     const Id& pice_num,
+                                     const Real& qqr2e,
+                                     const Vec3f& box,
+                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                     const ContPointLocator& locator,
+                                     const ContTopology& topology,
+                                     const ContForceFunction& force_function,
+                                     const ContStaticTable& static_table,
+                                     const GroupVecType& id_verletlist_group,
+                                     const GroupNumType& num_verletlist,
+                                     const CoordOffsetType& offset_verletlist_group,
+                                     const GroupIdIdType& group_ids,
+                                     const GroupRealIdType& group_weights,
+                                     vtkm::cont::ArrayHandle<Vec3f>& corr_force)
+    {
+      vtkm::cont::Invoker{}(
+        ComputeNearForceRBLERFSpecialBondsWorklet{ rs_num, pice_num, qqr2e, box },
+        atoms_id,
+        locator,
+        topology,
+        force_function,
+        static_table,
+        id_verletlist_group,
+        num_verletlist,
+        offset_verletlist_group,
+        group_ids,
+        group_weights,
+        corr_force);
+    }
 
      void NearForceRBL(const Id& rs_num,
                        const Id& pice_num,
@@ -2146,6 +2174,7 @@ namespace RunWorklet
 
      void LJForceRBL(const Id& rs_num,
                      const Id& pice_num,
+                     const Vec3f& box,
                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                      const ContPointLocator& locator,
                      const ContTopology& topology,
@@ -2155,7 +2184,7 @@ namespace RunWorklet
                      const CoordOffsetType& offset_verletlist_group,
                      vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce)
      {
-      vtkm::cont::Invoker{}(ComputeLJForceRBLWorklet{ rs_num, pice_num },
+      vtkm::cont::Invoker{}(ComputeLJForceRBLWorklet{ rs_num, pice_num, box },
                             atoms_id,
                             locator,
                             topology,
@@ -2167,7 +2196,7 @@ namespace RunWorklet
      }
 
      void EAMfp(const Real& rc,
-                const Real& Vlength,
+                const Vec3f& box,
                 const Real& rs,
                 const Id& rs_num,
                 const Id& pice_num,
@@ -2181,7 +2210,7 @@ namespace RunWorklet
                 const CoordOffsetType& offset_verletlist_group,
                 vtkm::cont::ArrayHandle<Real>& EAM_fp)
      {
-      vtkm::cont::Invoker{}(ComputeEAMfp_Worklet{ rc, Vlength, rs, rs_num, pice_num },
+      vtkm::cont::Invoker{}(ComputeEAMfp_Worklet{ rc, box, rs, rs_num, pice_num },
                             atoms_id,
                             rhor_spline,
                             frho_spline,
@@ -2194,7 +2223,7 @@ namespace RunWorklet
      }
 
      void EAMRBLForce(const Real& rc,
-                    const Real& Vlength,
+                    const Vec3f& box,
                     const Real& rs,
                     const Id& rs_num,
                     const Id& pice_num,
@@ -2209,7 +2238,7 @@ namespace RunWorklet
                     const CoordOffsetType& offset_verletlist_group,
                     vtkm::cont::ArrayHandle<Vec3f>& corr_force)
      {
-      vtkm::cont::Invoker{}(ComputeEAMRBLWorklet{ rc, Vlength, rs, rs_num, pice_num },
+      vtkm::cont::Invoker{}(ComputeEAMRBLWorklet{ rc, box, rs, rs_num, pice_num },
                             atoms_id,
                             rhor_spline,
                             z2r_spline,
@@ -2293,7 +2322,7 @@ namespace RunWorklet
                             eleNearforce);
     }
 
-    void ComputeSpecialCoul(const Real& Vlength,
+    void ComputeSpecialCoul(const Vec3f& box,
                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                             const GroupVecType& group_vec,
                             const ContForceFunction& force_function,
@@ -2301,7 +2330,7 @@ namespace RunWorklet
                             const ContPointLocator& locator,
                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce)
     {
-      vtkm::cont::Invoker{}(ComputeSpecialCoulWorklet{ Vlength },
+      vtkm::cont::Invoker{}(ComputeSpecialCoulWorklet{ box },
                             atoms_id,
                             group_vec,
                             force_function,
@@ -2310,7 +2339,7 @@ namespace RunWorklet
                             SpecCoulforce);
     }
 
-    void ComputeSpecialCoulGeneral(const Real& Vlength,
+    void ComputeSpecialCoulGeneral(const Vec3f& box,
                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                             const GroupVecType& group_vec,
                             const ContForceFunction& force_function,
@@ -2320,7 +2349,7 @@ namespace RunWorklet
                             const GroupRealIdType& group_weights,
                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce)
     {
-      vtkm::cont::Invoker{}(ComputeSpecialCoulGeneralWorklet{ Vlength },
+      vtkm::cont::Invoker{}(ComputeSpecialCoulGeneralWorklet{ box },
                             atoms_id,
                             group_vec,
                             force_function,
@@ -2456,7 +2485,7 @@ namespace RunWorklet
                                Density_Image);
     }
 
-    void ComputePnumberChargeStructureFactor(const Real& _Vlength,
+    void ComputePnumberChargeStructureFactor(const Vec3f& _box,
                                             const Id& pnumber,
                                             const Id& pos_number,
                                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -2470,7 +2499,7 @@ namespace RunWorklet
                                              GroupRealType& rhok_Re_group,
                                              GroupRealType& rhok_Im_group*/)
     {
-      vtkm::cont::Invoker{}(ComputePnumberChargeStructureFactorWorklet{ _Vlength, pnumber,pos_number },
+      vtkm::cont::Invoker{}(ComputePnumberChargeStructureFactorWorklet{ _box, pnumber,pos_number },
                             atoms_id,
                             position,
                             charge,

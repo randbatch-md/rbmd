@@ -57,13 +57,15 @@ void LJInitCondition::SetParameters()
   auto xLength = _x_range[1] - _x_range[0];
   auto yLength = _y_range[1] - _y_range[0];
   auto zLength = _z_range[1] - _z_range[0];
+  Vec3f box = { xLength, yLength, zLength };
   auto num_pos = _dims[0] * _dims[1] * _dims[2];
   auto range = vtkm::Vec<vtkm::Range, 3>{ { _x_range[0], _x_range[1] },
                                           { _y_range[0], _y_range[1] },
                                           { _z_range[0], _z_range[1] } };
   _para.SetParameter(PARA_VLENGTH, xLength);
-  _para.SetParameter(PARA_VOLUME, xLength * yLength * zLength);
-  _para.SetParameter(PARA_RHO, num_pos / (xLength * yLength * zLength));
+  _para.SetParameter(PARA_BOX, box);
+  _para.SetParameter(PARA_VOLUME, box[0] * box[1] * box[2]);
+  _para.SetParameter(PARA_RHO, num_pos / (box[0] * box[1] * box[2]));
   _para.SetParameter(PARA_RANGE, range);
   _para.SetParameter(gtest::velocity_type, Get<std::string>("velocity_type"));
   _para.SetParameter(PARA_UNIT, Get<std::string>("unit"));
@@ -74,13 +76,4 @@ void LJInitCondition::SetParameters()
     static_cast<int>(zLength / cut_off),
   };
   _para.SetParameter(PARA_BIN_NUMBER, bin_number);
-
-  // 注意：这里要放到后面填充！！！！！因为cut_off暂时不知道；
-  // auto cut_off = GetParameter<Real>(PARA_CUTOFF);
-  // auto bin_number = Id3{
-  //   static_cast<int>(xLength / cut_off),
-  //   static_cast<int>(yLength / cut_off),
-  //   static_cast<int>(zLength / cut_off),
-  // };
-  // SetParameter(PARA_BIN_NUMBER, bin_number);
 }

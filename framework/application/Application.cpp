@@ -3,36 +3,65 @@
 #include "CommandLine.h"
 #include <vtkm/cont/RuntimeDeviceTracker.h>
 
+#define VTKM_NO_ERROR_ON_MIXED_CUDA_CXX_TAG
+#include <vtkm/cont/DeviceAdapter.h>
+
+#undef VTKM_NO_ERROR_ON_MIXED_CUDA_CXX_TAG
+
+
 Application::Application(int argc, char** argv)
 {
-  int iargc = 1;
-  if (argc == 2)
-  {
-    if (std::string(argv[iargc]) == "--version")
+  int iarg = 1;  
+  if (std::string(argv[iarg]) == "-help" || std::string(argv[iarg]) == "-h")
     {
-      OutputVersion();
+      if (2 == argc)
+        HelpMessages();      
+      else
+      {
+        ErrerMessages();
+      }
+    } 
+  else if (std::string(argv[iarg]) == "--version" || std::string(argv[iarg]) == "-v")
+    {
+      if (2 == argc)
+        VersionMessages();
+      else
+      {
+        ErrerMessages();
+      }
+    }   
+  else if (argc - iarg >= 2 && std::string(argv[iarg])=="cuda")
+    {
+      if (4 == argc)
+      {
+        _device.reset(new vtkm::cont::DeviceAdapterTagCuda);
+      }
+      else
+      {
+        ErrerMessages();
+      }
     }
-    else if (std::string(argv[iargc]) == "-help")
+  else if (argc - iarg >= 2 && std::string(argv[iarg]) == "dcu")
+  {
+    if (4 == argc)
     {
-      HelpMessages();
+      _device.reset(new vtkm::cont::DeviceAdapterTagKokkos);
+      _init_global = std::make_unique<InitGlobal>(std::string(argv[iarg]),argc, argv);
     }
     else
     {
       ErrerMessages();
     }
   }
-  else if (argc > 2)
+  else if (argc - iarg >= 2 && std::string(argv[iarg]) == "mpi")
   {
-    if (std::string(argv[iargc]) == "-j" && argc == 3)
+    _device.reset(new vtkm::cont::DeviceAdapterTagOpenMP); 
+  }
+  else if (argc - iarg >= 2 && std::string(argv[iarg]) == "-j")
+  {
+    if (3 == argc)
     {
-      _command_line = std::make_unique<CommandLine>(argc, argv);
-      _init_global = std::make_unique<InitGlobal>(argc, argv);
-      //RegisterObjectGlobal();
-    }
-    else if (std::string(argv[iargc]) == "-j" && argc > 3)
-    {
-      std::cout << "--- The formate is: '-j'+ '*.json'---" << std::endl;
-      exit(0);
+      _device.reset(new vtkm::cont::DeviceAdapterTagSerial);
     }
     else
     {
@@ -40,9 +69,13 @@ Application::Application(int argc, char** argv)
     }
   }
   else
-  {
-    ErrerMessages();
-  }
+    {
+      std::cout << (argv[iarg]) << std::endl;
+
+      ErrerMessages();
+    }
+  
+  _command_line = std::make_unique<CommandLine>(argc, argv);
 }
 
 Application::~Application() {}
@@ -58,13 +91,13 @@ void Application::SetupDevice()
     if (!tracker.CanRunOn(*_device))
     {
       console::Error(
-        "不能在 Device Tag: ", _device->GetName(), "上运行，", "选项：serial|cuda|tbb|openmp|hip");
+        "不能在 Device Tag: ", _device->GetName(), "上运行，", "选项：serial|cuda|dcu|mpi");
     }
   }
   catch (const std::exception&)
   {
     console::Error(
-      "不能在 Device Tag: ", _device->GetName(), "上运行，", "选项：serial|cuda|tbb|openmp|hip");
+      "不能在 Device Tag: ", _device->GetName(), "上运行，", "选项：serial|cuda|dcu|mpi");
   }
 
   console::Info("Device Tag: ", _device->GetName());
@@ -81,7 +114,12 @@ void Application::HelpMessages()
 {
   std::cout << "---Reference website: https://www.randbatch.com/guide/CASE_STUDIES.html---"
             << std::endl;
-  exit(0);
+  exit(1);
+}
+void Application::VersionMessages()
+{
+  std::cout << "RBMD_VERSION = 2.0.0 " << std::endl;
+  exit(1);
 }
 
 void Application::ErrerMessages()
@@ -92,10 +130,7 @@ void Application::ErrerMessages()
 }
 void Application::Run()
 {
-
-  //vtkm::cont::ScopedRuntimeDeviceTracker track(tbb);
-
-  PrintLogo(); // 打印logo
+  PrintLogo(); 
 
   ParseCLI(); //解析命令行
 

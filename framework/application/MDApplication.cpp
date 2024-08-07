@@ -23,17 +23,14 @@ MDApplication::MDApplication(int argc, char** argv)
   _ifile = _command_line->GetValue<std::string>("j");
   _parser = std::make_shared<JsonParser>(_ifile);
   _cfg = std::make_shared<Configuration>();
-  _parameter = std::make_shared<Para>();   // 这里要提前将app中的Para生成好，后面才会存在一个para中；
+  _parameter = std::make_shared<Para>(); 
   _parameter->SetParameter(PARA_FAR_FORCE, false);
   _parameter->SetParameter(PARA_DIHEDRALS_FORCE, false);
 }
 
 void MDApplication::PrintLogo()
 {
-  std::string logo = R"(
-SEMD
-)";
-  //std::cout << logo << std::endl;
+  std::string logo = R"( SEMD )";
 
   std::ofstream log_file("rbmd.log");
   try
@@ -54,8 +51,7 @@ void MDApplication::Run()
   PrintLogo();
   ParseCLI();
   CreateCommand();
-  //CreateActions();
-  //SetupDevice();
+  SetupDevice();
 
   RunExecutioner();
 }
@@ -73,7 +69,6 @@ void MDApplication::CreateActions()
 
 void MDApplication::CreateCommand()
 {
-  // 初始化配置文件节点
   HyperParametersCommand();
   InitConfigurationCommand();
   ExecutionCommand();
@@ -99,7 +94,7 @@ void MDApplication::InitConfigurationCommand()
     }
     else
     {
-      _init_condition = std::make_shared<LJInitCondition>(cfg); // 调用一次这个就可以初始化
+      _init_condition = std::make_shared<LJInitCondition>(cfg); 
       _parameter->SetParameter(PARA_INIT_WAY, (std::string) "inbuild");     
     }
   }
@@ -150,9 +145,8 @@ void MDApplication::ExecutionCommand()
 {
   Configuration cfg;
   auto& execution_node = _parser->GetJsonNode("execution");
-  //_cfg->Add<Json::Value*>("execution", &execution_node);
   cfg.Add<Application*>("_app", this);
-  cfg.Add<Json::Value*>("_json_node", &execution_node); // 为了提取一级标题的内容；
+  cfg.Add<Json::Value*>("_json_node", &execution_node); 
 
   auto ensemble = cfg.Get<std::string>("ensemble");
   if (ensemble == "NPT")
@@ -169,7 +163,6 @@ void MDApplication::ExecutionCommand()
   }
   else if (ensemble == "TEST")
   {
-    //_run = std::make_shared<ExecutionTest>(cfg);
   }
   else
   {
@@ -177,18 +170,6 @@ void MDApplication::ExecutionCommand()
     exit(0);
   }
   _executioner = std::make_shared<Executioner>(cfg);
-
-  // // Execution中还有2个二级标题（temperature 和 pressure）暂时改为了数组
-  // std::vector<std::string> executions;
-  // executions = execution_node.getMemberNames();
-  // for (auto& execution : executions)
-  // {
-  //   Configuration cfg;
-  //   auto execution_string = execution.c_str();
-  //   auto& execution_child_node = execution_node[execution_string];
-  //   cfg.Add<Application*>("_app", this); // 这个app 可以注释掉？！！！
-  //   cfg.Add<Json::Value*>("_json_node", &execution_child_node);
-  // }
 }
 
 void MDApplication::OutputsCommand()
