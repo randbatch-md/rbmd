@@ -17,6 +17,7 @@ TempOutput::TempOutput(const Configuration& cfg)
   , _file("temperature.rbmd")
   , _interval(Get<int>("interval", 1))
   , _temperature(0.0)
+  , _pressure(0.0)
 {
 }
 
@@ -34,6 +35,7 @@ void TempOutput::Init()
 void TempOutput::Execute()
 {
   _temperature = _para.GetParameter<Real>(PARA_TEMPT);
+  _pressure = _para.GetParameter<Real>(PARA_PE);
   WriteToFile();
 
 }
@@ -54,14 +56,15 @@ void TempOutput::WriteToFile()
   {
     _file << "Step"
           << " "
-          << "Temperature" << std::endl;
+          << "Temperature" 
+          << " "
+          << "Pressure" << std::endl;
   }
   if (ShouldOutput())
   {
     try
     {
-      _file << _executioner->CurrentStep() << " "
-            << _temperature << std::endl;
+      _file << _executioner->CurrentStep() << " " << _temperature << " " << _pressure << std::endl;
     }
     catch (const std::exception& e)
     {

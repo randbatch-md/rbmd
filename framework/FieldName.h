@@ -100,6 +100,7 @@ const std::string PARA_COULOMB_TYPE = "coulomb_type";
 const std::string PARA_ENSEMBLE = "ensemble";
 const std::string PARA_TEMPERATURE = "temperature";
 const std::string PARA_PRESSURE = "pressure";
+const std::string PARA_PE = "pe";
 const std::string PARA_TEMP_CTRL_TYPE = "temp_ctrl_type";
 const std::string PARA_PRESS_CTRL_TYPE = "press_ctrl_type";
 const std::string PARA_TIMESTEP = "timestep";

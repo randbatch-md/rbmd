@@ -760,6 +760,7 @@ void ExecutionNVT::InitParameters()
 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
+  _para.SetParameter(PARA_PE, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
 }
 
@@ -1163,7 +1164,7 @@ void ExecutionNVT::Compute_Pressure_Scalar()
   _pressure_scalar = (dof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
     3.0 * inv_volume * _unit_factor._nktv2p;
 
-  _para.SetParameter(PARA_PRESSURE, _pressure_scalar);
+  _para.SetParameter(PARA_PE, _pressure_scalar);
   std::cout << " pressure=" << _pressure_scalar << std::endl;
 }
 

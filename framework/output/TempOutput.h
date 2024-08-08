@@ -24,5 +24,6 @@ private:
   bool _output_file;
 
   Real _temperature;
+  Real _pressure;
 
 };

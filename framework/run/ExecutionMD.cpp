@@ -124,6 +124,7 @@ void ExecutionMD::SetParameters()
   _para.SetParameter(PARA_NUM_STEPS, Get<Real>("num_steps"));
   _para.SetParameter(PARA_TEMPERATURE, GetVectorValue<Real>("temperature"));
   _para.SetParameter(PARA_PRESSURE, GetVectorValue<Real>("pressure"));
+
 }
 
 void ExecutionMD::InitialCondition()
