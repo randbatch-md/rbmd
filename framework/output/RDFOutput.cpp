@@ -31,6 +31,12 @@ RDFOutput::RDFOutput(const Configuration& cfg)
   if (init_way != "inbuild")
   {
     _atoms_pair = GetVectorOfVectorsValue<int>("atoms_pair");
+    for (int i = 0; i < _atoms_pair.size(); i++)
+    {
+      vtkm::cont::ArrayHandle<Real> rdf_pair;
+      rdf_pair.AllocateAndFill(_vRadius.size(), 0);
+      _rdf.push_back(rdf_pair);
+    }
     std::vector<int> atoms_pair_type;
     int i, type;
     int size = _atoms_pair.size() * 2 - 1;
@@ -41,10 +47,6 @@ RDFOutput::RDFOutput(const Configuration& cfg)
       if (atoms_pair_type.size() == 0)
       {
         atoms_pair_type.push_back(type);
-        vtkm::cont::ArrayHandle<Real> rdf_pair;
-        rdf_pair.AllocateAndFill(_vRadius.size(), 0);
-        _rdf.push_back(rdf_pair);
-
       }
       else
       {
@@ -53,9 +55,6 @@ RDFOutput::RDFOutput(const Configuration& cfg)
           if (type != atoms_pair_type[i] && i == atoms_pair_type.size() - 1)
           {
             atoms_pair_type.push_back(type);
-            vtkm::cont::ArrayHandle<Real> rdf_pair;
-            rdf_pair.AllocateAndFill(_vRadius.size(), 0);
-            _rdf.push_back(rdf_pair);
           }
           else
             i++;
