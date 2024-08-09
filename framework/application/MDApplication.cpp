@@ -35,7 +35,7 @@ void MDApplication::PrintLogo()
   std::ofstream log_file("rbmd.log");
   try
   {
-    log_file << "RBMD (V1.0)" << std::endl
+    log_file << "RBMD (V2.0)" << std::endl
              << "========================================================" << std::endl
              << _parser->GetFileStr() << std::endl;
     log_file.close();
