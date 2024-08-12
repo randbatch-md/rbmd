@@ -852,7 +852,8 @@ namespace RunWorklet
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+          //auto r_ij = locator.MinDistanceVec1(p_i, p_j, _box);
+          auto r_ij = locator.MinDistanceVecOptimized(p_j, p_i, _box);
 
           auto charge_pj = topology.GetCharge(pts_id_j);
           Real dispij = vtkm::Magnitude(r_ij);
