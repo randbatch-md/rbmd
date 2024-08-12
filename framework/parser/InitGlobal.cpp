@@ -4,7 +4,7 @@
 #include <Kokkos_Core.hpp>
 #endif // VTKM_HIP
 
-InitGlobal::InitGlobal(std::string& device,int argc, char** argv)
+InitGlobal::InitGlobal(const std::string& device,int argc, char** argv)
 {
   if (device == "duc")
   {
