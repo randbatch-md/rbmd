@@ -21,7 +21,7 @@
   "hyper_parameters": {
     "force_field": {
       "type": "EAM", //,  OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file)
-      "potential_file": "D:/git_codes/rbmd/potentials/Au_u3.eam"
+      "potential_file": "Au_u3.eam"
     },
 
     "neighbor": {
