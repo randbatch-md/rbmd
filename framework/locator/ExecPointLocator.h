@@ -161,46 +161,7 @@ public:
     return vec;
   }
 
-  VTKM_EXEC Vec3f MinDistanceVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
-  {
-    Vec3f vec = p1 - p2;
-    // 处理原子间的距离
-    for (vtkm::Id i = 0; i < 3; ++i)
-    {
-      if (vtkm::Abs(vec[i]) > _box[i] * 0.5)
-      {
-        if (vec[i] < 0)
-        {
-          vec[i] += _box[i];
-        }
-        else
-        {
-          vec[i] -= _box[i];
-        }
-      }
-    }
-    return vec;
-  }
-
-  VTKM_EXEC Vec3f MinDistanceVec1(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
-  {
-    Vec3f vec = p1 - p2;
-    for (vtkm::Id i = 0; i < 3; ++i)
-    {
-      if (vec[i] < -_box[i] * 0.5)
-      {
-        vec[i] += _box[i];
-      }
-      else if (vec[i] > _box[i] * 0.5)
-      {
-        vec[i] -= _box[i];
-      }
-    }
-    return vec;
-  }
-
-
-  VTKM_EXEC Vec3f MinDistanceVec11(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
+  VTKM_EXEC Vec3f MinDistanceVec0(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
   {
     Vec3f p12 = p1 - p2;
     //case1:  orthogonal box
@@ -235,7 +196,7 @@ public:
     return p12;
   }
 
-  VTKM_EXEC Vec3f MinDistanceVecOptimized(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
+  VTKM_EXEC Vec3f MinDistanceVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const  // Optimized
   {
     Id periodicX = 1;
     Id periodicY = 1;

@@ -852,8 +852,7 @@ namespace RunWorklet
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
           //auto r_ij = p_j - p_i;
-          //auto r_ij = locator.MinDistanceVec1(p_i, p_j, _box);
-          auto r_ij = locator.MinDistanceVecOptimized(p_j, p_i, _box);
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
           auto charge_pj = topology.GetCharge(pts_id_j);
           Real dispij = vtkm::Magnitude(r_ij);
@@ -1360,7 +1359,7 @@ namespace RunWorklet
 
     struct ComputeSpecialCoulWorklet : vtkm ::worklet::WorkletMapField
        {
-          ComputeSpecialCoulWorklet(const Vec3f box)
+          ComputeSpecialCoulWorklet(const Vec3f& box)
             : _box(box)
          {
          }
@@ -1412,11 +1411,11 @@ namespace RunWorklet
        };
 
     struct ComputeSpecialCoulGeneralWorklet : vtkm ::worklet::WorkletMapField
-       {
-         ComputeSpecialCoulGeneralWorklet(const Vec3f box)
+    {
+         ComputeSpecialCoulGeneralWorklet(const Vec3f& box)
            : _box(box)
-      {
-      }
+         {
+         }
        
          using ControlSignature = void(FieldIn atoms_id,
                                        FieldIn group_vec,
@@ -1478,7 +1477,7 @@ namespace RunWorklet
             } 
          }
          Vec3f _box;
-       };
+    };
 
     struct ComputeNewRBEForceWorklet : vtkm ::worklet::WorkletMapField
        {
