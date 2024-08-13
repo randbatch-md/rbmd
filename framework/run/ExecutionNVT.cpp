@@ -87,8 +87,8 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  fix_press_berendsen();
-  //fix_press_berendsen_scale();
+  //fix_press_berendsen();
+  fix_press_berendsen_scale();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -1125,6 +1125,9 @@ void ExecutionNVT::fix_press_berendsen_scale()
              Real(range[2].Max - range[2].Min)
   };
   _para.SetParameter(PARA_BOX, box);
+  Vec3f left_bottom{ Real(range[0].Min), Real(range[1].Min), Real(range[2].Min) };
+  Vec3f right_top{ Real(range[0].Max), Real(range[1].Max), Real(range[2].Max) };
+  _locator.SetRange(left_bottom, right_top);
   //
   //Vec3f position_base;
   //auto n = _position.GetNumberOfValues();
@@ -1178,9 +1181,9 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-  RunWorklet::LJVirialPBC(cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  //auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  //RunWorklet::LJVirialPBC(cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
   //mic
   //auto box = _para.GetParameter<Vec3f>(PARA_BOX);

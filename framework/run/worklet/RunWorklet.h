@@ -14,6 +14,7 @@ using GroupRealIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::Arra
 namespace RunWorklet 
 {
     void ComputeNeighbours(const Real& cut_off,
+                           const Vec3f& box,
                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                            const ContPointLocator& locator,
                            GroupVecType& id_verletlist_group,
@@ -59,7 +60,8 @@ namespace RunWorklet
                       const GroupVecType& Group_j,
                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                       const CoordOffsetType& coord_offset_j,
-                      vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+                      vtkm::cont::ArrayHandle<Vec3f>& LJforce,
+                      vtkm::cont::ArrayHandle<Vec6f>& LJvirial);
 
    void EAMfpVerlet(const Real& cut_off,
                     const Vec3f& box,
@@ -351,5 +353,7 @@ namespace RunWorklet
                               vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                               const ContPointLocator& locator);
 
-     void ApplyPbc(const Vec3f& box, vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,const ContPointLocator& locator);
+     void ApplyPbc(const Vec3f& box,
+                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                   const ContPointLocator& locator);
  }

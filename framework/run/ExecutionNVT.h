@@ -140,7 +140,7 @@ private:
   std::vector<Id> map; // mapping from atom types to elements
 
       //
-  ArrayHandle<Vec6f> _virial_atom;
+  //ArrayHandle<Vec6f> _virial_atom;
   Real _lj_potential_energy;
   Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
   Real _pressure_scalar; // computed global pressure scalar

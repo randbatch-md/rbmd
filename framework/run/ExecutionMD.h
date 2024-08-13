@@ -80,4 +80,6 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
+
+  ArrayHandle<Vec6f> _virial_atom;
 };

@@ -48,7 +48,7 @@ namespace RunWorklet
       auto eps_j = topology.GetEpsilon(pts_type_j);
       auto sigma_j = topology.GetSigma(pts_type_j);
       // auto r_ij = p_j - p_i;
-      auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+      auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
 
       virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
     };
@@ -72,7 +72,7 @@ namespace RunWorklet
      VTKM_EXEC void operator()(Vec3f& position, const ExecPointLocator locator) const
     {
       position = _scale_factor * position;
-      locator.UpdateOverRangePoint(position);
+      //locator.UpdateOverRangePoint(position);
     }
      Real _scale_factor;
      };
@@ -90,51 +90,27 @@ namespace RunWorklet
      template<typename CoordType>
      VTKM_EXEC void operator()(CoordType& position, const ExecPointLocator locator) const
      {
-       Id periodicX = 1;
-       Id periodicY = 1;
-       Id periodicZ = 1;
-
-       if (periodicX)
-       {
-        if (position[0] < 0) { position[0] += _box[0];}
-        else if (position[0] >= _box[0]){ position[0] -= _box[0];}
-       }
-
-      if (periodicY)
+      for (vtkm::Id i = 0; i < 3; ++i)
       {
-        if (position[1] < 0){ position[1] += _box[1];}
-        else if (position[1] >= _box[1]){ position[1] -= _box[1]; }
+        if (position[i] < 0)
+        {     
+          position[i] += _box[i];
+        }
+        else if (position[i] >= _box[i])
+        {
+          position[i] -= _box[i];
+        }
       }
-
-      if (periodicZ)
-      {
-        if (position[2] < 0){  position[2] += _box[2]; }
-        else if (position[2] >= _box[2]){ position[2] -= _box[2]; }
-      }
-
-     // for (vtkm::Id i = 0; i < 3; ++i)
-     // {
-     //   if (position[i] < 0)
-     //   {
-     //     //position[i] += vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i];
-     //     position[i] += _box[i];
-     //   }
-     //   else if (position[i] >= _box[i])
-     //   {
-     //     position[i] -= _box[i];
-     //     // position[i] -= vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i];
-     //   }
-     // }
-     // //locator.UpdateOverRangePoint(position);
+      //locator.UpdateOverRangePoint(position);
      }
      Vec3f _box;
-
      };
 
     struct ComputeNeighboursWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeNeighboursWorklet(const Real& cut_off)
+     ComputeNeighboursWorklet(const Real& cut_off, const Vec3f& box)
         : _cut_off(cut_off)
+       , _box(box)
       {
       }
 
@@ -172,6 +148,7 @@ namespace RunWorklet
                 auto pts_id_j = locator.PtsInCell(ijk, p);
                 auto p_j = locator.GetPtsPosition(pts_id_j) - coord_offset;
                 auto r_ij = p_j - p_i;
+                //auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
                 const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
                 const Real _cut_off_2 = _cut_off * _cut_off;
                 if ( _cut_off_2 - dis_2 > 0.0001 && dis_2 > 0.0001)
@@ -187,6 +164,7 @@ namespace RunWorklet
         num_verletlist = index; 
        }
       Real _cut_off;
+      Vec3f _box;
     };
 
     struct ComputeNearForceVerletERFWorklet : vtkm::worklet::WorkletMapField
@@ -345,8 +323,9 @@ namespace RunWorklet
                                     FieldIn group_j,
                                     FieldIn num_j,
                                     FieldIn coord_offset_j,
-                                    FieldOut LJforce);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+                                    FieldOut LJforce,
+                                    FieldOut LJvirial);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
 
       template<typename NeighbourGroupVecType, typename CoordOffsetj>
       VTKM_EXEC void operator()(const Id atoms_id,
@@ -356,9 +335,11 @@ namespace RunWorklet
                                 const NeighbourGroupVecType& group_j,
                                 const Id& num_j,
                                 const CoordOffsetj& coord_offset_j,
-                                Vec3f& LJforce) const
+                                Vec3f& LJforce,
+                                Vec6f& LJvirial) const
       {
         Vec3f LJ_force = { 0, 0, 0 };
+        Vec6f virial = { 0, 0, 0, 0, 0, 0 };
 
         LJforce = { 0, 0, 0 };
         const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
@@ -380,6 +361,7 @@ namespace RunWorklet
           if (molecular_id_i == molecular_id_j)
             return;
           LJ_force += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
         };
 
         auto p_i = locator.GetPtsPosition(atoms_id);
@@ -391,6 +373,7 @@ namespace RunWorklet
           function(p_i, p_j, idj);
         }
         LJforce = LJ_force;
+        LJvirial = virial;
       }
       Real _cut_off;
       Vec3f _box;
@@ -1479,7 +1462,7 @@ namespace RunWorklet
 
     struct ComputeSpecialCoulWorklet : vtkm ::worklet::WorkletMapField
        {
-          ComputeSpecialCoulWorklet(const Vec3f& box)
+          ComputeSpecialCoulWorklet(const Vec3f box)
             : _box(box)
          {
          }
@@ -1532,7 +1515,7 @@ namespace RunWorklet
 
     struct ComputeSpecialCoulGeneralWorklet : vtkm ::worklet::WorkletMapField
        {
-         ComputeSpecialCoulGeneralWorklet(const Vec3f& box)
+         ComputeSpecialCoulGeneralWorklet(const Vec3f box)
            : _box(box)
       {
       }
@@ -2007,13 +1990,14 @@ namespace RunWorklet
     };   
 
     void ComputeNeighbours(const Real& cut_off,
+                            const Vec3f& box,
                                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                const ContPointLocator& locator,
                                GroupVecType& id_verletlist_group,
                                vtkm::cont::ArrayHandle<vtkm::Id>& num_verletlist,
                                CoordOffsetType& offset_verletlist_group)
     {
-      vtkm::cont::Invoker{}(ComputeNeighboursWorklet{ cut_off },
+      vtkm::cont::Invoker{}(ComputeNeighboursWorklet{ cut_off, box },
                             atoms_id,
                             locator,
                             id_verletlist_group,
@@ -2090,7 +2074,8 @@ namespace RunWorklet
                        const GroupVecType& Group_j,
                        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                        const CoordOffsetType& coord_offset_j,
-                       vtkm::cont::ArrayHandle<Vec3f>& LJforce)
+                       vtkm::cont::ArrayHandle<Vec3f>& LJforce,
+                       vtkm::cont::ArrayHandle<Vec6f>& LJvirial)
     {
       vtkm::cont::Invoker{}(ComputeLJForceVerletWorklet{ cut_off, box },
                             atoms_id,
@@ -2100,7 +2085,8 @@ namespace RunWorklet
                             Group_j,
                             num_j,
                             coord_offset_j,
-                            LJforce);
+                            LJforce,
+                            LJvirial);
     }
 
     void EAMfpVerlet(const Real& cut_off,
@@ -2676,9 +2662,9 @@ namespace RunWorklet
                              const ContPointLocator& locator)
      {
          vtkm::cont::Invoker{}(fix_press_berendsenWorklet{ scale_factor }, position, locator);
-     } 
+     }  
 
-     void ApplyPbc(const Vec3f& box,
+      void ApplyPbc(const Vec3f& box,
                    vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                    const ContPointLocator& locator)
      {
