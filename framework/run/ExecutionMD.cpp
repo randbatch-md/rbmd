@@ -550,7 +550,9 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
 
   auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
-  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  auto rho_system = N / (box[0] * box[1] * box[2]);
+
+  //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
 
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
@@ -653,7 +655,8 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto N = _position.GetNumberOfValues();
-  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  auto rho_system = N / (box[0] * box[1] * box[2]);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
   auto verletlist_num = N * max_j_num;
 

@@ -48,7 +48,7 @@ namespace RunWorklet
       auto eps_j = topology.GetEpsilon(pts_type_j);
       auto sigma_j = topology.GetSigma(pts_type_j);
       // auto r_ij = p_j - p_i;
-      auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
+      auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
       virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
     };
@@ -75,6 +75,60 @@ namespace RunWorklet
       locator.UpdateOverRangePoint(position);
     }
      Real _scale_factor;
+     };
+
+    struct ApplyPbcWorklet : vtkm::worklet::WorkletMapField
+     {
+     ApplyPbcWorklet(const Vec3f& box)
+       : _box(box)
+     {
+     }
+
+     using ControlSignature = void(FieldInOut position, ExecObject locator);
+     using ExecutionSignature = void(_1, _2);
+
+     template<typename CoordType>
+     VTKM_EXEC void operator()(CoordType& position, const ExecPointLocator locator) const
+     {
+       Id periodicX = 1;
+       Id periodicY = 1;
+       Id periodicZ = 1;
+
+       if (periodicX)
+       {
+        if (position[0] < 0) { position[0] += _box[0];}
+        else if (position[0] >= _box[0]){ position[0] -= _box[0];}
+       }
+
+      if (periodicY)
+      {
+        if (position[1] < 0){ position[1] += _box[1];}
+        else if (position[1] >= _box[1]){ position[1] -= _box[1]; }
+      }
+
+      if (periodicZ)
+      {
+        if (position[2] < 0){  position[2] += _box[2]; }
+        else if (position[2] >= _box[2]){ position[2] -= _box[2]; }
+      }
+
+     // for (vtkm::Id i = 0; i < 3; ++i)
+     // {
+     //   if (position[i] < 0)
+     //   {
+     //     //position[i] += vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i];
+     //     position[i] += _box[i];
+     //   }
+     //   else if (position[i] >= _box[i])
+     //   {
+     //     position[i] -= _box[i];
+     //     // position[i] -= vtkm::Floor(vtkm::Abs(position[i] / _vlength[i])) * _vlength[i];
+     //   }
+     // }
+     // //locator.UpdateOverRangePoint(position);
+     }
+     Vec3f _box;
+
      };
 
     struct ComputeNeighboursWorklet : vtkm::worklet::WorkletMapField
@@ -1425,7 +1479,7 @@ namespace RunWorklet
 
     struct ComputeSpecialCoulWorklet : vtkm ::worklet::WorkletMapField
        {
-          ComputeSpecialCoulWorklet(const Vec3f box)
+          ComputeSpecialCoulWorklet(const Vec3f& box)
             : _box(box)
          {
          }
@@ -1478,7 +1532,7 @@ namespace RunWorklet
 
     struct ComputeSpecialCoulGeneralWorklet : vtkm ::worklet::WorkletMapField
        {
-         ComputeSpecialCoulGeneralWorklet(const Vec3f box)
+         ComputeSpecialCoulGeneralWorklet(const Vec3f& box)
            : _box(box)
       {
       }
@@ -1911,7 +1965,7 @@ namespace RunWorklet
                                 Id3& position_flag) const
       {
         position += velocity * _dt;
-        locator.UpdateFlagOverRangePoint(position, position_flag);
+        //locator.UpdateFlagOverRangePoint(position, position_flag);
       }
       Real _dt;
     };
@@ -2622,6 +2676,13 @@ namespace RunWorklet
                              const ContPointLocator& locator)
      {
          vtkm::cont::Invoker{}(fix_press_berendsenWorklet{ scale_factor }, position, locator);
+     } 
+
+     void ApplyPbc(const Vec3f& box,
+                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                   const ContPointLocator& locator)
+     {
+         vtkm::cont::Invoker{}(ApplyPbcWorklet{ box }, position, locator);
      }  
 
  }

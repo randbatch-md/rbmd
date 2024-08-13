@@ -350,4 +350,6 @@ namespace RunWorklet
      void fix_press_berendsen(const Real& scale_factor,
                               vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                               const ContPointLocator& locator);
+
+     void ApplyPbc(const Vec3f& box, vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,const ContPointLocator& locator);
  }

@@ -87,8 +87,8 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  //fix_press_berendsen();
-  fix_press_berendsen_scale();
+  fix_press_berendsen();
+  //fix_press_berendsen_scale();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -188,7 +188,8 @@ void ExecutionNVT::UpdatePosition()
   {
     RunWorklet::UpdatePosition(_dt, _velocity, _locator, _position);
   }
-
+  //pbc
+  ApplyPbc();
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
 }
@@ -1063,6 +1064,8 @@ void ExecutionNVT::fix_press_berendsen()
   //redo KSpace coeffs since volume has changed
 
   remap();
+  ApplyPbc();
+  _locator.SetPosition(_position);
 }
 
 void ExecutionNVT::fix_press_berendsen_scale()
@@ -1117,7 +1120,11 @@ void ExecutionNVT::fix_press_berendsen_scale()
   std::cout << "scale_factor =" << _scale_factor << ",range.Min=" << range[0].Min
             << ",range.Max=" << range[0].Max << std::endl;
   _para.SetParameter(PARA_RANGE, range);
-
+  Vec3f box{ Real(range[0].Max - range[0].Min),
+             Real(range[1].Max - range[1].Min),
+             Real(range[2].Max - range[2].Min)
+  };
+  _para.SetParameter(PARA_BOX, box);
   //
   //Vec3f position_base;
   //auto n = _position.GetNumberOfValues();
@@ -1135,6 +1142,7 @@ void ExecutionNVT::fix_press_berendsen_scale()
 
 
   RunWorklet::fix_press_berendsen(_scale_factor, _position, _locator);
+  ApplyPbc();
   _locator.SetPosition(_position);
 }
 
@@ -1171,8 +1179,8 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 void ExecutionNVT::ComputeVirial()
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-
-  RunWorklet::LJVirialPBC(cut_off, _box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  RunWorklet::LJVirialPBC(cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
   //mic
   //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
@@ -1245,6 +1253,10 @@ void ExecutionNVT::set_global_box()
   h[4] = 0;
   h[5] = 0;
 
+  Vec3f box{ h[0], h[1], h[2] };
+  _para.SetParameter(PARA_BOX, box);
+
+
   //
   auto orthogonal = 1;
   if (orthogonal)
@@ -1261,13 +1273,9 @@ void ExecutionNVT::set_global_box()
 void ExecutionNVT::ApplyPbc()
 {
   //pbc
-  //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  //Vec3f box;
-  //for (int i = 0; i < 3; ++i)
-  //{
-  //  box[i] = range[i].Max - range[i].Min;
-  //}
-  //RunWorklet::ApplyPbc(box, _position, _locator);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX); //
+  RunWorklet::ApplyPbc(box, _position, _locator);
+
 }
 
 void ExecutionNVT::x2lamda(Id n)

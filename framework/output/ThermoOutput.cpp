@@ -145,8 +145,9 @@ void ThermoOutput::ComputePotentialEnergy()
 auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
   if ("LJ/CUT" == force_field)
   {
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);  //
     OutPut::ComputePotentialEnergy(
-      _cut_off, _box, atoms_id, locator, topology, force_function, lj_potential_energy);
+      _cut_off,box, atoms_id, locator, topology, force_function, lj_potential_energy);
     auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
       lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
     _lj_potential_energy_avr = lj_potential_energy_total / position.GetNumberOfValues();
