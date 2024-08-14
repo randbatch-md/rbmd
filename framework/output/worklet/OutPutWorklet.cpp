@@ -135,6 +135,60 @@ namespace OutPut
   Vec3f _box;
 };
 
+    struct ComputeEAMrhoVerletWorklet : vtkm::worklet::WorkletMapField
+    {
+     ComputeEAMrhoVerletWorklet(const Real& eam_cut_off, const Vec3f& box)
+    : _eam_cut_off(eam_cut_off)
+    , _box(box)
+    {
+     }
+
+    using ControlSignature = void(FieldIn atoms_id,
+                                WholeArrayIn rhor_spline,
+                                ExecObject locator,
+                                ExecObject topology,
+                                ExecObject force_function,
+                                FieldIn group_j,
+                                FieldIn num_j,
+                                FieldIn coord_offset_j,
+                                FieldOut EAM_rho);
+    using ExecutionSignature = void(_1, _2, _3, _4, _5, _6,_7, _8,_9);
+   
+    template<typename SpileType, typename NeighbourGroupVecType, typename CoordOffsetj>
+    VTKM_EXEC void operator()(const Id atoms_id,
+                            const SpileType& rhor_spline,
+                            const ExecPointLocator& locator,
+                            const ExecTopology& topology,
+                            const ExecForceFunction& force_function,
+                            const NeighbourGroupVecType& group_j,
+                            const Id& num_j,
+                            const CoordOffsetj& coord_offset_j,
+                            Real& EAM_rho) const
+  {
+    Real rho = 0;
+
+    auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+    {
+      //auto r_ij = p_j - p_i;
+      auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
+      rho += force_function.ComputeEAMrhoOUT(_eam_cut_off, r_ij, rhor_spline);
+    };
+
+    auto p_i = locator.GetPtsPosition(atoms_id);
+
+    for (Id p = 0; p < num_j; p++)
+    {
+      auto idj = group_j[p];
+      auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+      function(p_i, p_j, idj);
+    }
+
+    EAM_rho = rho;
+  }
+  Real _eam_cut_off;
+  Vec3f _box;
+};
+
     struct ComputeEAMrhoWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeEAMrhoWorklet(const Real& eam_cut_off, const Vec3f& box)
@@ -232,6 +286,58 @@ namespace OutPut
           pair_energy += force_function.ComputePairEnergy(_eam_cut_off, r_ij, z2r_spline);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
+      }
+      Real _eam_cut_off;
+      Vec3f _box;
+    };
+
+    struct ComputePairEnergyVerletWorklet : vtkm::worklet::WorkletMapField
+    {
+      ComputePairEnergyVerletWorklet(const Real& eam_cut_off, const Vec3f& box)
+        : _eam_cut_off(eam_cut_off)
+        , _box(box)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    WholeArrayIn z2r_spline,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldIn group_j,
+                                    FieldIn num_j,
+                                    FieldIn coord_offset_j,
+                                    FieldOut pair_energy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6,_7, _8,_9);
+
+      template<typename z2rSpileType, typename NeighbourGroupVecType, typename CoordOffsetj>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const z2rSpileType& z2r_spline,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const NeighbourGroupVecType& group_j,
+                                const Id& num_j,
+                                const CoordOffsetj& coord_offset_j,
+                                Real& pair_energy) const
+      {
+        pair_energy = 0;
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
+          pair_energy += force_function.ComputePairEnergy(_eam_cut_off, r_ij, z2r_spline);
+        };
+
+        auto p_i = locator.GetPtsPosition(atoms_id);
+
+        for (Id p = 0; p < num_j; p++)
+        {
+          auto idj = group_j[p];
+          auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+          function(p_i, p_j, idj);
+        }
+
       }
       Real _eam_cut_off;
       Vec3f _box;
@@ -794,6 +900,30 @@ namespace OutPut
                             LJPE);
     }
 
+    void EAM_rho_Verlet(const Real& eam_cut_off,
+                 const Vec3f& box,
+                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                 const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                 const ContPointLocator& locator,
+                 const ContTopology& topology,
+                 const ContForceFunction& force_function,
+                 const GroupVecType& Group_j,
+                 const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                 const CoordOffsetType& coord_offset_j,
+                 vtkm::cont::ArrayHandle<Real>& EAM_rho)
+    {
+      vtkm::cont::Invoker{}(ComputeEAMrhoVerletWorklet{ eam_cut_off, box },
+                            atoms_id,
+                            rhor_spline,
+                            locator,
+                            topology,
+                            force_function,
+                            Group_j,
+                            num_j,
+                            coord_offset_j,
+                            EAM_rho);
+    }
+
     void EAM_rho(const Real& eam_cut_off,
                  const Vec3f& box,
                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -831,7 +961,7 @@ namespace OutPut
                             embedding_energy);
     }
 
-    void EAM_PairEnergy(const Real& eam_cut_off,
+     void EAM_PairEnergy(const Real& eam_cut_off,
                         const Vec3f& box,
                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                         const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
@@ -850,6 +980,30 @@ namespace OutPut
                             pair_energy);
     }
 
+     void EAM_PairEnergyVerlet(const Real& eam_cut_off,
+                              const Vec3f& box,
+                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                              const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                              const ContPointLocator& locator,
+                              const ContTopology& topology,
+                              const ContForceFunction& force_function,
+                              const GroupVecType& Group_j,
+                              const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                              const CoordOffsetType& coord_offset_j,
+                              vtkm::cont::ArrayHandle<Real>& pair_energy)
+    {
+
+      vtkm::cont::Invoker{}(ComputePairEnergyVerletWorklet{ eam_cut_off, box },
+                            atoms_id,
+                            z2r_spline,
+                            locator,
+                            topology,
+                            force_function,
+                            Group_j,
+                            num_j,
+                            coord_offset_j,
+                            pair_energy);
+    }
     //Statistical PotentialEnergy
     void ComputePotentialEnergy(const Real& cutoff,
                                 const Vec3f& box,

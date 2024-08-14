@@ -601,9 +601,46 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
   ContPointLocator locator;
   SetLocator(locator);
 
+  //Build neighbour;
+  auto rho_system = N / (box[0] * box[1] * box[2]);
+
+  auto max_j_num =
+    rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+  auto verletlist_num = N * max_j_num;
+
+  ArrayHandle<Id> id_verletlist;
+  ArrayHandle<Vec3f> offset_verletlist;
+  offset_verletlist.Allocate(verletlist_num);
+  id_verletlist.Allocate(verletlist_num);
+
+  std::vector<Id> temp_vec(N + 1);
+  Id inc = 0;
+  std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * max_j_num; });
+  vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+  vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+  auto id_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+  auto offset_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+
+  OutPut::ComputeNeighbours(
+    cut_off, box, atoms_id, locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+
   //1:compute EAM_rho;
   ArrayHandle<Real> EAM_rho;
-  OutPut::EAM_rho(cut_off, box, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
+  OutPut::EAM_rho_Verlet(cut_off,
+                         box,
+                         atoms_id,
+                         rhor_spline,
+                         locator,
+                         topology,
+                         force_function,
+                         id_verletlist_group,
+                         num_verletlist,
+                         offset_verletlist_group,
+                         EAM_rho);
+  //OutPut::EAM_rho(cut_off, box, atoms_id, rhor_spline, locator, topology, force_function, EAM_rho);
 
   //2: embedding_energy_atom
   ArrayHandle<Real> embedding_energy_atom;
@@ -615,8 +652,19 @@ void ThermoOutput::ComputeEAMPotentialEnergy()
 
   //3: pair_energy_atom
   ArrayHandle<Real> pair_energy_atom;
-  OutPut::EAM_PairEnergy(
-    cut_off, box, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
+  OutPut::EAM_PairEnergyVerlet(cut_off,
+                               box,
+                               atoms_id,
+                               z2r_spline,
+                               locator,
+                               topology,
+                               force_function,
+                               id_verletlist_group,
+                               num_verletlist,
+                               offset_verletlist_group,
+                               pair_energy_atom);
+  //OutPut::EAM_PairEnergy(
+  //  cut_off, box, atoms_id, z2r_spline, locator, topology, force_function, pair_energy_atom);
 
   auto pair_energy_atom_total =
     vtkm::cont::Algorithm::Reduce(pair_energy_atom, vtkm::TypeTraits<Real>::ZeroInitialization());

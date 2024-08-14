@@ -41,6 +41,18 @@ void EAM_rho(const Real& eam_cut_off,
              const ContForceFunction& force_function,
              vtkm::cont::ArrayHandle<Real>& EAM_rho);
 
+void EAM_rho_Verlet(const Real& eam_cut_off,
+                    const Vec3f& box,
+                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                    const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
+                    const ContPointLocator& locator,
+                    const ContTopology& topology,
+                    const ContForceFunction& force_function,
+                    const GroupVecType& Group_j,
+                    const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                    const CoordOffsetType& coord_offset_j,
+                    vtkm::cont::ArrayHandle<Real>& EAM_rho);
+
 void EAM_EmbeddingEnergy(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                          const vtkm::cont::ArrayHandle<Real>& EAM_rho,
                          const vtkm::cont::ArrayHandle<Vec7f>& frho_spline,
@@ -57,6 +69,18 @@ void EAM_PairEnergy(const Real& eam_cut_off,
                     const ContTopology& topology,
                     const ContForceFunction& force_function,
                     vtkm::cont::ArrayHandle<Real>& pair_energy);
+
+ void EAM_PairEnergyVerlet(const Real& eam_cut_off,
+                          const Vec3f& box,
+                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                          const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
+                          const ContPointLocator& locator,
+                          const ContTopology& topology,
+                          const ContForceFunction& force_function,
+                          const GroupVecType& Group_j,
+                          const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                          const CoordOffsetType& coord_offset_j,
+                          vtkm::cont::ArrayHandle<Real>& pair_energy);
 
 void ComputePotentialEnergy(const Real& cutoff,
                             const Vec3f& box,
