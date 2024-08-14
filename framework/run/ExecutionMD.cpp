@@ -123,7 +123,7 @@ void ExecutionMD::SetParameters()
   _para.SetParameter(PARA_TIMESTEP, Get<Real>("timestep"));
   _para.SetParameter(PARA_NUM_STEPS, Get<Real>("num_steps"));
   _para.SetParameter(PARA_TEMPERATURE, GetVectorValue<Real>("temperature"));
-  _para.SetParameter(PARA_PRESSURE, GetVectorValue<Real>("pressure"));
+  _para.SetParameter(PARA_PRESSURE_VECTOR, GetVectorValue<Real>("pressure"));
 
 }
 
@@ -552,7 +552,7 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
   auto rs = _para.GetParameter<Real>(PARA_R_CORE);
   //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
-  auto rho_system = N / box[0] * box[1] * box[2];
+  auto rho_system = N / (box[0] * box[1] * box[2]);
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Id> id_verletlist;
   vtkm::cont::ArrayHandle<vtkm::Vec3f> offset_verletlist;
@@ -654,7 +654,8 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto N = _position.GetNumberOfValues();
-  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  auto rho_system = N / (box[0] * box[1] * box[2]);
+  //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
   auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
   auto verletlist_num = N * max_j_num;
 
@@ -684,8 +685,7 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
                             id_verletlist_group,
                             num_verletlist,
                             offset_verletlist_group,
-                            ljforce ,
-                           _virial_atom);
+                            ljforce );
 }
 void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 {
@@ -693,6 +693,53 @@ void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 
   RunWorklet::LJForceWithPeriodicBC(
     cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+}
+
+void ExecutionMD::ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& virial_atom)
+{
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  auto N = _position.GetNumberOfValues();
+  auto rho_system = N / (box[0] * box[1] * box[2]);
+  //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  auto max_j_num =
+    rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+  auto verletlist_num = N * max_j_num;
+
+  ArrayHandle<Id> id_verletlist;
+  ArrayHandle<Vec3f> offset_verletlist;
+  offset_verletlist.Allocate(verletlist_num);
+  id_verletlist.Allocate(verletlist_num);
+
+  std::vector<Id> temp_vec(N + 1);
+  Id inc = 0;
+  std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * max_j_num; });
+  vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+  vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+  auto id_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+  auto offset_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+
+  RunWorklet::ComputeNeighbours(cut_off,
+                                box,
+                                _atoms_id,
+                                _locator,
+                                id_verletlist_group,
+                                num_verletlist,
+                                offset_verletlist_group);
+
+  RunWorklet::LJVirialVerlet(cut_off,
+                            box,
+                            _atoms_id,
+                            _locator,
+                            _topology,
+                            _force_function,
+                            id_verletlist_group,
+                            num_verletlist,
+                            offset_verletlist_group,
+                             virial_atom);
 }
 
 void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)

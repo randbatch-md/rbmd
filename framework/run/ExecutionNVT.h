@@ -70,6 +70,7 @@ private:
 private:
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
+  ArrayHandle<Vec6f> _LJVirial;
   ArrayHandle<Vec3f> _ele_near_force;
   ArrayHandle<Vec3f> _ele_new_force;
   ArrayHandle<Vec3f> _all_force;
@@ -140,7 +141,7 @@ private:
   std::vector<Id> map; // mapping from atom types to elements
 
       //
-  //ArrayHandle<Vec6f> _virial_atom;
+  ArrayHandle<Vec6f> _virial_atom;
   Real _lj_potential_energy;
   Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
   Real _pressure_scalar; // computed global pressure scalar

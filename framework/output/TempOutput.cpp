@@ -35,7 +35,7 @@ void TempOutput::Init()
 void TempOutput::Execute()
 {
   _temperature = _para.GetParameter<Real>(PARA_TEMPT);
-  _pressure = _para.GetParameter<Real>(PARA_PE);
+  _pressure = _para.GetParameter<Real>(PARA_PRESSURE);
   WriteToFile();
 
 }

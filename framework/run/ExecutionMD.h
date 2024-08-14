@@ -39,6 +39,7 @@ protected:
   void ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force);
   void ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force);
 
+  void ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& virial_atom);
 
   void UpdateVerletList();
 
@@ -80,6 +81,4 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
-
-  ArrayHandle<Vec6f> _virial_atom;
 };

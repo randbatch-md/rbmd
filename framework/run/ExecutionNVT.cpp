@@ -87,8 +87,8 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  //fix_press_berendsen();
-  fix_press_berendsen_scale();
+  fix_press_berendsen();
+  //fix_press_berendsen_scale();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -754,14 +754,14 @@ void ExecutionNVT::InitParameters()
   _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
   _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2];
 
-  _Pstart = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[0];
-  _Pstop = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[1];
-  _Pperiod = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[2];
-  _bulkmodulus = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE)[3];
+  _Pstart = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE_VECTOR)[0];
+  _Pstop = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE_VECTOR)[1];
+  _Pperiod = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE_VECTOR)[2];
+  _bulkmodulus = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE_VECTOR)[3];
 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
-  _para.SetParameter(PARA_PE, Real{ 0.0 });
+  _para.SetParameter(PARA_PRESSURE, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
 }
 
@@ -1092,21 +1092,11 @@ void ExecutionNVT::fix_press_berendsen_scale()
     p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
   }
   _pressure_coupling = _dt / (p_period[0] * 3 * _bulkmodulus);
-  //std::cout << ",delta=" << delta << ",pressure_coupling=" << _pressure_coupling << std::endl;
   _scale_factor = 1.0 -
     _pressure_coupling * (p_target[0] - (p_current[0] + p_current[1] + p_current[2]) * 0.3333);
 
-  //
-  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-  //box[0] *= _scale_factor;
-  //box[1] *= _scale_factor;
-  //box[2] *= _scale_factor;
-  //_para.SetParameter(PARA_BOX, box);
-  //std::cout << "scale_factor =" << _scale_factor << ",box[0]=" << box[0] << ",box[1]=" << box[1]
-  //          << ",box[2]=" << box[2]
-  //          << std::endl;
 
-  // 调整range的Min和Max值
+  // change range
   auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
   for (int i = 0; i < 3; ++i)
   {
@@ -1120,30 +1110,19 @@ void ExecutionNVT::fix_press_berendsen_scale()
   std::cout << "scale_factor =" << _scale_factor << ",range.Min=" << range[0].Min
             << ",range.Max=" << range[0].Max << std::endl;
   _para.SetParameter(PARA_RANGE, range);
+
+  Vec3f left_bottom{ Real(range[0].Min), Real(range[1].Min), Real(range[2].Min) };
+  Vec3f right_top{ Real(range[0].Max), Real(range[1].Max), Real(range[2].Max) };
+  _locator.SetRange(left_bottom, right_top);
+
+  // change box
   Vec3f box{ Real(range[0].Max - range[0].Min),
              Real(range[1].Max - range[1].Min),
              Real(range[2].Max - range[2].Min)
   };
   _para.SetParameter(PARA_BOX, box);
-  Vec3f left_bottom{ Real(range[0].Min), Real(range[1].Min), Real(range[2].Min) };
-  Vec3f right_top{ Real(range[0].Max), Real(range[1].Max), Real(range[2].Max) };
-  _locator.SetRange(left_bottom, right_top);
-  //
-  //Vec3f position_base;
-  //auto n = _position.GetNumberOfValues();
-  //for (int i = 0; i < n; i++)
-  //{
-  //  position_base[0] = _position.ReadPortal().Get(i)[0] * scale_factor;
-  //  position_base[1] = _position.ReadPortal().Get(i)[1] * scale_factor;
-  //  position_base[2] = _position.ReadPortal().Get(i)[2] * scale_factor;
 
-  //  Vec3f x_position = { position_base[0], position_base[1] ,position_base[2] };
-
-  //  _position.WritePortal().Set(i, x_position);
-  //}
-  //_locator.SetPosition(_position);
-
-
+  // change position
   RunWorklet::fix_press_berendsen(_scale_factor, _position, _locator);
   ApplyPbc();
   _locator.SetPosition(_position);
@@ -1160,11 +1139,7 @@ void ExecutionNVT::Compute_Pressure_Scalar()
     (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
   auto inv_volume = 1.0 / volume;
 
-  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-  //auto volume = box[0] * box[1] * box[2];
-  //auto inv_volume = 1.0 / volume;
   ComputeVirial();
-  //ComputeVirial_r();
 
   //compute dof
   auto n = _position.GetNumberOfValues();
@@ -1175,25 +1150,14 @@ void ExecutionNVT::Compute_Pressure_Scalar()
   _pressure_scalar = (dof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
     3.0 * inv_volume * _unit_factor._nktv2p;
 
-  _para.SetParameter(PARA_PE, _pressure_scalar);
+  _para.SetParameter(PARA_PRESSURE, _pressure_scalar);
   std::cout << " pressure=" << _pressure_scalar << std::endl;
 }
 
 void ExecutionNVT::ComputeVirial()
 {
-  //auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
-  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-  //RunWorklet::LJVirialPBC(cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
 
-  //mic
-  //auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-  //auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  //Vec3f box{0,0,0};
-  //for (int i = 0; i < 3; ++i)
-  //{
-  //  box[i] = range[i].Max - range[i].Min;
-  //}
-  //RunWorklet::LJVirialPBC(cut_off, box, _atoms_id, _locator, _topology, _force_function, _virial_atom);
+  ComputeVerletlistLJVirial(_virial_atom); //_virial_atom
 
 
   //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
@@ -1217,17 +1181,6 @@ void ExecutionNVT::ComputeVirial()
   //  }
   //}
 
-  virial =
-    vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-  //
-  //for (int i = 0; i < 6; ++i)
-  //{
-  //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
-  //}
-}
-
-void ExecutionNVT::ComputeVirial_r()
-{
   virial =
     vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
   //
@@ -1276,8 +1229,13 @@ void ExecutionNVT::set_global_box()
 void ExecutionNVT::ApplyPbc()
 {
   //pbc
+  auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX); //
-  RunWorklet::ApplyPbc(box, _position, _locator);
+  auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  Vec<Vec2f, 3> data_range{ { static_cast<Real>(range[0].Min), static_cast<Real>(range[0].Max) },
+                            { static_cast<Real>(range[1].Min), static_cast<Real>(range[1].Max) },
+                            { static_cast<Real>(range[2].Min), static_cast<Real>(range[2].Max) }};
+  RunWorklet::ApplyPbcFlag(box, data_range, _position, _locator, position_flag);
 
 }
 
@@ -1360,6 +1318,11 @@ void ExecutionNVT::remap()
   std::cout << "range.Min=" << range[0].Min << ",range.Max=" << range[0].Max << std::endl;
   //
   _para.SetParameter(PARA_RANGE, range);
+
+
+  Vec3f left_bottom{ Real(range[0].Min), Real(range[1].Min), Real(range[2].Min) };
+  Vec3f right_top{ Real(range[0].Max), Real(range[1].Max), Real(range[2].Max) };
+  _locator.SetRange(left_bottom, right_top);
 
   set_global_box();
 

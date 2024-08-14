@@ -60,8 +60,20 @@ namespace RunWorklet
                       const GroupVecType& Group_j,
                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                       const CoordOffsetType& coord_offset_j,
+                      vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+
+   void ComputeThermo(const Real& cut_off,
+                      const Vec3f& box,
+                      const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                      const ContPointLocator& locator,
+                      const ContTopology& topology,
+                      const ContForceFunction& force_function,
+                      const GroupVecType& Group_j,
+                      const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                      const CoordOffsetType& coord_offset_j,
                       vtkm::cont::ArrayHandle<Vec3f>& LJforce,
-                      vtkm::cont::ArrayHandle<Vec6f>& LJvirial);
+                      vtkm::cont::ArrayHandle<Vec6f>& LJvirial,
+                      vtkm::cont::ArrayHandle<Real>& LJPE);
 
    void EAMfpVerlet(const Real& cut_off,
                     const Vec3f& box,
@@ -349,11 +361,29 @@ namespace RunWorklet
                      const ContForceFunction& force_function,
                      vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
 
+      void LJVirialVerlet(const Real& cut_off,
+                         const Vec3f& box,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const GroupVecType& Group_j,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                         const CoordOffsetType& coord_offset_j,
+                         vtkm::cont::ArrayHandle<Vec6f>& LJVirial);
+
      void fix_press_berendsen(const Real& scale_factor,
                               vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                               const ContPointLocator& locator);
 
      void ApplyPbc(const Vec3f& box,
+                   const Vec<Vec2f, 3>& range,
                    vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                    const ContPointLocator& locator);
+
+     void ApplyPbcFlag(const Vec3f& box,
+                       const Vec<Vec2f, 3>& range,
+                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+                       const ContPointLocator& locator,
+                       vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag);
  }
