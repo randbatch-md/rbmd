@@ -353,14 +353,6 @@ namespace RunWorklet
                                       const ContPointLocator& locator,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce);
 
-     void LJVirialPBC(const Real& cut_off,
-                     const Vec3f& box,
-                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                     const ContPointLocator& locator,
-                     const ContTopology& topology,
-                     const ContForceFunction& force_function,
-                     vtkm::cont::ArrayHandle<Vec6f>& lj_virial);
-
       void LJVirialVerlet(const Real& cut_off,
                          const Vec3f& box,
                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -386,4 +378,11 @@ namespace RunWorklet
                        vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                        const ContPointLocator& locator,
                        vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag);
+     void X2Lamda(const Vec6f& h_inv,
+                  const vtkm::Vec<vtkm::Range, 3>& range,
+                  vtkm::cont::ArrayHandle<vtkm::Vec3f>& position);
+
+     void Lamda2X(const Vec6f& h,
+                  const vtkm::Vec<vtkm::Range, 3>& range,
+                  vtkm::cont::ArrayHandle<vtkm::Vec3f>& position);
  }

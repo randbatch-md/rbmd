@@ -11,54 +11,6 @@
 
 namespace RunWorklet
 {
-    struct ComputeLJVirialPBCWorklet : vtkm::worklet::WorkletMapField
-  {
-  ComputeLJVirialPBCWorklet(const Real& cut_off, const Vec3f& box)
-    : _cut_off(cut_off)
-    , _box(box)
-  {
-  }
-
-  using ControlSignature = void(FieldIn atoms_id,
-                                ExecObject locator,
-                                ExecObject topology,
-                                ExecObject force_function,
-                                FieldOut lj_virial);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5);
-
-  VTKM_EXEC void operator()(const Id atoms_id,
-                            const ExecPointLocator& locator,
-                            const ExecTopology& topology,
-                            const ExecForceFunction& force_function,
-                            Vec6f& lj_virial) const
-  {
-    Vec6f virial = { 0, 0, 0, 0, 0, 0 };
-    const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
-    const auto& pts_type_i = topology.GetAtomsType(atoms_id);
-    auto eps_i = topology.GetEpsilon(pts_type_i);
-    auto sigma_i = topology.GetSigma(pts_type_i);
-
-    auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
-    {
-      auto molecular_id_j = topology.GetMolecularId(pts_id_j);
-      if (molecular_id_i == molecular_id_j)
-        return;
-
-      auto pts_type_j = topology.GetAtomsType(pts_id_j);
-      auto eps_j = topology.GetEpsilon(pts_type_j);
-      auto sigma_j = topology.GetSigma(pts_type_j);
-      // auto r_ij = p_j - p_i;
-      auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
-
-      virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
-    };
-    locator.ExecuteOnNeighbor(atoms_id, function);
-    lj_virial = virial;
-  }
-  Real _cut_off;
-  Vec3f _box;
-  };
-
     struct ComputeLJVirialVerletWorklet : vtkm::worklet::WorkletMapField
     {
     ComputeLJVirialVerletWorklet(const Real& cut_off, const Vec3f& box)
@@ -209,6 +161,73 @@ namespace RunWorklet
      Vec3f _box;
      Vec<Vec2f, 3> _range;
      };
+
+    struct X2LamdaWorklet : vtkm::worklet::WorkletMapField
+    {                   
+        X2LamdaWorklet(const Vec6f& h_inv,
+                       const vtkm::Vec<vtkm::Range, 3>& range)
+        : _h_inv(h_inv)
+        , _range(range)
+        {
+        }
+        
+        using ControlSignature = void(FieldInOut position);
+        using ExecutionSignature = void(_1);
+        
+        template<typename CoordType>
+        VTKM_EXEC void operator()(CoordType& position) const
+        {
+         Vec3f delta;
+         delta[0] = position[0] - _range[0].Min;
+         delta[1] = position[1] - _range[1].Min;
+         delta[2] = position[2] - _range[2].Min;
+        
+         // 计算 lamda 坐标
+         Vec3f lamda_position;
+         lamda_position[0] = _h_inv[0] * delta[0] + _h_inv[5] * delta[1] + _h_inv[4] * delta[2];
+         lamda_position[1] = _h_inv[1] * delta[1] + _h_inv[3] * delta[2];
+         lamda_position[2] = _h_inv[2] * delta[2];
+        
+         // 更新位置
+         position = lamda_position;
+        }
+        Vec6f _h_inv;
+        vtkm::Vec<vtkm::Range, 3> _range;  
+    };
+
+    struct Lamda2XWorklet : vtkm::worklet::WorkletMapField
+    {       
+        Lamda2XWorklet(const Vec6f& h, const vtkm::Vec<vtkm::Range, 3>& range)
+          : _h(h)
+          , _range(range)
+        {
+        }
+        using ControlSignature = void(FieldInOut position);
+        using ExecutionSignature = void(_1);
+
+        template<typename CoordType>
+        VTKM_EXEC void operator()(CoordType& position) const
+        {
+         Vec3f position_base;
+         position_base[0] = position[0];
+         position_base[1] = position[1];
+         position_base[2] = position[2];
+
+         // compute  real position
+         Vec3f x_position;
+         x_position[0] = _h[0] * position_base[0] + _h[5] * position_base[1] +
+           _h[4] * position_base[2] + static_cast<vtkm::FloatDefault>(_range[0].Min);
+
+         x_position[1] = _h[1] * position_base[1] + _h[3] * position_base[2] +
+           static_cast<vtkm::FloatDefault>(_range[1].Min);
+
+         x_position[2] = _h[2] * position_base[2] + static_cast<vtkm::FloatDefault>(_range[2].Min);
+        
+         position = x_position;
+        }
+        Vec6f _h;                         
+        vtkm::Vec<vtkm::Range, 3> _range; 
+    };
 
     struct ComputeNeighboursWorklet : vtkm::worklet::WorkletMapField
     {
@@ -2841,22 +2860,6 @@ namespace RunWorklet
                                eleFarNewforce);
     }
 
-     void LJVirialPBC(const Real& cut_off,
-                     const Vec3f& box,
-                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                     const ContPointLocator& locator,
-                     const ContTopology& topology,
-                     const ContForceFunction& force_function,
-                     vtkm::cont::ArrayHandle<Vec6f>& lj_virial)
-    {
-         vtkm::cont::Invoker{}(ComputeLJVirialPBCWorklet{ cut_off, box },
-                               atoms_id,
-                               locator,
-                               topology,
-                               force_function,
-                               lj_virial);
-    }
-
       void LJVirialVerlet(const Real& cut_off,
                        const Vec3f& box,
                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -2901,5 +2904,19 @@ namespace RunWorklet
                    const ContPointLocator& locator)
      {
          vtkm::cont::Invoker{}(ApplyPbcWorklet{ box, range }, position, locator);
-     }  
+     }
+
+      void X2Lamda(const Vec6f& h_inv,
+                   const vtkm::Vec<vtkm::Range, 3>& range,
+                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& position)
+     {
+         vtkm::cont::Invoker{}(X2LamdaWorklet{ h_inv, range }, position);
+     } 
+
+      void Lamda2X(const Vec6f& h,
+                  const vtkm::Vec<vtkm::Range, 3>& range,
+                  vtkm::cont::ArrayHandle<vtkm::Vec3f>& position)
+     {
+         vtkm::cont::Invoker{}(Lamda2XWorklet{ h, range }, position);
+     } 
  }

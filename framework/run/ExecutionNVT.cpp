@@ -87,8 +87,12 @@ void ExecutionNVT::Solve()
 
   ComputeTempe();
   UpdateVelocityByTempConType();
-  fix_press_berendsen();
-  //fix_press_berendsen_scale();
+
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "BERENDSEN")
+  {
+    fix_press_berendsen();
+    //fix_press_berendsen_scale();
+  }
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -1036,6 +1040,8 @@ void ExecutionNVT::fix_press_berendsen()
   Compute_Pressure_Scalar();
   Couple();
 
+
+  //Compute dilation
   auto currentstep = _app.GetExecutioner()->CurrentStep();
   auto beginstep = 0;
   auto endstep = _app.GetExecutioner()->NumStep();
@@ -1045,7 +1051,6 @@ void ExecutionNVT::fix_press_berendsen()
   {
     delta = delta / static_cast<Real>(endstep - beginstep);
   }
-  std::cout << ",delta=" << delta << std::endl;
 
   for (int i = 0; i < 3; i++)
   {
@@ -1057,12 +1062,7 @@ void ExecutionNVT::fix_press_berendsen()
       vtkm::Pow(1.0 - dt_over_period * (p_target[0] - p_current[i]) * bulkmodulus_inv, 1.0 / 3.0);
   }
 
-  std::cout << "p_target=" << p_target[0] << ",p_current=" << p_current[0]
-            << ",dilation=" << dilation[0] << std::endl;
-
   //remap simulation box and atoms
-  //redo KSpace coeffs since volume has changed
-
   remap();
   ApplyPbc();
   _locator.SetPosition(_position);
@@ -1156,24 +1156,12 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-
   ComputeVerletlistLJVirial(_virial_atom); //_virial_atom
-
-
-  //for (int i = 0; i <_virial_atom.GetNumberOfValues();++i)
-  //{
-  //  std::cout << "i=" << i << ",_virial_atom=" << _virial_atom.ReadPortal().Get(i)[0] << ","
-  //            << _virial_atom.ReadPortal().Get(i)[1] << "," << _virial_atom.ReadPortal().Get(i)[2] << ","
-  //            << _virial_atom.ReadPortal().Get(i)[3] << "," << _virial_atom.ReadPortal().Get(i)[4] << ","
-  //            << _virial_atom.ReadPortal().Get(i)[5]
-  //      << std::endl;
-  //}
 
   //reduce virial_atom
   //virial = { 0, 0, 0, 0, 0, 0 };
   //for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
   //{
-  //  // 获取当前原子的virial
   //  Vec6f vatom = _virial_atom.ReadPortal().Get(i);
   //  for (int j = 0; j < 6; ++j)
   //  {
@@ -1183,11 +1171,6 @@ void ExecutionNVT::ComputeVirial()
 
   virial =
     vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-  //
-  //for (int i = 0; i < 6; ++i)
-  //{
-  //  std::cout << "total_virial[" << i << "] = " << virial[i] << std::endl;
-  //}
 }
 
 void ExecutionNVT::Couple()
@@ -1242,59 +1225,53 @@ void ExecutionNVT::ApplyPbc()
 void ExecutionNVT::x2lamda(Id n)
 {
   //
-  Vec3f delta;
-  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
-  //
   vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  for (int i = 0; i < n; i++)
-  {
-    delta[0] = _position.ReadPortal().Get(i)[0] - range[0].Min;
-    delta[1] = _position.ReadPortal().Get(i)[1] - range[1].Min;
-    delta[2] = _position.ReadPortal().Get(i)[2] - range[2].Min;
-
-    Vec3f lamda_position = { h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2],
-                             h_inv[1] * delta[1] + h_inv[3] * delta[2],
-                             h_inv[2] * delta[2] };
-
-    _position.WritePortal().Set(i, lamda_position);
-  }
+  RunWorklet::X2Lamda(h_inv, range, _position);
   _locator.SetPosition(_position);
+
+
+  //Vec3f delta;
+  //vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+
   //for (int i = 0; i < n; i++)
   //{
-  //  std::cout << "i=" << i << ", lamda_position=" << _position.ReadPortal().Get(i)[0] << ","
-  //            << _position.ReadPortal().Get(i)[1] << "," << _position.ReadPortal().Get(i)[2]
-  //            << std::endl;
+  //  delta[0] = _position.ReadPortal().Get(i)[0] - range[0].Min;
+  //  delta[1] = _position.ReadPortal().Get(i)[1] - range[1].Min;
+  //  delta[2] = _position.ReadPortal().Get(i)[2] - range[2].Min;
+
+  //  Vec3f lamda_position = { h_inv[0] * delta[0] + h_inv[5] * delta[1] + h_inv[4] * delta[2],
+  //                           h_inv[1] * delta[1] + h_inv[3] * delta[2],
+  //                           h_inv[2] * delta[2] };
+
+  //  _position.WritePortal().Set(i, lamda_position);
   //}
+  //_locator.SetPosition(_position);
 }
 
 void ExecutionNVT::lamda2x(Id n)
 {
-  //auto position = GetFieldAsArrayHandle<Vec3f>(field::position);
   vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
-  Vec3f position_base;
-
-  for (int i = 0; i < n; i++)
-  {
-    position_base[0] = _position.ReadPortal().Get(i)[0];
-    position_base[1] = _position.ReadPortal().Get(i)[1];
-    position_base[2] = _position.ReadPortal().Get(i)[2];
-
-    Vec3f x_position = { h[0] * position_base[0] + h[5] * position_base[1] +
-                           h[4] * position_base[2] + static_cast<vtkm::FloatDefault>(range[0].Min),
-                         h[1] * position_base[1] + h[3] * position_base[2] +
-                           static_cast<vtkm::FloatDefault>(range[1].Min),
-                         h[2] * position_base[2] + static_cast<vtkm::FloatDefault>(range[2].Min) };
-
-    _position.WritePortal().Set(i, x_position);
-  }
+  RunWorklet::Lamda2X(h, range, _position);
   _locator.SetPosition(_position);
+
+  //vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  //Vec3f position_base;
+
   //for (int i = 0; i < n; i++)
   //{
-  //  std::cout << "i=" << i << ", new_position=" <<
-  //            _position.ReadPortal().Get(i)[0] << "," <<
-  //            _position.ReadPortal().Get(i)[1] << ","  << _position.ReadPortal().Get(i)[2]
-  //            << std::endl;
+  //  position_base[0] = _position.ReadPortal().Get(i)[0];
+  //  position_base[1] = _position.ReadPortal().Get(i)[1];
+  //  position_base[2] = _position.ReadPortal().Get(i)[2];
+
+  //  Vec3f x_position = { h[0] * position_base[0] + h[5] * position_base[1] +
+  //                         h[4] * position_base[2] + static_cast<vtkm::FloatDefault>(range[0].Min),
+  //                       h[1] * position_base[1] + h[3] * position_base[2] +
+  //                         static_cast<vtkm::FloatDefault>(range[1].Min),
+  //                       h[2] * position_base[2] + static_cast<vtkm::FloatDefault>(range[2].Min) };
+
+  //  _position.WritePortal().Set(i, x_position);
   //}
+  //_locator.SetPosition(_position);
 }
 
 void ExecutionNVT::remap()
@@ -1302,10 +1279,10 @@ void ExecutionNVT::remap()
   Real oldlo, oldhi, ctr;
   auto n = _position.GetNumberOfValues();
 
-  // convert pertinent atoms and rigid bodies to lamda coords
+  //  convert lamda coords
   x2lamda(n);
 
-  // reset global and local box to new size/shape
+  // change range and box 
   vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
   for (int i = 0; i < 3; i++)
   {
@@ -1326,16 +1303,6 @@ void ExecutionNVT::remap()
 
   set_global_box();
 
-
-  //for (auto i = 0; i < n; ++i)
-  //{
-  //  _position.ReadPortal().Get(i)[0] = (_position.ReadPortal().Get(i)[0] - ctr) * dilation[0] + ctr;
-  //  _position.ReadPortal().Get(i)[1] = (_position.ReadPortal().Get(i)[1] - ctr) * dilation[1] + ctr;
-  //  _position.ReadPortal().Get(i)[2] = (_position.ReadPortal().Get(i)[2] - ctr) * dilation[2] + ctr;
-  //}
-  //_locator.SetPosition(_position);
-
-  // convert pertinent atoms and rigid bodies back to box coords
-
+  // convert real coords
   lamda2x(n);
 }
