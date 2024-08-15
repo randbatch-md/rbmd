@@ -2015,6 +2015,20 @@ namespace RunWorklet
       }
     };
 
+    struct SumVirialWorklet : vtkm::worklet::WorkletMapField
+    {
+      using ControlSignature = void(FieldIn LJVirial, FieldIn EwaldVirial, FieldOut allVirial);
+      using ExecutionSignature = void(_1, _2, _3);
+
+
+      VTKM_EXEC void operator()(const Vec6f& LJVirial,
+                                const Vec6f& EwaldVirial,
+                                Vec6f& allVirial) const
+      {
+        allVirial = LJVirial + EwaldVirial;
+      }
+    };
+
     struct SumFarNearLJForceWorklet : vtkm::worklet::WorkletMapField
     {
       using ControlSignature = void(FieldIn farforce,
@@ -2182,6 +2196,44 @@ namespace RunWorklet
          locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
       }
       IdComponent _Kmax;
+    };   
+
+    struct ComputeEwaldVirialWorklet : vtkm ::worklet::WorkletMapField
+    {
+      ComputeEwaldVirialWorklet(const IdComponent& Kmax, const Real& unit_factor )
+        : _Kmax(Kmax)
+        , _unit_factor(unit_factor)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    WholeArrayIn whole_rhok,
+                                    ExecObject force_function,
+                                    ExecObject topology,
+                                    ExecObject locator,
+                                    FieldOut force);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+
+      template<typename WholeRhokType>
+      VTKM_EXEC void operator()(const Id atoms_id,
+                                const WholeRhokType& whole_rhok,
+                                ExecForceFunction& force_function,
+                                const ExecTopology& topology,
+                                const ExecPointLocator& locator,
+                                Vec6f& virial) const
+      {
+         virial = { 0, 0, 0, 0, 0, 0 };
+         const auto& charge_p_i = topology.GetCharge(atoms_id);
+         const auto& p_i = locator.GetPtsPosition(atoms_id);
+         auto function = [&](const vtkm::Vec3f& M, const vtkm::Id& indexEwald)
+         {
+           auto rhok_ri = whole_rhok.Get(indexEwald - 1);
+           virial += _unit_factor * force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
+         };
+         locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
+      }
+      IdComponent _Kmax;
+      Real _unit_factor;
     };   
 
     void ComputeNeighbours(const Real& cut_off,
@@ -2724,7 +2776,15 @@ namespace RunWorklet
                          vtkm::cont::ArrayHandle<vtkm::Vec3f>& Allforce)
     {
       vtkm::cont::Invoker{}(SumFarNearForceWorklet{}, eleFarNewforce, nearforce, Allforce);
-    }    
+    }
+
+    void SumVirial(const vtkm::cont::ArrayHandle<Vec6f>& LJVirial,
+                   const vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial,
+                   vtkm::cont::ArrayHandle<Vec6f>& AllVirial)
+    {
+      vtkm::cont::Invoker{}(SumVirialWorklet{}, LJVirial, EwaldVirial, AllVirial);
+    }   
+
 
     void SumFarNearLJForce(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce,
                        const vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleNearforce,
@@ -2844,12 +2904,12 @@ namespace RunWorklet
     
 
     void ComputeNewFarElectrostatics(const IdComponent& Kmax,
-                                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                                             const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
-                                             const ContForceFunction& force_function,
-                                             const ContTopology& topology,
-                                             const ContPointLocator& locator,
-                                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce)
+                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                     const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
+                                     const ContForceFunction& force_function,
+                                     const ContTopology& topology,
+                                     const ContPointLocator& locator,
+                                     vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce)
     {
          vtkm::cont::Invoker{}(ComputeNewFarElectrostaticsWorklet{ Kmax },
                                atoms_id,
@@ -2858,6 +2918,24 @@ namespace RunWorklet
                                topology,
                                locator,
                                eleFarNewforce);
+    }
+
+     void ComputeEwaldVirial(const IdComponent& Kmax,
+                             const Real& unit_factor,
+                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                            const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
+                            const ContForceFunction& force_function,
+                            const ContTopology& topology,
+                            const ContPointLocator& locator,
+                            vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial)
+    {
+         vtkm::cont::Invoker{}(ComputeEwaldVirialWorklet{ Kmax, unit_factor },
+                               atoms_id,
+                               whole_rhok,
+                               force_function,
+                               topology,
+                               locator,
+                               EwaldVirial);
     }
 
       void LJVirialVerlet(const Real& cut_off,

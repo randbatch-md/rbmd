@@ -654,6 +654,17 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::EleNewForce()
   return _ele_new_force;
 }
 
+vtkm::cont::ArrayHandle<Vec6f> ExecutionNVT::LJVirial()
+{
+  ComputeVerletlistLJVirial(_virial_atom_lj);
+  return _virial_atom_lj;
+}
+
+vtkm::cont::ArrayHandle<Vec6f> ExecutionNVT::EwaldVirial()
+{
+  ComputeEwaldVirial(_Kmax, _virial_atom_ewald);
+  return _virial_atom_ewald;
+}
 void ExecutionNVT::TempConTypeForce()
 {
   vtkm::cont::ArrayHandle<Real> mass;
@@ -1156,8 +1167,10 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-  ComputeVerletlistLJVirial(_virial_atom); //_virial_atom
+  //ComputeVerletlistLJVirial(_virial_atom); //_virial_atom
 
+  //ComputeEwaldVirial(_Kmax, _virial_atom);
+  RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);
   //reduce virial_atom
   //virial = { 0, 0, 0, 0, 0, 0 };
   //for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)

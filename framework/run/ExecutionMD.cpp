@@ -439,6 +439,16 @@ void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ew
     Kmax, _atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force);
 }
 
+void ExecutionMD::ComputeEwaldVirial(IdComponent& Kmax, ArrayHandle<Vec6f>& Ewald_virial)
+{
+  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  auto rhok = ComputeChargeStructureFactorEwald(box, Kmax);
+  ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
+  RunWorklet::ComputeEwaldVirial(
+    Kmax, _unit_factor._qqr2e,_atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_virial);
+}
+
 void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
 {
   auto N = _position.GetNumberOfValues();

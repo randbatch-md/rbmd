@@ -256,32 +256,38 @@ public:
     return force;
   }
 
-  VTKM_EXEC Vec3f ComputeFarEleVirial(const Vec3f& M,
+  VTKM_EXEC Vec6f ComputeEwaldVirial(const Vec3f& M,
                                       const Vec3f& r_i,
                                       const Real& charge_p_i,
-                                      const Vec2f& rhok_ri,
-                                      vtkm::Vec<Real, 6>& virial) // virial变量
+                                      const Vec2f& rhok_ri)
   {
-    Vec3f force = { 0, 0, 0 };
+    //auto dielectric = 1.0;
+    // auto  scale = 1.0;
+    //qqrd2e = qqr2e / dielectric;
+    //const double qscale = qqrd2e * scale;
+    Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+
     Vec3f K{ 0, 0, 0 };
     K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
     K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
     K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
+    auto volume = _box[0] * _box[1] * _box[2];
 
     Real range_K_2 = K[0] * K[0] + K[1] * K[1] + K[2] * K[2];
-    auto factor_a = -4 * vtkm::Pi() * charge_p_i * K;
-    auto factor_b = vtkm::Exp(-range_K_2 / (4 * _alpha));
+
     auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
     auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
 
-    force = factor_a / (_volume * range_K_2) * factor_b * (factor_c - factor_d);
+
+    auto ug = (-4 * vtkm::Pi() / volume) *
+            vtkm::Exp(-range_K_2 / (4 * _alpha)) / range_K_2;
+    Real uk = ug * (factor_c * factor_c + factor_d * factor_d);
 
     // 计算virial的中间变量
-    Real vterm = -2.0 * (1.0 / range_K_2 + 0.25 * (1.0 / (_alpha * _alpha)));
-    Real uk = factor_b * (factor_c * factor_c + factor_d * factor_d);
+    Real vterm = -2.0 * (1.0 / range_K_2 + (1.0 / 4*_alpha));
 
     // 计算vg的各个分量
-    vtkm::Vec<Real, 6> vg;
+    Vec6f vg;
     vg[0] = 1.0 + vterm * K[0] * K[0]; // xx 分量
     vg[1] = 1.0 + vterm * K[1] * K[1]; // yy 分量
     vg[2] = 1.0 + vterm * K[2] * K[2]; // zz 分量
@@ -292,10 +298,10 @@ public:
     // 更新 virial，累加到全局 virial 数组中
     for (int j = 0; j < 6; ++j)
     {
-      virial[j] += uk * vg[j];
+      virial[j] = uk * vg[j];
     }
 
-    return force;
+    return virial;
   }
 
 

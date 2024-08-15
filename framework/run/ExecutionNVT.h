@@ -28,6 +28,8 @@ private:
   vtkm::cont::ArrayHandle<Vec3f> DihedralsForce();
   vtkm::cont::ArrayHandle<Vec3f> SpecialCoulForce();
   vtkm::cont::ArrayHandle<Vec3f> EleNewForce();
+  vtkm::cont::ArrayHandle<Vec6f> LJVirial();
+  vtkm::cont::ArrayHandle<Vec6f> EwaldVirial();
   void TempConTypeForce();
   void ComputeTempe();
   void InitialCondition() override;
@@ -141,6 +143,8 @@ private:
   std::vector<Id> map; // mapping from atom types to elements
 
       //
+  ArrayHandle<Vec6f> _virial_atom_lj;
+  ArrayHandle<Vec6f> _virial_atom_ewald;
   ArrayHandle<Vec6f> _virial_atom;
   Real _lj_potential_energy;
   Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz

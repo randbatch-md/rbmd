@@ -282,6 +282,10 @@ namespace RunWorklet
                          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& nearforce,
                          vtkm::cont::ArrayHandle<vtkm::Vec3f>& Allforce);
 
+    void SumVirial(const vtkm::cont::ArrayHandle<Vec6f>& LJVirial,
+                   const vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial,
+                         vtkm::cont::ArrayHandle<Vec6f>& AllVirial);
+
     void SumFarNearLJForce(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce,
                            const vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleNearforce,
                            const vtkm::cont::ArrayHandle<vtkm::Vec3f>& LJforce,
@@ -352,6 +356,15 @@ namespace RunWorklet
                                       const ContTopology& topology,
                                       const ContPointLocator& locator,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce);
+
+     void ComputeEwaldVirial(const IdComponent& Kmax,
+                            const Real& unit_factor,
+                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                            const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
+                            const ContForceFunction& force_function,
+                            const ContTopology& topology,
+                            const ContPointLocator& locator,
+                            vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial);
 
       void LJVirialVerlet(const Real& cut_off,
                          const Vec3f& box,
