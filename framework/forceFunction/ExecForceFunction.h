@@ -273,7 +273,7 @@ public:
     K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
     auto volume = _box[0] * _box[1] * _box[2];
 
-    Real range_K_2 = K[0] * K[0] + K[1] * K[1] + K[2] * K[2];
+    Real range_K_2 = K[0] * K[0] + K[1] * K[1] + K[2] * K[2];  //K[0] = 2.0*vtkm::Pi()/_box[0],  K[0]^2 = sqk[0] = K[0] *M[0]  * K[0] *M[0]   
 
     auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
     auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
@@ -299,6 +299,224 @@ public:
     for (int j = 0; j < 6; ++j)
     {
       virial[j] = uk * vg[j];
+    }
+
+    return virial;
+  }
+
+  VTKM_EXEC Vec6f ComputeEwaldVirial1(const Vec3f& M,
+                                     const Vec3f& r_i,
+                                     const Real& charge_p_i,
+                                     const Vec2f& rhok_ri)
+  {
+
+    Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+
+    Vec3f K{ 0, 0, 0 };
+    K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
+    K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
+    K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
+    auto volume = _box[0] * _box[1] * _box[2];
+
+
+
+    auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
+    auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
+
+
+    Real ug;
+    Real uk = ug * (factor_c * factor_c + factor_d * factor_d);
+
+    // 计算virial的中间变量
+    Real vterm;
+
+    // 计算vg的各个分量
+    Vec6f vg;
+
+
+    // 更新 virial，累加到全局 virial 数组中
+    for (int j = 0; j < 6; ++j)
+    {
+      virial[j] = uk * vg[j];
+    }
+
+    return virial;
+  }
+
+   VTKM_EXEC Vec6f ComputeEwaldVirial2(const Vec3f& M,
+                                     const Vec3f& r_i,
+                                     const Real& charge_p_i,
+                                     const Vec2f& rhok_ri) const
+  {
+    Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+    Vec3f K{ 0, 0, 0 };
+
+    // 计算K向量
+    K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
+    K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
+    K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
+
+    auto volume = _box[0] * _box[1] * _box[2];
+
+    auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
+    auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
+
+    Real ug = rhok_ri[0] * rhok_ri[1]; // 根据实际情况计算ug
+    Real uk = ug * (factor_c * factor_c + factor_d * factor_d);
+
+    // 计算vg分量
+    Vec6f vg = { 0, 0, 0, 0, 0, 0 };
+
+    Real sqk = vtkm::Dot(K, K);
+    Real vterm = -2.0 * (1.0 / sqk + 0.25 * _alpha);
+
+    // vg的计算分为几种情况
+
+    // (k,0,0)
+    if (M[1] == 0 && M[2] == 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]);
+      vg[1] = 1.0;
+      vg[2] = 1.0;
+      vg[3] = 0.0;
+      vg[4] = 0.0;
+      vg[5] = 0.0;
+    }
+    // (0,l,0)
+    else if (M[0] == 0 && M[2] == 0)
+    {
+      vg[0] = 1.0;
+      vg[1] = 1.0 + vterm * (K[1] * M[1]) * (K[1] * M[1]);
+      vg[2] = 1.0;
+      vg[3] = 0.0;
+      vg[4] = 0.0;
+      vg[5] = 0.0;
+    }
+    // (0,0,m)
+    else if (M[0] == 0 && M[1] == 0)
+    {
+      vg[0] = 1.0;
+      vg[1] = 1.0;
+      vg[2] = 1.0 + vterm * (K[2] * M[2]) * (K[2] * M[2]);
+      vg[3] = 0.0;
+      vg[4] = 0.0;
+      vg[5] = 0.0;
+    }
+    // (k,l,0)
+    else if (M[2] == 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]); 
+      vg[1] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]); 
+      vg[2] = 1.0;
+      vg[3] = vterm * (K[0] * M[0]) * (K[1] * M[1]); 
+      vg[4] = 0.0;
+      vg[5] = 0.0;
+    }
+    // (k,-l,0)
+    else if (M[2] == 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]);
+      vg[1] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]);
+      vg[2] = 1.0;
+      vg[3] = -vterm * (K[0] * M[0]) * (K[1] * M[1]); 
+      vg[4] = 0.0;
+      vg[5] = 0.0;
+    }
+    // (0,l,m)
+    else if (M[0] == 0)
+    {
+      vg[0] = 1.0;
+      vg[1] = 1.0 + vterm * (K[1] * M[1]) * (K[1] * M[1]);  
+      vg[2] = 1.0 + vterm * (K[2] * M[2]) * (K[2] * M[2]);          
+      vg[3] = 0.0;
+      vg[4] = 0.0;
+      vg[5] = vterm * (K[1] * M[1]) * (K[2] * M[2]);
+    }
+    // (0,l,-m)
+    else if (M[0] == 0)
+    {
+      vg[0] = 1.0;
+      vg[1] = 1.0 + vterm * (K[1] * M[1]) * (K[1] * M[1]);
+      vg[2] = 1.0 + vterm * (K[1] * M[1]) * (K[1] * M[1]);
+      vg[3] = 0.0;
+      vg[4] = 0.0;
+      vg[5] = -vterm * (K[1] * M[1]) * (K[2] * M[2]);
+    }
+    // (k,0,m)
+    else if (M[1] == 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]);
+      vg[1] = 1.0;
+      vg[2] = 1.0 + vterm * (K[2] * M[2]) * (K[2] * M[2]);
+      vg[3] = 0.0;
+      vg[4] = vterm * (K[0] * M[0]) * (K[2] * M[2]);
+      vg[5] = 0.0;
+    }
+    // (k,0,-m)
+    else if (M[1] == 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]);
+      vg[1] = 1.0;
+      vg[2] = 1.0 + vterm * (K[2] * (-M[2])) * (K[2] * (-M[2]));
+      vg[3] = 0.0;
+      vg[4] = -vterm * (K[0] * M[0]) * (K[2] * M[2]);
+      vg[5] = 0.0;
+    }
+    // (k,l,m)
+    else if (M[0] > 0 && M[1] > 0 && M[2] > 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * M[0]) * (K[0] * M[0]) ;
+      vg[1] = 1.0 + vterm * (K[1] * M[1]) * (K[1] * M[1]) ;
+      vg[2] = 1.0 + vterm * (K[2] * M[2]) * (K[2] * M[2]) ;
+      vg[3] = vterm * (K[0] * M[0]) * (K[1] * M[1]);
+      vg[4] = vterm * (K[0] * M[0]) * (K[2] * M[2]);
+      vg[5] = vterm * (K[1] * M[1]) * (K[2] * M[1]);
+    }
+
+      // (k,-l,m)
+    else if (M[1] < 0 && M[1] < 0 && M[2] > 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * K[0]);
+      vg[1] = 1.0 + vterm * (K[1] * K[1]);
+      vg[2] = 1.0 + vterm * (K[2] * K[2]);
+      vg[3] = -vterm * (K[0] * M[0] * K[1] * M[1]);
+      vg[4] = vterm * (K[0] * K[2]);
+      vg[5] = -vterm * (K[1] * K[2]);
+    }
+
+      // (k,l,-m)
+    else if (M[1] > 0 && M[1] > 0 && M[2] < 0)
+    {
+      vg[0] = 1.0 + vterm * (K[0] * K[0]);
+      vg[1] = 1.0 + vterm * (K[1] * K[1]);
+      vg[2] = 1.0 + vterm * (K[2] * K[2]);
+      vg[3] = vterm * (K[0] * K[1]);
+      vg[4] = -vterm * (K[0] * K[2]);
+      vg[5] = -vterm * (K[1] * K[2]);
+    }
+
+      // (k,-l,-m)
+    else
+    {
+      vg[0] = 1.0 + vterm * (K[0] * K[0]);
+      vg[1] = 1.0 + vterm * (K[1] * K[1]);
+      vg[2] = 1.0 + vterm * (K[2] * K[2]);
+      vg[3] = -vterm * (K[0] * K[1]);
+      vg[4] = -vterm * (K[0] * K[2]);
+      vg[5] = vterm * (K[1] * K[2]);
+    }
+
+
+     // (k,-l,m)
+
+     //(k, l, -m)
+
+     // (k, -l, -m)
+
+    // 更新 virial
+    for (int j = 0; j < 6; ++j)
+    {
+      virial[j] += uk * vg[j];
     }
 
     return virial;

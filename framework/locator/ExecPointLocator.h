@@ -117,7 +117,86 @@ public:
       }
     }
   }
-             
+  
+  template<typename Func>
+  VTKM_EXEC void ExecuteOnKNeighbor1(const IdComponent& k_maxconst,
+                                    const vtkm::Id& atoms_id,
+                                    Func& function) const
+  {
+    vtkm::Id indexEwald = 0;
+    for (vtkm::Id i = -k_maxconst; i <= k_maxconst; i++)
+    {
+      for (vtkm::Id j = -k_maxconst; j <= k_maxconst; j++)
+      {
+        for (vtkm::Id k = -k_maxconst; k <= k_maxconst; k++)
+        {
+          // 针对不同的(k,l,m)组合分别处理
+          if (i != 0 || j != 0 || k != 0)
+          {
+            vtkm::Vec3f M = { Real(i), Real(j), Real(k) };
+
+            // 处理(k,0,0)、(0,l,0)、(0,0,m)
+            if (j == 0 && k == 0)
+            {
+              function(M, indexEwald);
+            }
+            else if (i == 0 && k == 0)
+            {
+              function(M, indexEwald);
+            }
+            else if (i == 0 && j == 0)
+            {
+              function(M, indexEwald);
+            }
+
+            // 处理(k,l,0)、(k,-l,0)
+            else if (k == 0)
+            {
+              vtkm::Vec3f M_pos = { Real(i), Real(j), 0 };
+              vtkm::Vec3f M_neg = { Real(i), -Real(j), 0 };
+              function(M_pos, indexEwald);
+              function(M_neg, indexEwald);
+            }
+
+            // 处理(0,l,m)、(0,l,-m)
+            else if (i == 0)
+            {
+              vtkm::Vec3f M_pos = { 0, Real(j), Real(k) };
+              vtkm::Vec3f M_neg = { 0, Real(j), -Real(k) };
+              function(M_pos, indexEwald);
+              function(M_neg, indexEwald);
+            }
+
+            // 处理(k,0,m)、(k,0,-m)
+            else if (j == 0)
+            {
+              vtkm::Vec3f M_pos = { Real(i), 0, Real(k) };
+              vtkm::Vec3f M_neg = { Real(i), 0, -Real(k) };
+              function(M_pos, indexEwald);
+              function(M_neg, indexEwald);
+            }
+
+            // 处理(k,l,m)、(k,-l,m)、(k,l,-m)、(k,-l,-m)
+            else
+            {
+              vtkm::Vec3f M1 = { Real(i), Real(j), Real(k) };
+              vtkm::Vec3f M2 = { Real(i), -Real(j), Real(k) };
+              vtkm::Vec3f M3 = { Real(i), Real(j), -Real(k) };
+              vtkm::Vec3f M4 = { Real(i), -Real(j), -Real(k) };
+              function(M1, indexEwald);
+              function(M2, indexEwald);
+              function(M3, indexEwald);
+              function(M4, indexEwald);
+            }
+
+            indexEwald++;
+          }
+        }
+      }
+    }
+  }
+
+
   // 周期性算最小距离
   VTKM_EXEC Vec3f MinDistance(const Vec3f& p1, const Vec3f& p2, const Real& _vlength) const
   {
