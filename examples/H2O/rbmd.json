@@ -2,7 +2,7 @@
   "init_configuration": {
 
     "read_data": {
-      "file": "rbmd.data",
+      "file": "rbmd1.data",
       "unit": "REAL", //LJ ,REAL
       "atom_style": "full", //支持atomic，charge,full
       "velocity_type": "GAUSS"
@@ -27,8 +27,8 @@
     "neighbor": {
       "type": "RBL", //RBL,VERLET-LIST
       "cut_off": 12,
-      "r_core": 6,
-      "neighbor_sample_num": 50
+      "r_core": 5,
+      "neighbor_sample_num": 100
     },
 
     "coulomb": {
@@ -46,7 +46,7 @@
 
   "execution": {
     "ensemble": "NVT", // "NVE","NVT" ,"NPT"
-    "temperature":[ 298.0, 298.0, 5],  // 5= 10*dt;
+    "temperature":[ 298.0, 298.0, 1],  // 5= 20*dt;
 	"pressure" :[1.0,1.0,1000],
     "temp_ctrl_type": "BERENDSEN", //BERENDSEN ，NOSE_HOOVER                                      
     "press_ctrl_type": "Parrinello-Rahman", //Berendsen ,stochastic cell rescaling ,Parrinello-Rahman    
