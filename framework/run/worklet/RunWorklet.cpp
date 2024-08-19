@@ -1657,7 +1657,7 @@ namespace RunWorklet
 
     struct ComputeSpecialCoulWorklet : vtkm ::worklet::WorkletMapField
        {
-          ComputeSpecialCoulWorklet(const Vec3f box)
+          ComputeSpecialCoulWorklet(const Vec3f& box)
             : _box(box)
          {
          }
@@ -1709,11 +1709,11 @@ namespace RunWorklet
        };
 
     struct ComputeSpecialCoulGeneralWorklet : vtkm ::worklet::WorkletMapField
-       {
-         ComputeSpecialCoulGeneralWorklet(const Vec3f box)
+    {
+         ComputeSpecialCoulGeneralWorklet(const Vec3f& box)
            : _box(box)
-      {
-      }
+         {
+         }
        
          using ControlSignature = void(FieldIn atoms_id,
                                        FieldIn group_vec,
@@ -1775,7 +1775,7 @@ namespace RunWorklet
             } 
          }
          Vec3f _box;
-       };
+    };
 
     struct ComputeNewRBEForceWorklet : vtkm ::worklet::WorkletMapField
        {

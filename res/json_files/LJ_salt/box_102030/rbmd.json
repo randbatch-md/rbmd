@@ -1,0 +1,86 @@
+﻿{
+  "init_configuration": {
+    //"inbuild": {
+    //  "dims": [ 10, 20, 30 ],
+    //  "x_range": [ 0.0, 10.0 ],
+    //  "y_range": [ 0.0, 20.0 ],
+    //  "z_range": [ 0.0, 30.0 ],
+    //  "velocity_type": "GAUSS",
+    //  "unit": "LJ",
+	//  "atom_style": "charge"
+    //}
+	
+      "read_data": {
+      "file": "rbmd.data",
+      "unit": "LJ", //LJ ,REAL
+      "atom_style": "charge", //支持atomic，charge,full
+      "velocity_type": "GAUSS"
+    }
+  },
+
+  "hyper_parameters": {
+    "force_field": {
+      "type": "CVFF"
+    },
+
+    "neighbor": {
+      "type": "RBL", //RBL,VERLET-LIST
+      "cut_off": 5,
+      "r_core": 2.5,
+      "neighbor_sample_num": 100
+    },
+
+    "coulomb": {
+      "type": "RBE", //  RBE,EWALD
+      "coulomb_sample_num": 100,
+      "alpha": 0.5476,
+      "kmax": 2
+    },
+
+    "extend": {
+    //  "fix_shake": false
+    },
+  },
+
+  "execution": {
+    "ensemble": "NVT", 
+    "temperature": [ 1.0, 1.0, 0.5 ], 
+    "pressure": [ 1.0, 1.0, 1000 ], 
+    "temp_ctrl_type": "BERENDSEN", 
+    "press_ctrl_type": "Parrinello-Rahman",
+    "timestep": 2e-3, 
+    "num_steps": 10000
+  },
+
+  "outputs": {
+
+    "thermo_out": { 
+      "interval": 1
+    },
+
+    "rdf_out": {
+      "interval": 10,
+      "radius": 5,
+      "dr": 0.01,
+      "statistics_rdf_steps": 1000,
+      "atoms_pair": [ [ 1, 1 ] ]
+    },
+
+    "msd_out": {
+      "interval": 10,
+      "start_step": 0,
+      "end_step": 10000
+    },
+
+    "vacf_out": {
+      "interval": 10,
+      "start_step": 0,
+      "end_step": 10000
+    },
+    
+    "trajectory_out": {
+      "interval": 100
+    }
+
+  }
+}
