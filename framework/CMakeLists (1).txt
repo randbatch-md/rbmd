@@ -1,0 +1,174 @@
+﻿# 依赖vtkm
+cmake_minimum_required(VERSION 3.8)
+project(framework)
+#安装cxxopts
+include(./cmake/cxxopts.cmake)
+setup_cxxopts()
+
+#安装json
+include(./cmake/jsoncpp.cmake)
+setup_jsoncpp()
+
+if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+set(VTKm_DIR "${CMAKE_CURRENT_LIST_DIR}/../../vtkm_out/lib/cmake/vtkm-1.9" CACHE PATH "VTK directory override" FORCE)
+endif()
+
+#enable_language(CUDA)
+set(Torch_DIR "/data/zkh_mace/libtorch/share/cmake/Torch")
+set(CMAKE_PREFIX_PATH "/data/zkh_mace/libtorch")
+find_package(Torch REQUIRED)
+#set(VTKm_DIR "/data/zkh_mace/vtkm_out")
+#set(CMAKE_PREFIX_PATH "/data/zkh_mace/vtkm_out")
+#cmake_policy(SET CMP0146 NEW)
+#set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-11.8")
+#set(CUDA_PATH "/usr/local/cuda-11.8")
+#find_package(CUDA REQUIRED)
+#include_directories(${CUDA_INCLUDE_DIRS})
+#add_definitions(-D VTKm_NO_CUDA)
+#set(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4")
+#set(CUDA_NVCC_EXECUTABLE "${CUDA_TOOLKIT_ROOT_DIR}/bin/nvcc")
+#set(CUDA_INCLUDE_DIRS "${CUDA_TOOLKIT_ROOT_DIR}/include")
+#set(CUDA_LIBRARIES "${CUDA_TOOLKIT_ROOT_DIR}/lib/x64")
+
+#set(CMAKE_CUDA_STANDARD 17)
+#set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+#(CUDA_SEPARABLE_COMPILATION ON)
+#set(CMAKE_CUDA_ARCHITECTURES 86) 
+#set(CMAKE_CUDA_COMPILER "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4/bin/nvcc.exe")
+#set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DTHRUST_IGNORE_CUB")
+
+#set(CMAKE_PREFIX_PATH "D:/workspace/libtorch")
+#set(LIBTORCH_PATH "/data/zkh_mace/libtorch")
+#include_directories(${LIBTORCH_PATH}/include)
+#include_directories(${LIBTORCH_PATH}/include/torch/csrc/api/include)
+#include_directories(${LIBTORCH_PATH}/include/torch/csrc/autograd)
+#include_directories(${LIBTORCH_PATH}/include/torch/csrc/cuda)
+#link_directories(${LIBTORCH_PATH}/lib)
+#find_package(Torch REQUIRED)
+#set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS})
+#find_package(CUDA REQUIRED)
+
+#set(CMAKE_PREFIX_PATH "D:/sl/vtk/x64-Release-CUDA/lib/cmake/vtk-9.2/vtkm" ${CMAKE_PREFIX_PATH})
+#set(CMAKE_PREFIX_PATH "D:/sl/x64-Release-double" ${CMAKE_PREFIX_PATH})
+find_package(VTKm REQUIRED QUIET)
+
+set(target ${project_name})
+
+set(host_src
+parser/Configuration.cpp
+application/Application.cpp
+application/MDApplication.cpp
+executioner/Executioner.cpp
+output/Output.cpp
+output/FileOutput.cpp
+output/ConsoleOutput.cpp
+output/Progress.cpp
+model/FormatTable.cpp
+InitCondition/MeshFreeCondition.cpp
+InitCondition/ModelFileInitCondition.cpp
+InitCondition/MeshFreeFileInitCondition.cpp
+hyperparameters/Coulomb.cpp
+hyperparameters/Extend.cpp
+hyperparameters/ForceField.cpp
+hyperparameters/Neighbor.cpp
+)
+
+set(device_src
+output/ThermoOutput.cpp
+output/TempOutput.cpp
+output/RDFOutput.cpp
+output/MSDOutput.cpp
+output/VACFOutput.cpp
+output/worklet/OutPutWorklet.cpp
+output/TrajectoryOutput.cpp
+InitCondition/LJInitCondition.cpp
+InitCondition/MadelungInitCondition.cpp
+locator/ContPointLocator.cxx
+forceFunction/ContForceFunction.cpp
+topology/ContTopology.cpp
+staticTable/ContStaticTable.cpp
+run/ExecutionNPT.cpp
+run/ExecutionNVT.cpp
+run/ExecutionNVE.cpp
+run/ExecutionMD.cpp
+run/worklet/RunWorklet.cpp
+parser/InitGlobal.cpp
+mace/maceload.cpp
+)
+
+# 头文件引入
+add_library(_compiler_flags INTERFACE)
+target_include_directories(_compiler_flags INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/application
+  ${CMAKE_CURRENT_SOURCE_DIR}/executioner
+  ${CMAKE_CURRENT_SOURCE_DIR}/mesh
+  ${CMAKE_CURRENT_SOURCE_DIR}/meshmodifier
+  ${CMAKE_CURRENT_SOURCE_DIR}/output
+  ${CMAKE_CURRENT_SOURCE_DIR}/parser
+  ${CMAKE_CURRENT_SOURCE_DIR}/userobject
+  ${CMAKE_CURRENT_SOURCE_DIR}/model
+  ${CMAKE_CURRENT_SOURCE_DIR}/InitCondition
+  ${CMAKE_CURRENT_SOURCE_DIR}/locator
+  ${CMAKE_CURRENT_SOURCE_DIR}/forceFunction
+  ${CMAKE_CURRENT_SOURCE_DIR}/topology
+  ${CMAKE_CURRENT_SOURCE_DIR}/hyperparameters
+  ${CMAKE_CURRENT_SOURCE_DIR}/run
+  ${CMAKE_CURRENT_SOURCE_DIR}/mace
+  ${JSON_INSTALL_PATH}/include
+  ${CXXOPTS_INSTALL_PATH}/include
+  )
+  # 看来要在res 文件下建立cmake文件
+  # 定义lib
+add_library(libsemd STATIC ${host_src} ${device_src})
+target_link_libraries(libsemd PUBLIC _compiler_flags)
+
+#链接json库
+#set(CMAKE_PREFIX_PATH ${JSON_INSTALL_PATH}/lib/cmake)
+#find_package(jsoncpp REQUIRED)
+target_link_directories(libsemd PUBLIC ${JSON_INSTALL_PATH}/lib)
+target_link_libraries(libsemd PRIVATE jsoncpp)
+
+#加载 VTK-m 
+target_link_libraries(libsemd PUBLIC vtkm_cont vtkm_worklet vtkm_io)
+target_link_libraries(libsemd PRIVATE ${VTK_LIBRARIES})
+target_link_libraries(libsemd PUBLIC fmt::fmt)
+vtkm_add_target_information(libsemd DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES ${device_src})
+
+target_link_libraries(libsemd PRIVATE "${TORCH_LIBRARIES}")
+
+#target_link_libraries(libsemd PRIVATE "${TORCH_LIBRARIES}" "${CUDA_LIBRARIES}")
+#target_link_libraries(libsemd PRIVATE ${CUDA_LIBRARIES})
+#target_include_directories(libsemd PRIVATE ${CUDA_INCLUDE_DIRS})
+    #${LIBTORCH_PATH}/lib/caffe2_nvrtc.lib    
+target_include_directories(libsemd PRIVATE "${TORCH_INCLUDE_DIRS}")
+#set_property(TARGET libsemd PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+#target_link_libraries(libsemd PRIVATE ${C10_LIBRARIES})
+
+  # 定义target
+add_executable(${target} main.cpp)
+#file(COPY ${CMAKE_SOURCE_DIR}/framework/res/Gnear_table_geq2_2.txt DESTINATION ${CMAKE_BINARY_DIR}/framework/res)
+#file(COPY ${CMAKE_SOURCE_DIR}/framework/res/Gnear_table_leq2_2.txt DESTINATION ${CMAKE_BINARY_DIR}/framework/res)
+#file(COPY "../res" DESTINATION ${CMAKE_BINARY_DIR}/framework)
+#file(COPY "../res" DESTINATION ${CMAKE_BINARY_DIR}/framework)
+
+
+target_link_libraries(${target} PUBLIC libsemd)
+vtkm_add_target_information(${target} DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES main.cpp)
+
+install(TARGETS ${target} 
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
+  )
+
+#install(DIRECTORY "../res"
+#        DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
+        #FILES_MATCHING
+        #PATTERN "Gnear_table_geq2_2.txt"
+        #PATTERN "Gnear_table_leq2_2.txt")
+
+#install(DIRECTORY "../res/"
+#        DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
+#        FILES_MATCHING
+#        PATTERN "LJFluid.json"
+#        PATTERN "rbmd.data"
+#        PATTERN "rbmd.json")

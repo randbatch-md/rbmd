@@ -19,7 +19,7 @@
 
   "hyper_parameters": {
     "force_field": {
-      "type": "CVFF" //,  OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file)
+      "type": "CVFF" //,  OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file),MACE
       //"potential_file": "/path/to/"
     },
 

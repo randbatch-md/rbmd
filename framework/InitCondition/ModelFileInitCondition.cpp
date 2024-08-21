@@ -10,8 +10,11 @@
 #include <vtkm/cont/ConvertNumComponentsToOffsets.h>
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
 
+
+
 ModelFileInitCondition::ModelFileInitCondition(const Configuration& cfg)
   : MeshFreeFileInitCondition(cfg)
+  //, _mace(*(_app.GetMace()))
 {
   group_id_init.insert(std::make_pair("wat", MolecularType::H20));
   group_id_init.insert(std::make_pair("nacl", MolecularType::NACL));
@@ -184,6 +187,12 @@ void ModelFileInitCondition::Header(std::ifstream& file)
     { z_low, z_high }};
   _para.SetParameter(PARA_BIN_NUMBER, bin_number);
   _para.SetParameter(PARA_RANGE, range);
+
+  std::string path = "/data/zkh_mace/mace_agnesi_small.model-lammps.pt";
+  macetest.init(_header._num_atoms, false, path);
+  Real mace_cutoff = macetest.mace_r_max;
+  
+  _para.SetParameter(PARA_CUTOFF, mace_cutoff);
 }
 
 void ModelFileInitCondition::Parser(std::ifstream& file) 
@@ -262,6 +271,8 @@ void ModelFileInitCondition::Masses(std::ifstream& file, std::string line)
   {
     _mass = std::vector<Real>(_header._num_atoms_type, 1.0);
   }
+  // 注意： 这里是以H2O为例子；如果是LJ系统 没有元素类型 要另作考虑！！！！！
+
 }
 
 void ModelFileInitCondition::PairCoeffs(std::ifstream& file, std::string& line)

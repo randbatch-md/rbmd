@@ -4,6 +4,8 @@
 #include "math/Utiles.h"
 #include <map>
 #include <vector>
+#include "mace/maceload.h"
+
 struct ModelHeader
 {
   vtkm::Id _num_atoms;
@@ -100,4 +102,5 @@ private:
   std::vector<Id> _molecular_type;
   std::vector<int> _special_bonds;
   std::multimap<Id, Id> _special_map;
+ // maceload& _mace;
 };

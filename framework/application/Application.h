@@ -4,7 +4,7 @@
 #include "Object.h"
 #include <memory>
 #include <vector>
-
+#include "mace/maceload.h"
 class CommandLine;
 class System;
 class Executioner;
@@ -58,6 +58,8 @@ public:
   auto& GetInitConditionWarehouse() { return this->_init_condition_wh; }
   auto& GetParameter() { return this->_parameter; }
   auto& GetRun() { return this->_run; }
+  auto& GetMace() { return this->_mace; }
+
   template<typename T>
   T& GetSystem()
   {
@@ -81,4 +83,5 @@ protected:
   std::vector<std::shared_ptr<InitCondition>> _init_condition_wh; //init condition ware house
   // 不使用unique_ptr，因为需要#include DeviceAdapterId
   std::shared_ptr<vtkm::cont::DeviceAdapterId> _device;
+  std::shared_ptr<maceload> _mace;
 };

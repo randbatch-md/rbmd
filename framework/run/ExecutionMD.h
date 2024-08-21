@@ -7,6 +7,7 @@
 #include <vtkm/cont/ArrayCopy.h>
 #include "staticTable/ContStaticTable.h"
 #include <vtkm/cont/ArrayHandle.h>
+
 class ExecutionMD : public Execution
 {
 public:
@@ -38,8 +39,10 @@ protected:
   void ComputeRBLEAMForce(ArrayHandle<Vec3f>& force);
   void ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force);
   void ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force);
+  // mace
+  void ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce);
 
-
+  
   void UpdateVerletList();
 
   void ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force);
@@ -80,4 +83,7 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
+  std::ofstream _energy_file;
+  std::ofstream _force_file;
+  std::ofstream _positions_file;
 };

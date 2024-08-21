@@ -16,4 +16,8 @@ void ForceField::Execute()
     _para.SetParameter(PARA_POTENTIAL_FILE, Get<std::string>("potential_file"));
     _para.SetParameter(PARA_FILE_TYPE, (std::string) "EAM");
   }
+  else if (Get<std::string>("type") == "MACE")
+  {
+    _para.SetParameter(PARA_FILE_TYPE, (std::string) "MACE");
+  }
 }
