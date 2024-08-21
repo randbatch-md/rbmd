@@ -37,11 +37,6 @@ public:
       return _json_node.isMember(key);
   }
 
-  std::string GetFileStr() 
-  {
-    return _buffer.str();
-  }
-
 private:
 
   bool IsJsonFile(const std::string& file) 
@@ -60,9 +55,7 @@ private:
         console::Error("failed to open file: ", file);
         return;
       }
-      _buffer << filestream.rdbuf();
-      filestream.clear();  // 清除 EOF 标志
-      filestream.seekg(0); // 移动到文件开始位置
+
       Json::CharReaderBuilder readerBuilder;
       Json::parseFromStream(readerBuilder, filestream, &_json_node, nullptr);
 
@@ -79,5 +72,4 @@ private:
 
 private:
   Json::Value _json_node;
-  std::ostringstream _buffer;
 };

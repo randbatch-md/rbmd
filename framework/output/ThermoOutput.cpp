@@ -25,7 +25,7 @@ ThermoOutput::ThermoOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
   , _file("energy.rbmd")
   , _interval(Get<int>("interval", 1))
-  //, _system_state("SystemState.csv")
+  , _system_state("SystemState.csv")
   , _cut_off(0.0)
   , _Vlength(0.0)
   , _volume(0.0)
@@ -109,9 +109,9 @@ void ThermoOutput::Execute()
 
   WriteToFile();
 
-  //StatisticalStatus();
+  StatisticalStatus();
   ConsoleOutput::Execute();
-  //PostData();
+  PostData();
 }
 
 bool ThermoOutput::ShouldOutput()

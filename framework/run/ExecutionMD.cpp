@@ -11,6 +11,65 @@
 #include <vtkm/cont/DeviceAdapter.h>
 #include <vtkm/cont/ArrayHandleSOA.h>
 #include <vtkm/cont/EnvironmentTracker.h>
+#include "mace/maceload.h"
+#include "Types.h"
+struct ComputeNeighbours_maceWorklet : vtkm::worklet::WorkletMapField
+{
+  ComputeNeighbours_maceWorklet(const Real& cut_off)
+    : _cut_off(cut_off)
+  {
+  }
+
+  using ControlSignature = void(FieldIn atoms_id,
+                                ExecObject locator,
+                                FieldInOut id_verletlist_group,
+                                FieldOut num_verletlist,
+                                FieldInOut offset_verletlist_group);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5);
+
+  template<typename NeighbourGroupVecType, typename CoordOffsetj>
+  VTKM_EXEC void operator()(const Id atoms_id,
+                            const ExecPointLocator& locator,
+                            NeighbourGroupVecType& id_verletlist,
+                            Id& num_verletlist,
+                            CoordOffsetj& offset_verletlist) const
+  {
+    Id index = 0;
+    auto p_i = locator.GetPtsPosition(atoms_id);
+    vtkm::Id3 p_i_cell = locator.InWhichCell(p_i);
+    const auto num_cycles = locator.GetNumCycles();
+    for (Id i = -num_cycles; i <= num_cycles; i++)
+    {
+      for (Id j = -num_cycles; j <= num_cycles; j++)
+      {
+        for (Id k = -num_cycles; k <= num_cycles; k++)
+        {
+          auto neighbor_ijk = p_i_cell + Id3{ i, j, k };
+          auto ijk = locator.PeriodicIndexOffset(neighbor_ijk);
+          auto coord_offset = locator.PeriodicCoordOffset(ijk - neighbor_ijk);
+          auto num_pts = locator.NumberPtsInCell(ijk);
+
+          for (Id p = 0; p < num_pts; p++)
+          {
+            auto pts_id_j = locator.PtsInCell(ijk, p);
+            auto p_j = locator.GetPtsPosition(pts_id_j) - coord_offset;
+            auto r_ij = p_j - p_i;
+            const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+            const Real _cut_off_2 = _cut_off * _cut_off;
+            if (_cut_off_2 - dis_2 > 0.0001 && dis_2 > 0.0001)
+            {
+              id_verletlist[index] = pts_id_j;
+              offset_verletlist[index] = coord_offset;
+              index++;
+            }
+          }
+        }
+      }
+    }
+    num_verletlist = index;
+  }
+  Real _cut_off;
+};
 
 struct SetIndex : vtkm::worklet::WorkletMapField
 {
@@ -85,7 +144,9 @@ struct SetValue_New : vtkm::worklet::WorkletMapField
 ExecutionMD::ExecutionMD(const Configuration& cfg)
   : Execution(cfg)
 {
-
+  _energy_file.open("energy_data.txt");
+  _force_file.open("force_data.txt");
+  _positions_file.open("posi_data.txt");
 }
 
 void ExecutionMD::Init()
@@ -909,4 +970,117 @@ void ExecutionMD::InitPointLocator()
   _locator.SetRs(_para.GetParameter<Real>(PARA_R_CORE));
 
   _locator.SetPosition(_position);
+}
+
+void ExecutionMD::ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce)
+{
+  
+  //auto mace = _app.GetMace();
+  //mace = std::make_shared<maceload>();
+  //auto mace = _app.GetMace();
+  //maceload& mace = *(_app.GetMace());
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  // 加载盒子
+  macetest.loadcell(box);
+  //输出posi
+  auto posi_read = _position.ReadPortal();
+  for (size_t i = 0; i < _position.GetNumberOfValues(); i++)
+  {
+    _positions_file << posi_read.Get(i) << std::endl;
+  }
+  macetest.loadpositions(_position);
+
+  auto N = _position.GetNumberOfValues();
+  auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  auto max_j_num =
+    rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+  auto verletlist_num = N * N;
+
+  ArrayHandle<Id> id_verletlist;
+  ArrayHandle<Vec3f> offset_verletlist;
+  offset_verletlist.Allocate(verletlist_num);
+  id_verletlist.Allocate(verletlist_num);
+
+  std::vector<Id> temp_vec(N + 1);
+  Id inc = 0;
+  std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * N; });
+  vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+  auto id_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+  auto offset_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+  vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+
+  //RunWorklet::ComputeNeighbours(cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+
+  // Mace
+  vtkm::cont::ArrayHandle<Vec3f> unit_shift;
+  //auto box_mace = _para.GetParameter<Vec3f>(PARA_BOX);
+  vtkm::cont::Invoker{}(ComputeNeighbours_maceWorklet{ cut_off },
+                        _atoms_id,
+                        _locator,
+                        id_verletlist_group,
+                        num_verletlist,
+                        offset_verletlist_group);
+
+
+  std::vector<Id> edge0;
+  std::vector<Id> edge1;
+  std::vector<Vec3f> shifts;
+  std::vector<Vec3f> unit_shifts;
+  int index=0;
+
+  for (size_t i = 0; i < id_verletlist_group.GetNumberOfValues(); i++)
+  {
+    auto num_temp = num_verletlist.ReadPortal().Get(i);
+    //auto num_temp = id_verletlist_group.ReadPortal().Get(i).GetNumberOfComponents();
+    auto read_id = id_verletlist_group.ReadPortal().Get(i);
+    auto read_coorf = offset_verletlist_group.ReadPortal().Get(i);
+    for (size_t j = 0; j < num_temp; j++)
+    {
+      edge0.push_back(i);
+      edge1.push_back(read_id[j]);
+
+      Vec3f shifts_temp;
+      Vec3f unit_shifts_temp;
+      shifts_temp[0] = -read_coorf[j][0];
+      shifts_temp[1] = -read_coorf[j][1];
+      shifts_temp[2] = -read_coorf[j][2];
+      unit_shifts_temp[0] = std::round(-read_coorf[j][0] / box[0]);
+      unit_shifts_temp[1] = std::round(-read_coorf[j][1] / box[1]);
+      unit_shifts_temp[2] = std::round(-read_coorf[j][2] / box[2]);
+
+      shifts.push_back(shifts_temp);
+      unit_shifts.push_back(unit_shifts_temp);
+
+
+      index++;
+    }
+    
+  }
+
+  macetest.loadedges_index(edge0, edge1, unit_shifts, shifts);
+
+  // 初始化结束  进行计算
+  c10::impl::GenericDict mace_output = macetest.forward();
+
+  // 导出力
+  auto all_force_temp = macetest.forcesout(mace_output);
+  
+
+  vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(all_force_temp),allforce);
+  auto allforce_read = allforce.ReadPortal();
+  for (size_t i = 0; i < allforce.GetNumberOfValues(); i++)
+  {
+    _force_file << allforce_read.Get(i)<<std::endl;
+  }
+
+  // 输出能量
+
+  auto energy = macetest.energyout(mace_output);
+
+  _energy_file << energy << std::endl;
+  
 }

@@ -40,6 +40,20 @@ void ExecutionNVT::Init()
     InitStyle();
   }
 
+  if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "MACE")
+  {
+
+    std::vector<Real> mass;
+    auto mass_temp = _para.GetFieldAsArrayHandle<Real>(field::mass);
+    auto read_mass_temp = mass_temp.ReadPortal();
+    for (size_t i = 0; i < mass_temp.GetNumberOfValues(); i++)
+    {
+      mass.push_back(read_mass_temp.Get(i));
+    }
+    macetest.loadmass(mass);
+    //mace->mace_r_max;
+  }
+ 
   ExecutionMD::Init();
 
   InitialCondition();
@@ -89,7 +103,10 @@ void ExecutionNVT::Solve()
   UpdateVelocityByTempConType();
 }
 
-void ExecutionNVT::PostSolve() {}
+void ExecutionNVT::PostSolve() 
+{
+
+}
 
 void ExecutionNVT::InitialCondition()
 {
@@ -150,6 +167,10 @@ void ExecutionNVT::ComputeAllForce()
   {
     NearForceEAM();
   }
+  else if ("MACE" == force_field)
+  {
+    ComputeVerletlistNearForce_Mace(_all_force);
+  }
 }
 
 void ExecutionNVT::UpdateVelocity()
@@ -157,6 +178,17 @@ void ExecutionNVT::UpdateVelocity()
   try
   {
     vtkm::cont::ArrayCopy(_velocity, _old_velocity);
+#ifdef DEBUG
+    auto read_force = _all_force.ReadPortal();
+    auto read_velocity = _velocity.ReadPortal();
+    for (size_t i = 0; i < 10; i++)
+    {
+      std::cout << "  force： " << read_force.Get(i) << "  velocity： " << read_velocity.Get(i)
+                << std::endl;
+    }
+#endif // DEBUG
+
+
 
     RunWorklet::UpdateVelocity(_dt, _unit_factor._fmt2v, _all_force, _mass, _velocity);
   }
@@ -164,6 +196,18 @@ void ExecutionNVT::UpdateVelocity()
   {
     std::cout << e.what() << std::endl;
   }
+
+  #ifdef DEBUG
+  auto read_force = _all_force.ReadPortal();
+  auto read_velocity = _velocity.ReadPortal();
+  for (size_t i = 0; i < 10; i++)
+  {
+    std::cout << "  force： " << read_force.Get(i) << "  velocity： " << read_velocity.Get(i)
+              << std::endl;
+  }
+#endif // DEBUG
+
+
 }
 
 void ExecutionNVT::UpdatePosition()
@@ -182,6 +226,13 @@ void ExecutionNVT::UpdatePosition()
 
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
+#ifdef DEBUG
+  auto read_position = _position.ReadPortal();
+  for (size_t i = 0; i < 10; i++)
+  {
+    std::cout << "  read_position： " << read_position.Get(i) << std::endl;
+  }
+#endif // DEBUG
 }
 
 void ExecutionNVT::UpdateVelocityByTempConType()
@@ -684,6 +735,10 @@ void ExecutionNVT::ComputeTempe()
   else if (shake == "true")
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - n - 3) * temperature_kB / 2.0);
+  }
+  else if (shake == "false")
+  {
+    _tempT = 0.5 * _tempT_sum / ((3 * n) * temperature_kB / 2.0);
   }
   _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   _para.SetParameter(PARA_TEMPT, _tempT);

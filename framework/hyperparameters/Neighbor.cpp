@@ -9,7 +9,7 @@ void Neighbor::Execute()
 {
   _para.SetParameter(PARA_NEIGHBOR_TYPE, Get<std::string>("type"));
   _para.SetParameter(PARA_CUTOFF, Get<Real>("cut_off"));
-
+  auto a = _para.GetParameter<Real>(PARA_CUTOFF);
   // 注意：这里如果是 verletlist方法 locator中 locator.SetRs(GetParameter<Real>(PARA_R_CORE));要修改合理
   if (Get<std::string>("type") == "RBL")
   {
