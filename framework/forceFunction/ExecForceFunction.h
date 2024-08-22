@@ -263,6 +263,7 @@ public:
   {
     Vec6f virial = { 0, 0, 0, 0, 0, 0 };
     Vec3f K{ 0, 0, 0 };
+    auto _alpha_inv = 1 / _alpha;
 
     // 计算K向量
     K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
@@ -274,15 +275,15 @@ public:
     auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
     auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
 
-    auto ug = (4 * vtkm::Pi() / volume) *
-            vtkm::Exp(-range_K_2 / (4 * _alpha)) / range_K_2;
+    auto ug = (4 * vtkm::Pi() / volume) * 
+                vtkm::Exp(-0.25 *range_K_2 * _alpha_inv) / range_K_2;
     Real uk = ug * (factor_c * factor_c + factor_d * factor_d);
 
     // 计算vg分量
     Vec6f vg = { 0, 0, 0, 0, 0, 0 };
 
     //Real sqk = vtkm::Dot(K, K);
-    Real vterm = -2.0 * (1.0 / range_K_2 + 0.25 * _alpha);
+    Real vterm = -2.0 * (1.0 / range_K_2 + 0.25 * _alpha_inv);
 
     // vg的计算分为几种情况
 
@@ -424,12 +425,11 @@ public:
     // 更新 virial
     for (int j = 0; j < 6; ++j)
     {
-      virial[j] += uk * vg[j];
+      virial[j] = uk * vg[j];
     }
 
     return virial;
   }
-
 
   VTKM_EXEC Vec3f ComputeRBEForceSum(Vec3f& kl,
                                      const Vec3f& current_pts,
