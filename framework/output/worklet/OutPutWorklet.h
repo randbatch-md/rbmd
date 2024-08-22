@@ -21,7 +21,19 @@ void ComputeNeighbours(const Real& cut_off,
                        vtkm::cont::ArrayHandle<vtkm::Id>& num_verletlist,
                        CoordOffsetType& offset_verletlist_group);
 
-void LJEnergyVerlet(const Real& cut_off,
+ void LJEnergyVerlet0(const Real& cut_off,
+                     const Vec3f& box,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                     const ContPointLocator& locator,
+                     const ContTopology& topology,
+                     const ContForceFunction& force_function,
+                     const GroupVecType& Group_j,
+                     const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                     const CoordOffsetType& coord_offset_j,
+                     vtkm::cont::ArrayHandle<Real>& LJPE);
+
+ void LJEnergyVerlet(const Real& cut_off,
+                    const Real& alpha,
                     const Vec3f& box,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                     const ContPointLocator& locator,
@@ -30,7 +42,8 @@ void LJEnergyVerlet(const Real& cut_off,
                     const GroupVecType& Group_j,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                     const CoordOffsetType& coord_offset_j,
-                    vtkm::cont::ArrayHandle<Real>& LJPE);
+                    vtkm::cont::ArrayHandle<Real>& LJPE,
+                    vtkm::cont::ArrayHandle<Real>& LJCoul);
 
 void EAM_rho(const Real& eam_cut_off,
              const Vec3f& box,

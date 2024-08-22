@@ -69,9 +69,9 @@ namespace OutPut
   Vec3f _box;
 };
 
-    struct ComputeLJEnergyVerletWorklet : vtkm::worklet::WorkletMapField
+    struct ComputeLJEnergyVerletWorklet0 : vtkm::worklet::WorkletMapField
 {
-  ComputeLJEnergyVerletWorklet(const Real& cut_off, const Vec3f& box)
+  ComputeLJEnergyVerletWorklet0(const Real& cut_off, const Vec3f& box)
     : _cut_off(cut_off)
     , _box(box)
   {
@@ -134,6 +134,82 @@ namespace OutPut
   Real _cut_off;
   Vec3f _box;
 };
+
+    struct ComputeLJEnergyVerletWorklet : vtkm::worklet::WorkletMapField
+    {
+  ComputeLJEnergyVerletWorklet(const Real& cut_off, const Real& alpha,const Vec3f& box)
+    : _cut_off(cut_off)
+    , _alpha(alpha)
+    , _box(box)
+
+  {
+  }
+
+  using ControlSignature = void(FieldIn atoms_id,
+                                ExecObject locator,
+                                ExecObject topology,
+                                ExecObject force_function,
+                                FieldIn group_j,
+                                FieldIn num_j,
+                                FieldIn coord_offset_j,
+                                FieldOut LJPE,
+                                FieldOut LJCoul);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
+
+  template<typename NeighbourGroupVecType, typename CoordOffsetj>
+  VTKM_EXEC void operator()(const Id atoms_id,
+                            const ExecPointLocator& locator,
+                            const ExecTopology& topology,
+                            const ExecForceFunction& force_function,
+                            const NeighbourGroupVecType& group_j,
+                            const Id& num_j,
+                            const CoordOffsetj& coord_offset_j,
+                            Real& LJPE,
+                            Real& LJCoul) const
+  {
+    Real LJ_PE = 0;
+    Real LJ_coul = 0;
+
+    const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+    const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+    auto eps_i = topology.GetEpsilon(pts_type_i);
+    auto sigma_i = topology.GetSigma(pts_type_i);
+    auto charge_pi = topology.GetCharge(atoms_id);
+
+    auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+    {
+      auto charge_pj = topology.GetCharge(pts_id_j);
+      auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+      auto pts_type_j = topology.GetAtomsType(pts_id_j);
+      auto eps_j = topology.GetEpsilon(pts_type_j);
+      auto sigma_j = topology.GetSigma(pts_type_j);
+      //auto r_ij = p_j - p_i;
+      auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+      LJ_coul +=
+        force_function.ComputeNearEleEnergy(r_ij, charge_pi, charge_pj, _cut_off,_alpha);
+
+      if (molecular_id_i == molecular_id_j)
+        return;
+
+      LJ_PE += force_function.ComputePotentialEn0(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+    };
+
+    auto p_i = locator.GetPtsPosition(atoms_id);
+
+    for (Id p = 0; p < num_j; p++)
+    {
+      auto idj = group_j[p];
+      auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+      function(p_i, p_j, idj);
+    }
+    LJPE = LJ_PE;
+    LJCoul = LJ_coul;
+  }
+  Real _cut_off;
+  Vec3f _box;
+  Real _alpha;
+    };
 
     struct ComputeEAMrhoVerletWorklet : vtkm::worklet::WorkletMapField
     {
@@ -878,7 +954,7 @@ namespace OutPut
                             offset_verletlist_group);
     }
 
-    void LJEnergyVerlet(const Real& cut_off,
+         void LJEnergyVerlet0(const Real& cut_off,
                         const Vec3f& box,
                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                         const ContPointLocator& locator,
@@ -889,7 +965,7 @@ namespace OutPut
                         const CoordOffsetType& coord_offset_j,
                         vtkm::cont::ArrayHandle<Real>& LJPE)
     {
-      vtkm::cont::Invoker{}(ComputeLJEnergyVerletWorklet{ cut_off, box },
+      vtkm::cont::Invoker{}(ComputeLJEnergyVerletWorklet0{ cut_off, box },
                             atoms_id,
                             locator,
                             topology,
@@ -898,6 +974,31 @@ namespace OutPut
                             num_j,
                             coord_offset_j,
                             LJPE);
+    }
+
+    void LJEnergyVerlet(const Real& cut_off,
+                        const Real& alpha,
+                        const Vec3f& box,
+                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                        const ContPointLocator& locator,
+                        const ContTopology& topology,
+                        const ContForceFunction& force_function,
+                        const GroupVecType& Group_j,
+                        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                        const CoordOffsetType& coord_offset_j,
+                        vtkm::cont::ArrayHandle<Real>& LJPE ,
+                        vtkm::cont::ArrayHandle<Real>& LJCoul)
+    {
+      vtkm::cont::Invoker{}(ComputeLJEnergyVerletWorklet{ cut_off, alpha,box },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            Group_j,
+                            num_j,
+                            coord_offset_j,
+                            LJPE,
+                            LJCoul);
     }
 
     void EAM_rho_Verlet(const Real& eam_cut_off,
