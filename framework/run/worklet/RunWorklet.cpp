@@ -2228,7 +2228,7 @@ namespace RunWorklet
          auto function = [&](const vtkm::Vec3f& M, const vtkm::Id& indexEwald)
          {
            auto rhok_ri = whole_rhok.Get(indexEwald - 1);
-           virial += _unit_factor * force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
+           virial = _unit_factor * force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
          };
          locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
       }
