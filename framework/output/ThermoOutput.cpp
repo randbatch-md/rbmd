@@ -181,7 +181,7 @@ auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
                               num_verletlist,
                               offset_verletlist_group);
     //Compute LJEnergy;
-    OutPut::LJEnergyVerlet0(cut_off,
+    OutPut::LJEnergyVerlet(cut_off,
                            box,
                             atoms_id,
                            locator,
@@ -238,9 +238,7 @@ auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
                               num_verletlist,
                               offset_verletlist_group);
     //Compute LJEnergy;
-    ArrayHandle<Real> near_ele_potential_energy;
     OutPut::LJEnergyVerlet(cut_off,
-                           _alpha,
                            box,
                            atoms_id,
                            locator,
@@ -249,8 +247,7 @@ auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
                            id_verletlist_group,
                            num_verletlist,
                            offset_verletlist_group,
-                           lj_potential_energy,
-                           near_ele_potential_energy);
+                           lj_potential_energy);
 
     auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
       lj_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
@@ -268,6 +265,19 @@ auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
       //                                topology,
       //                                force_function,
       //                                near_ele_potential_energy);
+      ArrayHandle<Real> near_ele_potential_energy;
+      OutPut::LJCoulVerlet(cut_off,
+                           _alpha,
+                             box,
+                             atoms_id,
+                             locator,
+                             topology,
+                             force_function,
+                             id_verletlist_group,
+                             num_verletlist,
+                             offset_verletlist_group,
+                           near_ele_potential_energy);
+
       auto near_ele_potential_energy_total = vtkm::cont::Algorithm::Reduce(
         near_ele_potential_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
       _near_ele_potential_energy_avr = near_ele_potential_energy_total / N;
