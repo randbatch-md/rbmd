@@ -265,7 +265,7 @@ public:
     Vec3f K{ 0, 0, 0 };
     auto _alpha_inv = 1 / _alpha;
 
-    // 计算K向量
+    // compute K
     K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
     K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
     K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
@@ -279,14 +279,13 @@ public:
                 vtkm::Exp(-0.25 *range_K_2 * _alpha_inv) / range_K_2;
     Real uk = ug * (factor_c * factor_c + factor_d * factor_d);
 
-    // 计算vg分量
+    // compute vg
     Vec3f eg{ 0, 0, 0 };
     Vec6f vg = { 0, 0, 0, 0, 0, 0 };
 
     //Real sqk = vtkm::Dot(K, K);
     Real vterm = -2.0 * (1.0 / range_K_2 + 0.25 * _alpha_inv);
 
-    // vg的计算分为几种情况
 
     // (k,0,0) , (0,l,0),(0,0,m),(k,l,0),(k,-l,0),(0,l,m),(0,l,-m),(k,0,m),(k,0,-m)
     //(k, l, m) ,(k, -l, m),(k,l,-m),(k,-l,-m)
@@ -413,7 +412,7 @@ public:
     }
 
       // (k,-l,-m)
-    else
+    else if (M[0] > 0 && M[1] < 0 && M[2] < 0)
     {
       vg[0] = 1.0 + vterm * (K[0]) * (K[0]);
       vg[1] = 1.0 + vterm * (K[1]) * (K[1]);
@@ -423,7 +422,7 @@ public:
       vg[5] = vterm * (K[1]) * (K[2]);
     }
 
-    // 更新 virial
+    // compute virial
     for (int j = 0; j < 6; ++j)
     {
       virial[j] = uk * vg[j];
