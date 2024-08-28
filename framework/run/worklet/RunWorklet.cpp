@@ -13,8 +13,9 @@ namespace RunWorklet
 {
     struct ComputeNeighboursWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeNeighboursWorklet(const Real& cut_off)
+      ComputeNeighboursWorklet(const Real& cut_off,const Vec3f& box)
         : _cut_off(cut_off)
+        , _box(box)
       {
       }
 
@@ -52,6 +53,7 @@ namespace RunWorklet
                 auto pts_id_j = locator.PtsInCell(ijk, p);
                 auto p_j = locator.GetPtsPosition(pts_id_j) - coord_offset;
                 auto r_ij = p_j - p_i;
+                //auto r_ij = locator.MinDistanceVec(p_j, p_i,_box);
                 const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
                 const Real _cut_off_2 = _cut_off * _cut_off;
                 if ( _cut_off_2 - dis_2 > 0.0001 && dis_2 > 0.0001)
@@ -67,6 +69,7 @@ namespace RunWorklet
         num_verletlist = index; 
        }
       Real _cut_off;
+       Vec3f _box;
     };
 
     struct ComputeNearForceVerletERFWorklet : vtkm::worklet::WorkletMapField
@@ -1887,13 +1890,14 @@ namespace RunWorklet
     };   
 
     void ComputeNeighbours(const Real& cut_off,
+                           const Vec3f& box,
                                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                const ContPointLocator& locator,
                                GroupVecType& id_verletlist_group,
                                vtkm::cont::ArrayHandle<vtkm::Id>& num_verletlist,
                                CoordOffsetType& offset_verletlist_group)
     {
-      vtkm::cont::Invoker{}(ComputeNeighboursWorklet{ cut_off },
+      vtkm::cont::Invoker{}(ComputeNeighboursWorklet{ cut_off, box },
                             atoms_id,
                             locator,
                             id_verletlist_group,

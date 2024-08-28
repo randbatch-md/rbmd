@@ -14,6 +14,7 @@ using GroupRealIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::Arra
 namespace RunWorklet 
 {
     void ComputeNeighbours(const Real& cut_off,
+                           const Vec3f& box,
                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                            const ContPointLocator& locator,
                            GroupVecType& id_verletlist_group,

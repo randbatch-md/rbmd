@@ -194,6 +194,7 @@ void ExecutionMD::UpdateVerletList()
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto N = _position.GetNumberOfValues();
   auto verletlist_num = N * N;
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   ArrayHandle<Id> id_verletlist;
   id_verletlist.Allocate(verletlist_num);
@@ -215,7 +216,7 @@ void ExecutionMD::UpdateVerletList()
     vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
 
   RunWorklet::ComputeNeighbours(
-    cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+    cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   _locator.SetVerletListInfo(num_verletlist, id_verletlist_group, offset_verletlist_group);
 }
@@ -627,7 +628,7 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
   auto offset_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
 
-  RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+  RunWorklet::ComputeNeighbours(cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::NearForceVerlet(cut_off,
                               box,
@@ -664,7 +665,7 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
   auto id_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
   auto offset_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
 
-  RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+  RunWorklet::ComputeNeighbours(cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::LJForceVerlet(cut_off,
                             box,
@@ -806,7 +807,7 @@ void ExecutionMD::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
     vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
 
   RunWorklet::ComputeNeighbours(
-    cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+    cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::EAMfpVerlet(cut_off,
                           box,
