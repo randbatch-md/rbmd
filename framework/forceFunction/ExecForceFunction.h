@@ -286,6 +286,31 @@ public:
     return 0.5 * ComptePE_ij;
   }
 
+    VTKM_EXEC Real ComputePotentialEn0(const Vec3f& r_ij,
+                                     const Real& eps_i,
+                                     const Real& eps_j,
+                                     const Real& sigma_i,
+                                     const Real& sigma_j,
+                                     const Real& cut_off) const
+  {
+    const Real small_value = 0.0001;
+    Real cut_off_2 = cut_off * cut_off;
+    Real ComptePE_ij = 0;
+    Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+
+    if (dis_2 < cut_off_2 && dis_2 > small_value)
+    {
+      Real sigma_ij = (sigma_i + sigma_j) / 2;
+      Real sigmaij_6 = sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij * sigma_ij;
+      Real dis_6 = dis_2 * dis_2 * dis_2;
+
+      Real eps_ij = vtkm::Sqrt(eps_i * eps_j);
+
+      ComptePE_ij = 4 * eps_ij * (sigmaij_6 / dis_6 - 1) * (sigmaij_6 / dis_6);
+    }
+    return 0.5 * ComptePE_ij;
+  }
+
   VTKM_EXEC Real ComputeNearEleEnergy(const Vec3f& r_ij,
                                     const Real& charge_i,
                                     const Real& charge_j,
