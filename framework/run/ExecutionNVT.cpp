@@ -685,6 +685,10 @@ void ExecutionNVT::ComputeTempe()
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - n - 3) * temperature_kB / 2.0);
   }
+  else if (shake == "false")
+  {
+    _tempT = 0.5 * _tempT_sum / ((3 * n) * temperature_kB / 2.0);
+  }
   _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   _para.SetParameter(PARA_TEMPT, _tempT);
 }

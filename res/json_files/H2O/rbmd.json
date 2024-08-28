@@ -26,7 +26,7 @@
 
     "neighbor": {
       "type": "RBL", //RBL,VERLET-LIST
-      "cut_off": 12,
+      "cut_off": 10, // Less than half of the box
       "r_core": 5,
       "neighbor_sample_num": 100
     },
