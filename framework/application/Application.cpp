@@ -118,7 +118,7 @@ void Application::HelpMessages()
 }
 void Application::VersionMessages()
 {
-  std::cout << "RBMD_VERSION = 2.0.0 " << std::endl;
+  std::cout << "RBMD_VERSION = 2.1.0 " << std::endl;
   exit(1);
 }
 
