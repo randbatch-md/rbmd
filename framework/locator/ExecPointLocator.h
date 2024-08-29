@@ -98,7 +98,7 @@ public:
   }
 
   template<typename Func>
-  VTKM_EXEC void ExecuteOnKNeighbor1(const IdComponent& k_maxconst, const vtkm::Id& atoms_id,Func& function) const
+  VTKM_EXEC void ExecuteOnKNeighbor(const IdComponent& k_maxconst, const vtkm::Id& atoms_id,Func& function) const
   {
     vtkm::Id indexEwald = 0;
     for (vtkm::Id i = -k_maxconst; i <= k_maxconst; i++)
@@ -119,7 +119,7 @@ public:
   }
   
   template<typename Func>
-  VTKM_EXEC void ExecuteOnKNeighbor(const IdComponent& k_maxconst,
+  VTKM_EXEC void ExecuteOnKNeighbor1(const IdComponent& k_maxconst,
                                     const vtkm::Id& atoms_id,
                                     Func& function) const
   {

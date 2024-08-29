@@ -77,6 +77,62 @@ namespace RunWorklet
   Vec3f _box;
   };
 
+    struct ComputeCoulVirialVerletWorklet : vtkm::worklet::WorkletMapField
+  {
+  ComputeCoulVirialVerletWorklet(const Real& cut_off, const Vec3f& box)
+    : _cut_off(cut_off)
+    , _box(box)
+  {
+  }
+
+  using ControlSignature = void(FieldIn atoms_id,
+                                ExecObject locator,
+                                ExecObject topology,
+                                ExecObject force_function,
+                                FieldIn group_j,
+                                FieldIn num_j,
+                                FieldIn coord_offset_j,
+                                FieldOut coulvirial);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+
+  template<typename NeighbourGroupVecType, typename CoordOffsetj>
+  VTKM_EXEC void operator()(const Id atoms_id,
+                            const ExecPointLocator& locator,
+                            const ExecTopology& topology,
+                            const ExecForceFunction& force_function,
+                            const NeighbourGroupVecType& group_j,
+                            const Id& num_j,
+                            const CoordOffsetj& coord_offset_j,
+                            Vec6f& coulvirial) const
+  {
+    Vec6f ewald_coul_v = { 0, 0, 0, 0, 0, 0 };
+
+    auto charge_pi = topology.GetCharge(atoms_id);
+    auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+    {
+      auto charge_pj = topology.GetCharge(pts_id_j);
+
+      //auto r_ij = p_j - p_i;
+      auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+      ewald_coul_v += force_function.ComputeCoulVirial(r_ij, charge_pi, charge_pj,_cut_off);
+
+    };
+
+    auto p_i = locator.GetPtsPosition(atoms_id);
+
+    for (Id p = 0; p < num_j; p++)
+    {
+      auto idj = group_j[p];
+      auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+      function(p_i, p_j, idj);
+    }
+    coulvirial = ewald_coul_v;
+  }
+  Real _cut_off;
+  Vec3f _box;
+  };
+
     struct fix_press_berendsenWorklet : vtkm::worklet::WorkletMapField
     {
     fix_press_berendsenWorklet(const Real& scale_factor)
@@ -2228,7 +2284,9 @@ namespace RunWorklet
          auto function = [&](const vtkm::Vec3f& M, const vtkm::Id& indexEwald)
          {
            auto rhok_ri = whole_rhok.Get(indexEwald - 1);
-           virial = _unit_factor * force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
+           //virial = _unit_factor * force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
+          // virial =  force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
+           virial = force_function.ComputeLongVirial(M, p_i, charge_p_i, rhok_ri);
          };
          locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
       }
@@ -2958,6 +3016,29 @@ namespace RunWorklet
                                num_j,
                                coord_offset_j,
                                LJVirial);
+    }
+
+      
+    void CoulVirialVerlet(const Real& cut_off,
+                         const Vec3f& box,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const GroupVecType& Group_j,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                         const CoordOffsetType& coord_offset_j,
+                          vtkm::cont::ArrayHandle<Vec6f>& coulvirial)
+    {
+         vtkm::cont::Invoker{}(ComputeCoulVirialVerletWorklet{ cut_off, box },
+                               atoms_id,
+                               locator,
+                               topology,
+                               force_function,
+                               Group_j,
+                               num_j,
+                               coord_offset_j,
+                               coulvirial);
     }
 
      void fix_press_berendsen(const Real& scale_factor,

@@ -662,8 +662,8 @@ vtkm::cont::ArrayHandle<Vec6f> ExecutionNVT::LJVirial()
 
 vtkm::cont::ArrayHandle<Vec6f> ExecutionNVT::EwaldVirial()
 {
-  ComputeEwaldVirial(_Kmax, _virial_atom_ewald);
-  return _virial_atom_ewald;
+  ComputeEwaldLongVirial(_Kmax, _virial_atom_ewald_long);
+  return _virial_atom_ewald_long;
 }
 void ExecutionNVT::TempConTypeForce()
 {
@@ -1167,10 +1167,20 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-  //ComputeVerletlistLJVirial(_virial_atom); //_virial_atom
+  ComputeVerletlistLJVirial(_virial_atom_lj); //_virial_atom
+  auto virial_lj = vtkm::cont::Algorithm::Reduce(_virial_atom_lj, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-  //ComputeEwaldVirial(_Kmax, _virial_atom);
-  RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);
+  ComputeEwaldCoulVirial(_virial_atom_ewald_coul);
+   auto virial_ewald_coul = vtkm::cont::Algorithm::Reduce(_virial_atom_ewald_coul, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) *
+                      _unit_factor._qqr2e;
+
+  ComputeEwaldLongVirial(_Kmax, _virial_atom_ewald_long);
+  auto virial_ewald_long = vtkm::cont::Algorithm::Reduce(_virial_atom_ewald_long, vtkm::TypeTraits<Vec6f>::ZeroInitialization())
+                    * _unit_factor._qqr2e;
+
+  virial = virial_lj + virial_ewald_coul + virial_ewald_long;
+
+  //RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);
   //reduce virial_atom
   //virial = { 0, 0, 0, 0, 0, 0 };
   //for (int i = 0; i < _virial_atom.GetNumberOfValues(); ++i)
@@ -1182,8 +1192,8 @@ void ExecutionNVT::ComputeVirial()
   //  }
   //}
 
-  virial =
-    vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+ // virial =
+   // vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 }
 
 void ExecutionNVT::Couple()

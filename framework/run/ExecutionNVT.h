@@ -144,7 +144,8 @@ private:
 
       //
   ArrayHandle<Vec6f> _virial_atom_lj;
-  ArrayHandle<Vec6f> _virial_atom_ewald;
+  ArrayHandle<Vec6f> _virial_atom_ewald_coul;
+  ArrayHandle<Vec6f> _virial_atom_ewald_long;
   ArrayHandle<Vec6f> _virial_atom;
   Real _lj_potential_energy;
   Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz

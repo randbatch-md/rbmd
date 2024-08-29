@@ -376,6 +376,17 @@ namespace RunWorklet
                          const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                          const CoordOffsetType& coord_offset_j,
                          vtkm::cont::ArrayHandle<Vec6f>& LJVirial);
+     void CoulVirialVerlet(const Real& cut_off,
+                           const Vec3f& box,
+                           const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                           const ContPointLocator& locator,
+                           const ContTopology& topology,
+                           const ContForceFunction& force_function,
+                           const GroupVecType& Group_j,
+                           const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                           const CoordOffsetType& coord_offset_j,
+                           vtkm::cont::ArrayHandle<Vec6f>& coulvirial);
+
 
      void fix_press_berendsen(const Real& scale_factor,
                               vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,

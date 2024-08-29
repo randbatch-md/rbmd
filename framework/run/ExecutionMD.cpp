@@ -439,14 +439,63 @@ void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ew
     Kmax, _atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force);
 }
 
-void ExecutionMD::ComputeEwaldVirial(IdComponent& Kmax, ArrayHandle<Vec6f>& Ewald_virial)
+
+void ExecutionMD::ComputeEwaldCoulVirial(ArrayHandle<Vec6f>& Ewald_Coul_virial)
+{
+  auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  auto N = _position.GetNumberOfValues();
+  //auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+  auto rho_system = N / (box[0] * box[1] * box[2]);
+
+  auto max_j_num =
+    rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+  auto verletlist_num = N * N;
+
+  ArrayHandle<Id> id_verletlist;
+  ArrayHandle<Vec3f> offset_verletlist;
+  offset_verletlist.Allocate(verletlist_num);
+  id_verletlist.Allocate(verletlist_num);
+
+  std::vector<Id> temp_vec(N + 1);
+  Id inc = 0;
+  std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * N; });
+  vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+  auto id_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+  auto offset_verletlist_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+  vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+
+  RunWorklet::ComputeNeighbours(cut_off,
+                                box,
+                                _atoms_id,
+                                _locator,
+                                id_verletlist_group,
+                                num_verletlist,
+                                offset_verletlist_group);
+
+  RunWorklet::CoulVirialVerlet(cut_off,
+                              box,
+                              _atoms_id,
+                              _locator,
+                              _topology,
+                              _force_function,
+                              id_verletlist_group,
+                              num_verletlist,
+                              offset_verletlist_group,
+                              Ewald_Coul_virial);
+}
+
+void ExecutionMD::ComputeEwaldLongVirial(IdComponent& Kmax, ArrayHandle<Vec6f>& Ewald_long_virial)
 {
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto rhok = ComputeChargeStructureFactorEwald(box, Kmax);
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   RunWorklet::ComputeEwaldVirial(
-    Kmax, _unit_factor._qqr2e,_atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_virial);
+    Kmax, _unit_factor._qqr2e,_atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_long_virial);
 }
 
 void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
