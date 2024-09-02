@@ -41,14 +41,16 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 WholeArrayIn _position,
                                 FieldOut forcebond,
                                 FieldOut bondEnergy,
+                                FieldOut bondVirial,
                                 ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8,_9);
 
   template<typename BondType,
            typename BondListType,
            typename PositionType,
            typename ForceBondType,
-           typename BondEnergyType>
+           typename BondEnergyType,
+           typename BondVirialyType>
   VTKM_EXEC void operator()(const BondType& bond_type,
                             const BondListType& bondlist,
                             const Real& bond_coeffs_k,
@@ -56,6 +58,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                             const PositionType& _position,
                             ForceBondType& forcebond,
                             BondEnergyType& bondEnergy,
+                            BondVirialyType& bondVirial,
                             const ExecPointLocator& locator) const
   {
 
@@ -72,6 +75,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                              _position,
                              forcebondij,
                              bondEnergy,
+                             bondVirial,
                              locator);
 
     //_forcebond.Get(bondi) = _forcebond.Get(bondi) + forcebondij;
@@ -89,6 +93,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                                           const PositionType& _position,
                                           Vec3f& forcebondij,
                                           Real& bondEnergy,
+                                          Vec6f&  bondVirial,
                                           const ExecPointLocator& locator) const
   {
     Vec3f p_i = _position.Get(bondi);
@@ -110,6 +115,14 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     forcebondij = r_ij * forcebondij;
 
     bondEnergy = rk * dr;
+    //
+    auto bondij = -0.5 * forcebondij * r_ij;
+    bondVirial[0] = r_ij[0] * bondij[0];
+    bondVirial[1] = r_ij[1] * bondij[1];
+    bondVirial[2] = r_ij[2] * bondij[2];
+    bondVirial[3] = r_ij[0] * bondij[1];
+    bondVirial[4] = r_ij[0] * bondij[2];
+    bondVirial[5] = r_ij[1] * bondij[2];
   }
   Vec3f _box;
 };
@@ -158,14 +171,16 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 const WholeArrayIn whole_pts,
                                 FieldOut forceangle,
                                 FieldOut angleEnergy,
+                                FieldOut angleVirial,
                                 ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8,_9);
 
   template<typename AngleType,
            typename AngleListType,
            typename WholePtsType,
            typename ForceAngleType,
-           typename AngleEnergyType>
+           typename AngleEnergyType,
+           typename AngleVirialType>
   VTKM_EXEC void operator()(const AngleType& angle_type,
                             const AngleListType& anglelist,
                             const Real& angle_coeffs_k,
@@ -173,6 +188,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                             const WholePtsType& whole_pts,
                             ForceAngleType& forceangle,
                             AngleEnergyType& angleEnergy,
+                            AngleVirialType& angleVirial,
                             const ExecPointLocator& locator) const
   {
 
@@ -193,6 +209,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                               force_anglei,
                               force_anglek,
                               angleEnergy,
+                              angleVirial,
                               locator);
     forceangle[0] = force_anglei;
     forceangle[1] = -force_anglei - force_anglek;
@@ -209,6 +226,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                            Vec3f& force_anglei,
                                            Vec3f& force_anglek,
                                            Real& angleEnergy,
+                                           Vec6f&  angleVirial,
                                            const ExecPointLocator& locator) const
   {
 
@@ -249,6 +267,17 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     force_anglei = a11 * r_ij + a12 * r_kj;
     force_anglek = a22 * r_kj + a12 * r_ij;
+
+    //
+    Real THIRD = 1.0 / 3.0;
+
+    angleVirial[0] = -THIRD * r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0];
+    angleVirial[1] = -THIRD * r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1];
+    angleVirial[2] = -THIRD * r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2];
+    angleVirial[3] = -THIRD * r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1];
+    angleVirial[4] = -THIRD * r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2];
+    angleVirial[5] = -THIRD * r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2];
+
   }
 
    Vec3f _box;

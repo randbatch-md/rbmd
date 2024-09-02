@@ -412,6 +412,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
             _position,
             forcebond_group,
             bond_energy,
+            _bond_virial_atom,
             _locator);
 
   auto bond_energy_avr =
@@ -483,6 +484,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
             _position,
             forceangle_group,
             angle_energy,
+            _angle_virial_atom,
             _locator);
 
   auto angle_energy_avr =
@@ -1178,7 +1180,20 @@ void ExecutionNVT::ComputeVirial()
   auto ewald_long_virial =vtkm::cont::Algorithm::Reduce(_ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization())
                     * _unit_factor._qqr2e;
 
+
+ 
   virial = lj_virial + coul_virial + ewald_long_virial;
+  auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
+  if ("CVFF" == force_field)
+  {
+    auto bond_virial = vtkm::cont::Algorithm::Reduce(_bond_virial_atom,
+                                                     vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+    auto angle_virial = vtkm::cont::Algorithm::Reduce(
+      _angle_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+    virial = bond_virial + angle_virial;
+  }
 
   //RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);
   //reduce virial_atom
