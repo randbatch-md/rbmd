@@ -11,9 +11,9 @@
 
 namespace RunWorklet
 {
-    struct ComputeLJVirialVerletWorklet : vtkm::worklet::WorkletMapField
+    struct ComputeLJVirialWorklet : vtkm::worklet::WorkletMapField
     {
-    ComputeLJVirialVerletWorklet(const Real& cut_off, const Vec3f& box)
+  ComputeLJVirialWorklet(const Real& cut_off, const Vec3f& box)
     : _cut_off(cut_off)
     , _box(box)
   {
@@ -26,7 +26,7 @@ namespace RunWorklet
                                 FieldIn group_j,
                                 FieldIn num_j,
                                 FieldIn coord_offset_j,
-                                FieldOut LJvirial);
+                                FieldOut LJVirial);
   using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
 
   template<typename NeighbourGroupVecType, typename CoordOffsetj>
@@ -39,17 +39,15 @@ namespace RunWorklet
                             const CoordOffsetj& coord_offset_j,
                             Vec6f& LJVirial) const
   {
-    Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+    Vec6f lj_v = { 0, 0, 0, 0, 0, 0 };
 
     const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
     const auto& pts_type_i = topology.GetAtomsType(atoms_id);
     auto eps_i = topology.GetEpsilon(pts_type_i);
     auto sigma_i = topology.GetSigma(pts_type_i);
-    auto charge_pi = topology.GetCharge(atoms_id);
 
     auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
     {
-      auto charge_pj = topology.GetCharge(pts_id_j);
       auto molecular_id_j = topology.GetMolecularId(pts_id_j);
       auto pts_type_j = topology.GetAtomsType(pts_id_j);
       auto eps_j = topology.GetEpsilon(pts_type_j);
@@ -59,7 +57,7 @@ namespace RunWorklet
 
       if (molecular_id_i == molecular_id_j)
         return;
-      virial += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+      lj_v += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
     };
 
     auto p_i = locator.GetPtsPosition(atoms_id);
@@ -71,15 +69,15 @@ namespace RunWorklet
       function(p_i, p_j, idj);
     }
 
-    LJVirial = virial;
+    LJVirial = lj_v;
   }
   Real _cut_off;
   Vec3f _box;
   };
 
-    struct ComputeCoulVirialVerletWorklet : vtkm::worklet::WorkletMapField
+    struct ComputeCoulVirialWorklet : vtkm::worklet::WorkletMapField
   {
-  ComputeCoulVirialVerletWorklet(const Real& cut_off, const Vec3f& box)
+  ComputeCoulVirialWorklet(const Real& cut_off, const Vec3f& box)
     : _cut_off(cut_off)
     , _box(box)
   {
@@ -92,7 +90,7 @@ namespace RunWorklet
                                 FieldIn group_j,
                                 FieldIn num_j,
                                 FieldIn coord_offset_j,
-                                FieldOut coulvirial);
+                                FieldOut CoulVirial);
   using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
 
   template<typename NeighbourGroupVecType, typename CoordOffsetj>
@@ -103,9 +101,9 @@ namespace RunWorklet
                             const NeighbourGroupVecType& group_j,
                             const Id& num_j,
                             const CoordOffsetj& coord_offset_j,
-                            Vec6f& coulvirial) const
+                            Vec6f& CoulVirial) const
   {
-    Vec6f ewald_coul_v = { 0, 0, 0, 0, 0, 0 };
+    Vec6f coul_v = { 0, 0, 0, 0, 0, 0 };
 
     auto charge_pi = topology.GetCharge(atoms_id);
     auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
@@ -115,7 +113,7 @@ namespace RunWorklet
       //auto r_ij = p_j - p_i;
       auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
-      ewald_coul_v += force_function.ComputeCoulVirial(r_ij, charge_pi, charge_pj,_cut_off);
+      coul_v += force_function.ComputeCoulVirial(r_ij, charge_pi, charge_pj,_cut_off);
 
     };
 
@@ -127,11 +125,51 @@ namespace RunWorklet
       auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
       function(p_i, p_j, idj);
     }
-    coulvirial = ewald_coul_v;
+    CoulVirial = coul_v;
   }
   Real _cut_off;
   Vec3f _box;
   };
+
+    struct ComputeEwaldVirialWorklet : vtkm ::worklet::WorkletMapField
+  {
+  ComputeEwaldVirialWorklet(const IdComponent& Kmax, const Real& unit_factor)
+    : _Kmax(Kmax)
+    , _unit_factor(unit_factor)
+  {
+  }
+
+  using ControlSignature = void(FieldIn atoms_id,
+                                WholeArrayIn whole_rhok,
+                                ExecObject force_function,
+                                ExecObject topology,
+                                ExecObject locator,
+                                FieldOut EwaldVirial);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+
+  template<typename WholeRhokType>
+  VTKM_EXEC void operator()(const Id atoms_id,
+                            const WholeRhokType& whole_rhok,
+                            ExecForceFunction& force_function,
+                            const ExecTopology& topology,
+                            const ExecPointLocator& locator,
+                            Vec6f& EwaldVirial) const
+  {
+    Vec6f  Ewald_v = { 0, 0, 0, 0, 0, 0 };
+    const auto& charge_p_i = topology.GetCharge(atoms_id);
+    const auto& p_i = locator.GetPtsPosition(atoms_id);
+    auto function = [&](const vtkm::Vec3f& M, const vtkm::Id& indexEwald)
+    {
+      auto rhok_ri = whole_rhok.Get(indexEwald - 1);
+      Ewald_v += force_function.ComputeLongVirial(M, p_i, charge_p_i, rhok_ri);
+    };
+
+    locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
+    EwaldVirial = Ewald_v;
+  }
+  IdComponent _Kmax;
+  Real _unit_factor;
+  };   
 
     struct fix_press_berendsenWorklet : vtkm::worklet::WorkletMapField
     {
@@ -466,7 +504,7 @@ namespace RunWorklet
           //auto r_ij = p_j - p_i;
           auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
-          ele_force += force_function.ComputeNearEnergyForce(p_i, p_j, charge_pi, charge_pj);
+          ele_force += force_function.ComputeNearEnergyForce1(r_ij, charge_pi, charge_pj, _cut_off);
 
           if (molecular_id_i == molecular_id_j)
             return;
@@ -2254,46 +2292,6 @@ namespace RunWorklet
       IdComponent _Kmax;
     };   
 
-    struct ComputeEwaldVirialWorklet : vtkm ::worklet::WorkletMapField
-    {
-      ComputeEwaldVirialWorklet(const IdComponent& Kmax, const Real& unit_factor )
-        : _Kmax(Kmax)
-        , _unit_factor(unit_factor)
-      {
-      }
-
-      using ControlSignature = void(FieldIn atoms_id,
-                                    WholeArrayIn whole_rhok,
-                                    ExecObject force_function,
-                                    ExecObject topology,
-                                    ExecObject locator,
-                                    FieldOut force);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
-
-      template<typename WholeRhokType>
-      VTKM_EXEC void operator()(const Id atoms_id,
-                                const WholeRhokType& whole_rhok,
-                                ExecForceFunction& force_function,
-                                const ExecTopology& topology,
-                                const ExecPointLocator& locator,
-                                Vec6f& virial) const
-      {
-         virial = { 0, 0, 0, 0, 0, 0 };
-         const auto& charge_p_i = topology.GetCharge(atoms_id);
-         const auto& p_i = locator.GetPtsPosition(atoms_id);
-         auto function = [&](const vtkm::Vec3f& M, const vtkm::Id& indexEwald)
-         {
-           auto rhok_ri = whole_rhok.Get(indexEwald - 1);
-           //virial = _unit_factor * force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
-          // virial =  force_function.ComputeEwaldVirial(M, p_i, charge_p_i, rhok_ri);
-           virial = force_function.ComputeLongVirial(M, p_i, charge_p_i, rhok_ri);
-         };
-         locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
-      }
-      IdComponent _Kmax;
-      Real _unit_factor;
-    };   
-
     void ComputeNeighbours(const Real& cut_off,
                             const Vec3f& box,
                                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -2978,8 +2976,54 @@ namespace RunWorklet
                                eleFarNewforce);
     }
 
+      void ComputeLJVirial(const Real& cut_off,
+                       const Vec3f& box,
+                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                       const ContPointLocator& locator,
+                       const ContTopology& topology,
+                       const ContForceFunction& force_function,
+                       const GroupVecType& Group_j,
+                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                       const CoordOffsetType& coord_offset_j,
+                       vtkm::cont::ArrayHandle<Vec6f>& LJVirial)
+    {
+         vtkm::cont::Invoker{}(ComputeLJVirialWorklet{ cut_off, box },
+                               atoms_id,
+                               locator,
+                               topology,
+                               force_function,
+                               Group_j,
+                               num_j,
+                               coord_offset_j,
+                               LJVirial);
+    }
+
+      
+    void ComputeCoulVirial(const Real& cut_off,
+                         const Vec3f& box,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const GroupVecType& Group_j,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                         const CoordOffsetType& coord_offset_j,
+                          vtkm::cont::ArrayHandle<Vec6f>& CoulVirial)
+    {
+         vtkm::cont::Invoker{}(ComputeCoulVirialWorklet{ cut_off, box },
+                               atoms_id,
+                               locator,
+                               topology,
+                               force_function,
+                               Group_j,
+                               num_j,
+                               coord_offset_j,
+                               CoulVirial);
+    }
+
+    
      void ComputeEwaldVirial(const IdComponent& Kmax,
-                             const Real& unit_factor,
+                            const Real& unit_factor,
                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                             const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
                             const ContForceFunction& force_function,
@@ -2994,51 +3038,6 @@ namespace RunWorklet
                                topology,
                                locator,
                                EwaldVirial);
-    }
-
-      void LJVirialVerlet(const Real& cut_off,
-                       const Vec3f& box,
-                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                       const ContPointLocator& locator,
-                       const ContTopology& topology,
-                       const ContForceFunction& force_function,
-                       const GroupVecType& Group_j,
-                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-                       const CoordOffsetType& coord_offset_j,
-                       vtkm::cont::ArrayHandle<Vec6f>& LJVirial)
-    {
-         vtkm::cont::Invoker{}(ComputeLJVirialVerletWorklet{ cut_off, box },
-                               atoms_id,
-                               locator,
-                               topology,
-                               force_function,
-                               Group_j,
-                               num_j,
-                               coord_offset_j,
-                               LJVirial);
-    }
-
-      
-    void CoulVirialVerlet(const Real& cut_off,
-                         const Vec3f& box,
-                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                         const ContPointLocator& locator,
-                         const ContTopology& topology,
-                         const ContForceFunction& force_function,
-                         const GroupVecType& Group_j,
-                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-                         const CoordOffsetType& coord_offset_j,
-                          vtkm::cont::ArrayHandle<Vec6f>& coulvirial)
-    {
-         vtkm::cont::Invoker{}(ComputeCoulVirialVerletWorklet{ cut_off, box },
-                               atoms_id,
-                               locator,
-                               topology,
-                               force_function,
-                               Group_j,
-                               num_j,
-                               coord_offset_j,
-                               coulvirial);
     }
 
      void fix_press_berendsen(const Real& scale_factor,

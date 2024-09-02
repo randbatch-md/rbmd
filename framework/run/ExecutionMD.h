@@ -28,7 +28,7 @@ protected:
                           IdComponent& RBE_P,
                           ArrayHandle<Vec3f>& RBE_ele_force);
   void ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force);
-  void ComputeEwaldCoulVirial(ArrayHandle<Vec6f>& Ewald_Coul_virial);
+  void ComputeCoulVirial(ArrayHandle<Vec6f>& Coul_virial);
   void ComputeEwaldLongVirial(IdComponent& Kmax, ArrayHandle<Vec6f>& Ewald_long_virial);
 
   void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
@@ -41,7 +41,7 @@ protected:
   void ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force);
   void ComputeOriginalEAMForce(ArrayHandle<Vec3f>& force);
 
-  void ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& virial_atom);
+  void ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& lj_virial);
 
   void UpdateVerletList();
 

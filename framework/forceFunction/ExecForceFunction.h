@@ -52,7 +52,7 @@ public:
                                   const Real& sigma_j,
                                   const Real& cut_off) const
   {
-      Vec6f virial = { 0, 0, 0, 0, 0, 0 };
+      Vec6f LJVirial = { 0, 0, 0, 0, 0, 0 };
 
       const Real small_value = 0.0001;
       Vec3f force{ 0, 0, 0 };
@@ -67,20 +67,18 @@ public:
         Real dis_6 = dis_2 * dis_2 * dis_2;
         Real sigmaij_dis_6 = sigmaij_6 / dis_6;
         Real eps_ij = vtkm::Sqrt(eps_i * eps_j);
-        auto fpair = 0.5 * 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6) * r_ij / dis_2;
+        auto f =  24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6) / dis_2;
+        auto LJPair = 0.5 * f * r_ij;
 
-        //auto forcelj = 24 * eps_ij * ((2 * sigmaij_dis_6 - 1) * sigmaij_dis_6;
-        //auto fpair = forcelj / dis_2;
-
-        //compute virial
-        virial[0] = r_ij[0] * fpair[0]; //xx
-        virial[1] = r_ij[1] * fpair[1]; //yy
-        virial[2] = r_ij[2] * fpair[2]; //zz
-        virial[3] = r_ij[0] * fpair[1]; //xy
-        virial[4] = r_ij[0] * fpair[2]; //xz
-        virial[5] = r_ij[1] * fpair[2]; //yz
+        //compute LJVirial
+        LJVirial[0] = r_ij[0] * LJPair[0]; //xx
+        LJVirial[1] = r_ij[1] * LJPair[1]; //yy
+        LJVirial[2] = r_ij[2] * LJPair[2]; //zz
+        LJVirial[3] = r_ij[0] * LJPair[1]; //xy
+        LJVirial[4] = r_ij[0] * LJPair[2]; //xz
+        LJVirial[5] = r_ij[1] * LJPair[2]; //yz
       }
-      return virial;
+      return LJVirial;
   }
 
   VTKM_EXEC Vec6f ComputeCoulVirial(const Vec3f& r_ij,
@@ -89,7 +87,7 @@ public:
                                          const Real& cut_off) const
   {
       Vec6f CoulVirial {0,0,0,0,0,0,};
-      Vec3f force{ 0, 0, 0 };
+      Vec3f CoulForce{ 0, 0, 0 };
 
       const Real small_value = 0.0001;
       Real dis = vtkm::Magnitude(r_ij);
@@ -98,17 +96,52 @@ public:
 
       if (dis_2 < cut_off_2 && dis_2 > small_value)
       {
-        force = 0.5 * charge_pi * charge_pj * Gnear(_alpha, dis) * r_ij / dis;
+        auto f =  charge_pi * charge_pj * Gnear(_alpha, dis) / dis;
+        CoulForce = 0.5 * f * r_ij;
 
-        CoulVirial[0] = force[0] * r_ij[0];
-        CoulVirial[1] = force[1] * r_ij[1];
-        CoulVirial[2] = force[2] * r_ij[2];
-        CoulVirial[3] = force[0] * r_ij[1];
-        CoulVirial[4] = force[0] * r_ij[2];
-        CoulVirial[5] = force[1] * r_ij[2];
-
+        //compute CoulVirial
+        CoulVirial[0] = r_ij[0] * CoulForce[0]; //xx
+        CoulVirial[1] = r_ij[1] * CoulForce[1]; //yy
+        CoulVirial[2] = r_ij[2] * CoulForce[2]; //zz
+        CoulVirial[3] = r_ij[0] * CoulForce[1]; //xy
+        CoulVirial[4] = r_ij[0] * CoulForce[2]; //xz
+        CoulVirial[5] = r_ij[1] * CoulForce[2]; //yz
       }
       return CoulVirial;
+  }
+
+    VTKM_EXEC Vec6f ComputeLongVirial(const Vec3f& M,
+                                    const Vec3f& r_i,
+                                    const Real& charge_p_i,
+                                    const Vec2f& rhok_ri)
+  {
+      Vec6f LongVirial{ 0, 0, 0, 0, 0, 0 };
+
+      Vec3f K{ 0, 0, 0 };
+      Real LongForce = 0;
+
+      K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
+      K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
+      K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
+   
+      Real range_K_2 = K[0] * K[0] + K[1] * K[1] + K[2] * K[2];
+      auto factor_a = 4 * vtkm::Pi() * charge_p_i;
+      auto factor_b = vtkm::Exp(-range_K_2 / (4 * _alpha));
+      auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
+      auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
+
+      auto f =  factor_a / (_volume * range_K_2) * factor_b * (factor_c - factor_d);
+      LongForce = 0.5 * f;
+
+      //compute LongVirial
+      LongVirial[0] = (r_i[0] * K[0] + r_i[0] * K[0]) * LongForce; //_xx
+      LongVirial[1] = (r_i[1] * K[1] + r_i[1] * K[1]) * LongForce; // yy
+      LongVirial[2] = (r_i[2] * K[2] + r_i[2] * K[2]) * LongForce; // zz
+      LongVirial[3] = (r_i[0] * K[1] + r_i[1] * K[0]) * LongForce; // xy
+      LongVirial[4] = (r_i[0] * K[2] + r_i[2] * K[0]) * LongForce; // xz
+      LongVirial[5] = (r_i[1] * K[2] + r_i[2] * K[1]) * LongForce; // yz
+
+      return LongVirial;
   }
 
   VTKM_EXEC vtkm::Vec3f ComputeLJForce(const Vec3f& r_ij,
@@ -173,6 +206,25 @@ public:
     Real dis = vtkm::Magnitude(r_ij);
 
     if (dis < _cut_Off && dis > small_value)
+    {
+      force = -charge_pi * charge_pj * Gnear(_alpha, dis) * r_ij / dis;
+    }
+    return force;
+  }
+
+    VTKM_EXEC Vec3f ComputeNearEnergyForce1(const Vec3f& r_ij,
+                                         const Real& charge_pi,
+                                         const Real& charge_pj,
+                                         const Real& cut_off) const
+  {
+    const Real small_value = 0.0001;
+    Vec3f force{ 0, 0, 0 };
+
+    Real dis = vtkm::Magnitude(r_ij);
+    const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    const Real cut_off_2 = cut_off * cut_off;
+
+    if (dis_2 < cut_off_2 && dis_2 > small_value)
     {
       force = -charge_pi * charge_pj * Gnear(_alpha, dis) * r_ij / dis;
     }
@@ -281,51 +333,8 @@ public:
     auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
 
     force = factor_a / (_volume * range_K_2) * factor_b * (factor_c - factor_d); 
-
-    Real W_xx = 2 * r_i[0] * K[0]; // W_xx 分量
-    Real W_yy = 2 * r_i[1] * K[1];  // W_yy 分量
-    Real W_zz = 2 * r_i[2] * K[2]; // W_zz 分量
-    Real W_xy = r_i[0] * K[1] + r_i[1] * K[0];               // W_xy 分量
-    Real W_xz = r_i[0] * K[2] + r_i[2] * K[0];               // W_xz 分量
-    Real W_yz = r_i[1] * K[2] + r_i[2] * K[1];               // W_yz 分量
-
-
     return force;
   }
-
-  VTKM_EXEC Vec6f ComputeLongVirial(const Vec3f& M,
-                                const Vec3f& r_i,
-                                const Real& charge_p_i,
-                                const Vec2f& rhok_ri)
-  {
-    Vec6f virial{0,0,0,0,0,0};
-
-    Vec3f K{ 0, 0, 0 };
-    Real force = 0;
-
-    K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
-    K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
-    K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
-    //Vec3f K = 2 * vtkm::Pi() * M / _Vlength; // TODO: Lx
-    Real range_K_2 = K[0] * K[0] + K[1] * K[1] + K[2] * K[2];
-    auto factor_a = 4 * vtkm::Pi() * charge_p_i;
-    auto factor_b = vtkm::Exp(-range_K_2 / (4 * _alpha));
-    auto factor_c = vtkm::Cos(vtkm::Dot(K, r_i)) * rhok_ri[1];
-    auto factor_d = vtkm::Sin(vtkm::Dot(K, r_i)) * rhok_ri[0];
-
-    force = 0.5* factor_a / (_volume * range_K_2) * factor_b * (factor_c - factor_d);
-
-    virial[0] = force * (r_i[0] * K[0] + r_i[0] * K[0]);       // W_xx 分量
-    virial[1] = force * (r_i[1] * K[1] + r_i[1] * K[1]);         // W_yy 分量
-    virial[2] = force * (r_i[2] * K[2] + r_i[2] * K[2]);       // W_zz 分量
-    virial[3] = force * (r_i[0] * K[1] + r_i[1] * K[0]);         // W_xy 分量
-    virial[4] = force * (r_i[0] * K[2] + r_i[2] * K[0]);       // W_xz 分量
-    virial[5] = force * (r_i[1] * K[2] + r_i[2] * K[1]);         // W_yz 分量
-
-
-    return virial;
-  }
-
 
    VTKM_EXEC Vec6f ComputeEwaldVirial(const Vec3f& M,
                                      const Vec3f& r_i,
@@ -600,6 +609,25 @@ public:
                                     const Real& charge_j,
                                     const Real& cut_off,
                                     const Real& nearalpha) const
+  {
+    const Real small_value = 0.0001;
+    Real ComputePE_ij = 0;
+
+    Real cut_off_2 = cut_off * cut_off;
+    Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+    Real dis = vtkm::Magnitude(r_ij);
+    if (dis_2 < cut_off_2 && dis_2 > small_value)
+    {
+      ComputePE_ij = charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(nearalpha) * dis)) / dis;
+    }
+    return 0.5 * ComputePE_ij;
+  }
+
+  VTKM_EXEC Real ComputeNearEleEnergy0(const Vec3f& r_ij,
+                                      const Real& charge_i,
+                                      const Real& charge_j,
+                                      const Real& cut_off,
+                                      const Real& nearalpha) const
   {
     const Real small_value = 0.01;
     Real ComputePE_ij = 0;

@@ -357,16 +357,7 @@ namespace RunWorklet
                                       const ContPointLocator& locator,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce);
 
-     void ComputeEwaldVirial(const IdComponent& Kmax,
-                            const Real& unit_factor,
-                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                            const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
-                            const ContForceFunction& force_function,
-                            const ContTopology& topology,
-                            const ContPointLocator& locator,
-                            vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial);
-
-      void LJVirialVerlet(const Real& cut_off,
+      void ComputeLJVirial(const Real& cut_off,
                          const Vec3f& box,
                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                          const ContPointLocator& locator,
@@ -376,7 +367,8 @@ namespace RunWorklet
                          const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                          const CoordOffsetType& coord_offset_j,
                          vtkm::cont::ArrayHandle<Vec6f>& LJVirial);
-     void CoulVirialVerlet(const Real& cut_off,
+
+     void ComputeCoulVirial(const Real& cut_off,
                            const Vec3f& box,
                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                            const ContPointLocator& locator,
@@ -385,8 +377,16 @@ namespace RunWorklet
                            const GroupVecType& Group_j,
                            const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                            const CoordOffsetType& coord_offset_j,
-                           vtkm::cont::ArrayHandle<Vec6f>& coulvirial);
+                           vtkm::cont::ArrayHandle<Vec6f>& CoulVirial);
 
+      void ComputeEwaldVirial(const IdComponent& Kmax,
+                              const Real& unit_factor,
+                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                              const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
+                              const ContForceFunction& force_function,
+                              const ContTopology& topology,
+                              const ContPointLocator& locator,
+                              vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial);
 
      void fix_press_berendsen(const Real& scale_factor,
                               vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,

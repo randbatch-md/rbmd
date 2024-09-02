@@ -656,14 +656,14 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::EleNewForce()
 
 vtkm::cont::ArrayHandle<Vec6f> ExecutionNVT::LJVirial()
 {
-  ComputeVerletlistLJVirial(_virial_atom_lj);
-  return _virial_atom_lj;
+  ComputeVerletlistLJVirial(_lj_virial_atom);
+  return _lj_virial_atom;
 }
 
 vtkm::cont::ArrayHandle<Vec6f> ExecutionNVT::EwaldVirial()
 {
-  ComputeEwaldLongVirial(_Kmax, _virial_atom_ewald_long);
-  return _virial_atom_ewald_long;
+  ComputeEwaldLongVirial(_Kmax, _ewald_long_virial_atom);
+  return _ewald_long_virial_atom;
 }
 void ExecutionNVT::TempConTypeForce()
 {
@@ -1167,18 +1167,18 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-  ComputeVerletlistLJVirial(_virial_atom_lj); //_virial_atom
-  auto virial_lj = vtkm::cont::Algorithm::Reduce(_virial_atom_lj, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+  ComputeVerletlistLJVirial(_lj_virial_atom); 
+  auto lj_virial =vtkm::cont::Algorithm::Reduce(_lj_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-  ComputeEwaldCoulVirial(_virial_atom_ewald_coul);
-   auto virial_ewald_coul = vtkm::cont::Algorithm::Reduce(_virial_atom_ewald_coul, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) *
-                      _unit_factor._qqr2e;
+  ComputeCoulVirial(_coul_virial_atom);
+  auto coul_virial = vtkm::cont::Algorithm::Reduce(_coul_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) 
+                      * _unit_factor._qqr2e;
 
-  ComputeEwaldLongVirial(_Kmax, _virial_atom_ewald_long);
-  auto virial_ewald_long = vtkm::cont::Algorithm::Reduce(_virial_atom_ewald_long, vtkm::TypeTraits<Vec6f>::ZeroInitialization())
+  ComputeEwaldLongVirial(_Kmax, _ewald_long_virial_atom);
+  auto ewald_long_virial =vtkm::cont::Algorithm::Reduce(_ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization())
                     * _unit_factor._qqr2e;
 
-  virial = virial_lj + virial_ewald_coul + virial_ewald_long;
+  virial = lj_virial + coul_virial + ewald_long_virial;
 
   //RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);
   //reduce virial_atom
@@ -1192,8 +1192,6 @@ void ExecutionNVT::ComputeVirial()
   //  }
   //}
 
- // virial =
-   // vtkm::cont::Algorithm::Reduce(_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 }
 
 void ExecutionNVT::Couple()
