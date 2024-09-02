@@ -704,6 +704,13 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
 
   RunWorklet::ComputeNeighbours( cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
+
+  auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+  auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+  auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+  auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+  auto weight_group =
+    vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
   RunWorklet::NearForceVerlet(cut_off,
                               box,
                               _atoms_id,
@@ -713,6 +720,8 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
                               id_verletlist_group,
                               num_verletlist,
                               offset_verletlist_group,
+                              ids_group,
+                              weight_group,
                               nearforce);
 }
 

@@ -49,6 +49,8 @@ namespace RunWorklet
                          const GroupVecType& Group_j,
                          const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                          const CoordOffsetType& coord_offset_j,
+                         const GroupIdIdType& group_ids,
+                         const GroupRealIdType& group_weights,
                          vtkm::cont::ArrayHandle<Vec3f>& nearforce);
 
    void LJForceVerlet(const Real& cut_off,
@@ -250,7 +252,8 @@ namespace RunWorklet
                             const ContForceFunction& force_function,
                             const ContTopology& topology,
                             const ContPointLocator& locator,
-                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce);
+                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce,
+                            vtkm::cont::ArrayHandle<Vec6f>& SpecCoulVirial);
     void ComputeSpecialCoulGeneral(const Vec3f& box,
                                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                    const GroupVecType& group_vec,
@@ -259,7 +262,8 @@ namespace RunWorklet
                                    const ContPointLocator& locator,
                                    const GroupIdIdType& group_ids,
                                    const GroupRealIdType& group_weights,
-                                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce);
+                                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce,
+                                   vtkm::cont::ArrayHandle<Vec6f>& SpecCoulVirial);
     void ComputeNewRBEForce(const IdComponent& rbeP, 
                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,

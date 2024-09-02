@@ -402,8 +402,10 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
 
   // forcebond
   vtkm::cont::ArrayHandle<Vec3f> forcebond;
+  vtkm::cont::ArrayHandle<Vec6f> bond_virial_temp;
   vtkm::cont::ArrayHandle<Real> bond_energy;
   auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
+  auto&& bond_virial_group = vtkm::cont::make_ArrayHandleGroupVec<2>(bond_virial_temp);
   Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _box },
             bond_type,
             bondlist_group,
@@ -412,8 +414,11 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
             _position,
             forcebond_group,
             bond_energy,
-            _bond_virial_atom,
+            bond_virial_group,
             _locator);
+
+
+
 
   auto bond_energy_avr =
     vtkm::cont::Algorithm::Reduce(bond_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
@@ -450,6 +455,22 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
               keys_bond,
               vtkm::cont::make_ArrayHandle(new_forcebond),
               reduce_force_bond);
+
+
+    //append bond_virial
+    std::vector<Vec6f> new_bond_virial(original_number);
+    memcpy(&new_bond_virial[0],
+           bond_virial_temp.ReadPortal().GetArray(),
+           original_number * sizeof(Vec6f));
+
+    std::vector<Vec6f> value_virial(atom_id_number, Vec6f{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
+    new_bond_virial.insert(new_bond_virial.end(), value_virial.begin(), value_virial.end());
+
+    
+    Invoker{}(MolecularWorklet::ReduceVirialWorklet{},
+              keys_bond,
+              vtkm::cont::make_ArrayHandle(new_bond_virial),
+              _bond_virial_atom);
   }
   else
   {
@@ -475,7 +496,10 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
   // force_angle
   vtkm::cont::ArrayHandle<Vec3f> force_angle;
   vtkm::cont::ArrayHandle<Real> angle_energy;
+  vtkm::cont::ArrayHandle<Vec6f> virial_angle_temp;
   auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
+  auto&& virialangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(virial_angle_temp);
+
   Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _box },
             angle_type,
             anglelist_group,
@@ -484,8 +508,15 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
             _position,
             forceangle_group,
             angle_energy,
-            _angle_virial_atom,
+            virialangle_group,
             _locator);
+
+  //  std::cout << _angle_virial_atom.GetNumberOfValues() << std::endl;
+  //for (int i = 0; i < _angle_virial_atom.GetNumberOfValues(); ++i)
+  //{
+  //  std::cout << _angle_virial_atom.ReadPortal().Get(i) << std::endl;
+  //}
+
 
   auto angle_energy_avr =
     vtkm::cont::Algorithm::Reduce(angle_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
@@ -523,6 +554,21 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
               keys_angle,
               vtkm::cont::make_ArrayHandle(new_force_angle),
               reduce_force_angle);
+
+
+     //append virial bond
+    std::vector<Vec6f> new_virial_angle(original_number);
+    memcpy(&new_virial_angle[0],
+           virial_angle_temp.ReadPortal().GetArray(),
+           original_number * sizeof(Vec6f));
+    std::vector<Vec6f> value_virial(atom_id_number, Vec6f{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
+    new_virial_angle.insert(new_virial_angle.end(), value_virial.begin(), value_virial.end());
+
+    
+    Invoker{}(MolecularWorklet::ReduceVirialWorklet{},
+              keys_angle,
+              vtkm::cont::make_ArrayHandle(new_virial_angle),
+              _angle_virial_atom);
   }
   else
   {
@@ -552,7 +598,10 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
   // force_dihedrals
   vtkm::cont::ArrayHandle<Vec3f> force_dihedrals;
   vtkm::cont::ArrayHandle<Real> dihedrals_energy;
+  vtkm::cont::ArrayHandle<Vec6f> virial_dihedrals_temp;
   auto&& forcedihedrals_group = vtkm::cont::make_ArrayHandleGroupVec<4>(force_dihedrals);
+  auto&& virialdihedrals_group = vtkm::cont::make_ArrayHandleGroupVec<4>(virial_dihedrals_temp);
+
 
   Invoker{}(MolecularWorklet::ComputeDihedralHarmonicWorklet{ _box },
             dihedrals_type,
@@ -563,6 +612,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
             _position,
             forcedihedrals_group,
             dihedrals_energy,
+            virialdihedrals_group,
             _locator);
 
   auto dihedrals_energy_avr =
@@ -601,6 +651,23 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
             vtkm::cont::make_ArrayHandle(new_force_dihedrals),
             reduce_force_dihedrals);
 
+
+   
+
+  //append virial bond
+  std::vector<Vec6f> new_virial_dihedrals(original_number);
+  memcpy(&new_virial_dihedrals[0],
+         virial_dihedrals_temp.ReadPortal().GetArray(),
+         original_number * sizeof(Vec6f));
+  std::vector<Vec6f> value_virial(atom_id_number, Vec6f{ 0.0, 0.0, 0.0, .0, 0.0, 0.0 });
+  new_virial_dihedrals.insert(new_virial_dihedrals.end(), value_virial.begin(), value_virial.end());
+
+  
+  Invoker{}(MolecularWorklet::ReduceVirialWorklet{},
+            keys_dihedrals,
+            vtkm::cont::make_ArrayHandle(new_virial_dihedrals),
+            _dihedral_virial_atom);
+
   return reduce_force_dihedrals;
 }
 
@@ -629,12 +696,27 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
                                              _locator,
                                              ids_group,
                                              weight_group,
-                                             _spec_coul_force);
+                                             _spec_coul_force,
+                                             _spec_coul_virial_atom);
   }
   else
   {  
-    RunWorklet::ComputeSpecialCoul(box, _atoms_id, groupVecArray, _force_function, _topology, _locator, _spec_coul_force);
+    RunWorklet::ComputeSpecialCoul(box,
+                                   _atoms_id,
+                                   groupVecArray,
+                                   _force_function,
+                                   _topology,
+                                   _locator,
+                                   _spec_coul_force,
+                                   _spec_coul_virial_atom);
+
   }
+
+  //std::cout << _spec_coul_virial_atom.GetNumberOfValues() << std::endl;
+  //for (int i = 0; i < _spec_coul_virial_atom.GetNumberOfValues(); ++i)
+  //{
+  //  std::cout << _spec_coul_virial_atom.ReadPortal().Get(i) << std::endl;
+  //}
   return _spec_coul_force;
 }
 
@@ -1186,13 +1268,19 @@ void ExecutionNVT::ComputeVirial()
   auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
   if ("CVFF" == force_field)
   {
+    auto spec_coul_virial = vtkm::cont::Algorithm::Reduce(
+      _spec_coul_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
     auto bond_virial = vtkm::cont::Algorithm::Reduce(_bond_virial_atom,
                                                      vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
     auto angle_virial = vtkm::cont::Algorithm::Reduce(
       _angle_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-    virial = bond_virial + angle_virial;
+    auto dihedral_virial= vtkm::cont::Algorithm::Reduce(
+      _dihedral_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+    virial = bond_virial + angle_virial + dihedral_virial;
   }
 
   //RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);

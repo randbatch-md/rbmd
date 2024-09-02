@@ -66,6 +66,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     vtkm::IdComponent bondj = bondlist[1];
     vtkm::IdComponent bondtype = bond_type;
     Vec3f forcebondij;
+    Vec6f virialbondij;
 
     ComputeijBondEnergyForce(bondi,
                              bondj,
@@ -75,7 +76,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                              _position,
                              forcebondij,
                              bondEnergy,
-                             bondVirial,
+                             virialbondij,
                              locator);
 
     //_forcebond.Get(bondi) = _forcebond.Get(bondi) + forcebondij;
@@ -83,6 +84,8 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     forcebond[0] = forcebondij;
     forcebond[1] = -forcebondij;
+    bondVirial[0] = virialbondij;
+    bondVirial[1] = virialbondij;
   }
   template<typename PositionType>
   VTKM_EXEC void ComputeijBondEnergyForce(const vtkm::IdComponent& bondi,
@@ -93,7 +96,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                                           const PositionType& _position,
                                           Vec3f& forcebondij,
                                           Real& bondEnergy,
-                                          Vec6f&  bondVirial,
+                                          Vec6f& virialbondij,
                                           const ExecPointLocator& locator) const
   {
     Vec3f p_i = _position.Get(bondi);
@@ -116,13 +119,13 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     bondEnergy = rk * dr;
     //
-    auto bondij = -0.5 * forcebondij * r_ij;
-    bondVirial[0] = r_ij[0] * bondij[0];
-    bondVirial[1] = r_ij[1] * bondij[1];
-    bondVirial[2] = r_ij[2] * bondij[2];
-    bondVirial[3] = r_ij[0] * bondij[1];
-    bondVirial[4] = r_ij[0] * bondij[2];
-    bondVirial[5] = r_ij[1] * bondij[2];
+    auto bondij = -0.5 * forcebondij;
+    virialbondij[0] = r_ij[0] * bondij[0];
+    virialbondij[1] = r_ij[1] * bondij[1];
+    virialbondij[2] = r_ij[2] * bondij[2];
+    virialbondij[3] = r_ij[0] * bondij[1];
+    virialbondij[4] = r_ij[0] * bondij[2];
+    virialbondij[5] = r_ij[1] * bondij[2];
   }
   Vec3f _box;
 };
@@ -140,6 +143,28 @@ struct ReduceForceWorklet : vtkm::worklet::WorkletReduceByKey
     for (vtkm::IdComponent index = 0; index < force.GetNumberOfComponents(); index++)
     {
       sum = sum + force[index];
+    }
+    return sum;
+  }
+};
+
+struct ReduceVirialWorklet : vtkm::worklet::WorkletReduceByKey
+{
+  using ControlSignature = void(KeysIn atoms, ValuesIn virial, ReducedValuesOut reduce_virial);
+  using ExecutionSignature = _3(_2);
+  using InputDomain = _1;
+
+  template<typename VirialVecType>
+  VTKM_EXEC typename VirialVecType::ComponentType operator()(const VirialVecType& virialList) const
+  {
+ 
+    typename VirialVecType::ComponentType sum =
+      vtkm::TypeTraits<typename VirialVecType::ComponentType>::ZeroInitialization();
+
+   
+    for (vtkm::IdComponent index = 0; index < virialList.GetNumberOfComponents(); index++)
+    {
+      sum += virialList[index];
     }
     return sum;
   }
@@ -198,6 +223,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     vtkm::IdComponent angletype = angle_type;
     Vec3f force_anglei;
     Vec3f force_anglek;
+    Vec6f angleVirial_pair;
 
     ComputeijAngleEnergyForce(anglei,
                               anglej,
@@ -209,11 +235,15 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                               force_anglei,
                               force_anglek,
                               angleEnergy,
-                              angleVirial,
+                              angleVirial_pair,
                               locator);
     forceangle[0] = force_anglei;
     forceangle[1] = -force_anglei - force_anglek;
     forceangle[2] = force_anglek;
+    angleVirial[0] = angleVirial_pair;
+    angleVirial[1] = angleVirial_pair;
+    angleVirial[2] = angleVirial_pair;
+
   }
   template<typename WholePtsType>
   VTKM_EXEC void ComputeijAngleEnergyForce(const vtkm::IdComponent& anglei,
@@ -226,7 +256,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                            Vec3f& force_anglei,
                                            Vec3f& force_anglek,
                                            Real& angleEnergy,
-                                           Vec6f&  angleVirial,
+                                           Vec6f&  angleVirial_pair,
                                            const ExecPointLocator& locator) const
   {
 
@@ -271,17 +301,18 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     //
     Real THIRD = 1.0 / 3.0;
 
-    angleVirial[0] = -THIRD * r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0];
-    angleVirial[1] = -THIRD * r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1];
-    angleVirial[2] = -THIRD * r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2];
-    angleVirial[3] = -THIRD * r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1];
-    angleVirial[4] = -THIRD * r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2];
-    angleVirial[5] = -THIRD * r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2];
+    angleVirial_pair[0] = -THIRD * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+    angleVirial_pair[1] = -THIRD * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+    angleVirial_pair[2] = -THIRD * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+    angleVirial_pair[3] = -THIRD * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+    angleVirial_pair[4] = -THIRD * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+    angleVirial_pair[5] = -THIRD * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
 
   }
 
    Vec3f _box;
 };
+
 
 
 struct ComputeDihedralOPLSWorklet : vtkm::worklet::WorkletMapField
@@ -570,14 +601,16 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 WholeArrayIn whole_pts,
                                 FieldOut forcedihedral,
                                 FieldOut dihedralEnergy,
+                                FieldOut dihedralVirial,
                                 ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9,_10);
 
   template<typename DihedralType,
            typename DihedralListType,
            typename WholePtsType,
            typename ForceDihedralType,
-           typename DihedralEnergyType>
+           typename DihedralEnergyType,
+           typename DihedralVirialType>
   VTKM_EXEC void operator()(const DihedralType& dihedral_type,
                             const DihedralListType& dihedrallist,
                             const Real& dihedral_coeffs_k,
@@ -586,6 +619,7 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
                             const WholePtsType& whole_pts,
                             ForceDihedralType& forcedihedral,
                             DihedralEnergyType& dihedralEnergy,
+                            DihedralVirialType& dihedralVirial,
                             const ExecPointLocator& locator) const
   {
 
@@ -610,6 +644,7 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f force_dihedralj;
     Vec3f force_dihedralk;
     Vec3f force_dihedralw;
+    Vec6f dihedralVirial_pair;
 
     ComputeijDihedralHarmonicEnergyForce(dihedrali,
                                          dihedralj,
@@ -626,11 +661,17 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
                                          force_dihedralk,
                                          force_dihedralw,
                                          dihedralEnergy,
+                                         dihedralVirial_pair,
                                          locator);
     forcedihedral[0] = force_dihedrali;
     forcedihedral[1] = force_dihedralj;
     forcedihedral[2] = force_dihedralk;
     forcedihedral[3] = force_dihedralw;
+
+    dihedralVirial[0] = dihedralVirial_pair;
+    dihedralVirial[1] = dihedralVirial_pair;
+    dihedralVirial[2] = dihedralVirial_pair;
+    dihedralVirial[3] = dihedralVirial_pair;
   }
   template<typename WholePtsType>
   VTKM_EXEC void ComputeijDihedralHarmonicEnergyForce(
@@ -649,6 +690,7 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f& force_dihedralk,
     Vec3f& force_dihedralw,
     Real& dihedralEnergy,
+    Vec6f& dihedralVirial_pair,
     const ExecPointLocator& locator) const
   {
 
@@ -815,6 +857,27 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     //f3[0] = -sx2 - f4[0];
     //f3[1] = -sy2 - f4[1];
     //f3[2] = -sz2 - f4[2];
+
+
+    //dihedralVirial
+    dihedralVirial_pair[0] =  -0.25 * (vb1[0] * force_dihedrali[0] + vb2[0] * force_dihedralk[0] +
+      (vb3[0] + vb2[0]) * force_dihedralw[0]);
+
+    dihedralVirial_pair[1] =  -0.25 * (vb1[1] * force_dihedrali[1] + vb2[1] * force_dihedralk[1] +
+       (vb3[1] + vb2[1]) * force_dihedralw[1]);
+
+    dihedralVirial_pair[2] =  -0.25 * (vb1[2] * force_dihedrali[2] + vb2[2] * force_dihedralk[2] +
+      (vb3[2] + vb2[2]) * force_dihedralw[2]);
+
+    dihedralVirial_pair[3] =  -0.25 * (vb1[0] * force_dihedrali[1] + vb2[0] * force_dihedralk[1] +
+      (vb3[0] + vb2[0]) * force_dihedralw[1]);
+
+    dihedralVirial_pair[4] =  -0.25 * (vb1[0] * force_dihedrali[2] + vb2[0] * force_dihedralk[2] +
+      (vb3[0] + vb2[0]) * force_dihedralw[2]);
+
+    dihedralVirial_pair[5] =  -0.25 * (vb1[1] * force_dihedrali[2] + vb2[1] * force_dihedralk[2] +
+      (vb3[1] + vb2[1]) * force_dihedralw[2]);
+
   }
 
    Vec3f _box;

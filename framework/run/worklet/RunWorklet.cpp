@@ -471,10 +471,15 @@ namespace RunWorklet
                                     FieldIn group_j,
                                     FieldIn num_j,
                                     FieldIn coord_offset_j,
+                                    FieldIn special_ids,
+                                    FieldIn special_weights,
                                     FieldOut nearforce);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8,_9,_10);
 
-      template<typename NeighbourGroupVecType, typename CoordOffsetj>
+      template<typename NeighbourGroupVecType,
+               typename CoordOffsetj,
+               typename idsType,
+               typename weightsType>
       VTKM_EXEC void operator()(const Id atoms_id,
                                 const ExecPointLocator& locator,
                                 const ExecTopology& topology,
@@ -482,6 +487,8 @@ namespace RunWorklet
                                 const NeighbourGroupVecType& group_j,
                                 const Id& num_j,
                                 const CoordOffsetj& coord_offset_j,
+                                const idsType& special_ids,
+                                const weightsType& special_weights,
                                 Vec3f& nearforce) const
       {
         Vec3f LJ_force = { 0, 0, 0 };
@@ -493,6 +500,7 @@ namespace RunWorklet
         auto eps_i = topology.GetEpsilon(pts_type_i);
         auto sigma_i = topology.GetSigma(pts_type_i);
         auto charge_pi = topology.GetCharge(atoms_id);
+        auto num_components = special_ids.GetNumberOfComponents();
 
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
@@ -506,9 +514,21 @@ namespace RunWorklet
 
           ele_force += force_function.ComputeNearEnergyForce1(r_ij, charge_pi, charge_pj, _cut_off);
 
-          if (molecular_id_i == molecular_id_j)
-            return;
-          LJ_force += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          //if (molecular_id_i == molecular_id_j)
+           // return;
+          //LJ_force += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          
+          //weight
+          Vec3f forceij = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          auto weight = 1.0;
+          for (auto i = 0; i < num_components; ++i)
+          {
+            if (special_ids[i] == pts_id_j)
+            {
+              weight = special_weights[i];
+            }
+          }
+          LJ_force += weight * forceij;
         };
 
         auto p_i = locator.GetPtsPosition(atoms_id);
@@ -1761,8 +1781,9 @@ namespace RunWorklet
                                        ExecObject force_function,
                                        ExecObject topology,
                                        ExecObject locator,
-                                       FieldOut force);
-         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+                                       FieldOut force,
+                                       FieldOut SpecialCoulVirial);
+         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6,_7);
          template<typename GroupVecType>
 
          VTKM_EXEC void operator()(const Id& atoms_id,
@@ -1770,10 +1791,13 @@ namespace RunWorklet
                                    ExecForceFunction& force_function,
                                    const ExecTopology& topology,
                                    const ExecPointLocator& locator,
-                                   Vec3f& force) const
+                                   Vec3f& force,
+                                   Vec6f&  SpecialCoulVirial) const
          {
            auto num = group_vec.GetNumberOfComponents();
            force = { 0, 0, 0 };
+           SpecialCoulVirial = { 0, 0, 0, 0, 0, 0 };
+
            if (num < 3)
            {
              force = 0;
@@ -1796,6 +1820,15 @@ namespace RunWorklet
                Real dis_ij3 = vtkm::Pow(dis_ij, 3);
                Real force_component = -332.06371 * charge_p_i * atoms_charge_j / dis_ij3;
                force +=  force_component * rij;
+               //
+               auto f = -0.5 * force_component * rij;
+
+               SpecialCoulVirial[0] += rij[0] * f[0];
+               SpecialCoulVirial[1] += rij[1] * f[1];
+               SpecialCoulVirial[2] += rij[2] * f[2];
+               SpecialCoulVirial[3] += rij[0] * f[1];
+               SpecialCoulVirial[4] += rij[0] * f[2];
+               SpecialCoulVirial[5] += rij[1] * f[2];
              }
            }
          }
@@ -1816,8 +1849,9 @@ namespace RunWorklet
                                        ExecObject locator,
                                        FieldIn special_ids,
                                        FieldIn special_weights,
-                                       FieldOut force);
-         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6 ,_7,_8);
+                                       FieldOut force,
+                                       FieldOut SpecialCoulVirial);
+         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6 ,_7,_8,_9);
 
          template<typename GroupVecType, typename idsType, typename weightsType>
          VTKM_EXEC void operator()(const Id& atoms_id,
@@ -1827,10 +1861,13 @@ namespace RunWorklet
                                    const ExecPointLocator& locator,
                                    const idsType& special_ids,
                                    const weightsType& special_weights,
-                                   Vec3f& force) const
+                                   Vec3f& force,
+                                   Vec6f&  SpecialCoulVirial) const
          { 
             auto num = group_vec.GetNumberOfComponents();           
             force = { 0, 0, 0 };
+            SpecialCoulVirial = { 0, 0, 0, 0, 0, 0 };
+
             if (num < 3)
             {
               force = 0;
@@ -1865,6 +1902,16 @@ namespace RunWorklet
                 }
 
                 force += (1.0 - weight) * force_component * rij;
+
+                //
+                auto f = -0.5 * (1.0 - weight) * force_component * rij;
+
+                SpecialCoulVirial[0] += rij[0] * f[0];
+                SpecialCoulVirial[1] += rij[1] * f[1];
+                SpecialCoulVirial[2] += rij[2] * f[2];
+                SpecialCoulVirial[3] += rij[0] * f[1];
+                SpecialCoulVirial[4] += rij[0] * f[2];
+                SpecialCoulVirial[5] += rij[1] * f[2];
               }
             } 
          }
@@ -2356,6 +2403,8 @@ namespace RunWorklet
                          const GroupVecType& Group_j,
                          const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                          const CoordOffsetType& coord_offset_j,
+                         const GroupIdIdType& group_ids,
+                         const GroupRealIdType& group_weights,
                          vtkm::cont::ArrayHandle<Vec3f>& nearforce)
     {
       vtkm::cont::Invoker{}(ComputeNearForceVerletWorklet{ cut_off, box },
@@ -2366,6 +2415,8 @@ namespace RunWorklet
                             Group_j,
                             num_j,
                             coord_offset_j,
+                            group_ids,
+                            group_weights,
                             nearforce);
     }
     void LJForceVerlet(const Real& cut_off,
@@ -2761,7 +2812,8 @@ namespace RunWorklet
                             const ContForceFunction& force_function,
                             const ContTopology& topology,
                             const ContPointLocator& locator,
-                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce)
+                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce,
+                            vtkm::cont::ArrayHandle<Vec6f>& SpecCoulVirial)
     {
       vtkm::cont::Invoker{}(ComputeSpecialCoulWorklet{ box },
                             atoms_id,
@@ -2769,7 +2821,8 @@ namespace RunWorklet
                             force_function,
                             topology,
                             locator,
-                            SpecCoulforce);
+                            SpecCoulforce,
+                            SpecCoulVirial);
     }
 
     void ComputeSpecialCoulGeneral(const Vec3f& box,
@@ -2780,7 +2833,8 @@ namespace RunWorklet
                             const ContPointLocator& locator,
                             const GroupIdIdType& group_ids,
                             const GroupRealIdType& group_weights,
-                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce)
+                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce,
+                            vtkm::cont::ArrayHandle<Vec6f>& SpecCoulVirial)
     {
       vtkm::cont::Invoker{}(ComputeSpecialCoulGeneralWorklet{ box },
                             atoms_id,
@@ -2790,7 +2844,8 @@ namespace RunWorklet
                             locator,
                             group_ids,
                             group_weights,
-                            SpecCoulforce);
+                            SpecCoulforce,
+                            SpecCoulVirial);
     }
 
     void ComputeNewRBEForce(const IdComponent& rbeP,
