@@ -31,6 +31,8 @@ public:
 
   void Execute() override;
   void ReadDataFile(std::ifstream&file);
+  void InitField() override;
+  void SetParameters() override;
 
 private:
   void Header(std::ifstream& file);
@@ -96,6 +98,6 @@ private:
   std::map<std::string, Id> group_id_init;
   std::map<Id, Id> _group_info;
   std::vector<Id> _molecular_type;
-  std::vector<Real> _special_bonds;
+  std::vector<int> _special_bonds;
   std::multimap<Id, Id> _special_map;
 };

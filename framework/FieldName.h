@@ -19,6 +19,9 @@ namespace field
 	const std::string target_position = "target_position";
 	const std::string atom_id_center = "atom_id_center";
 	const std::string atom_id_target = "atom_id_target";
+	const std::string atom_pair_id = "atom_pair_id";
+	const std::string atom_pair_position = "atom_pair_position";
+    const std::string atoms_pair_type_offsets = "atoms_pair_type_offsets";
 	const std::string position_flag = "position_flag";
 	const std::string bond_atom_id = "bond_atom_id";
 	const std::string bond_type = "bond_type";
@@ -53,9 +56,11 @@ namespace gtest
 }
 
 const std::string PARA_CUTOFF = "cut_off";
-const std::string PARA_RS = "rs";
-const std::string PARA_RANDOM_NUM = "random_num";
+const std::string PARA_R_CORE = "r_core";
+const std::string PARA_NEIGHBOR_SAMPLE_NUM = "neighbor_sample_num";
+const std::string PARA_COULOMB_SAMPLE_NUM = "coulomb_sample_num";
 const std::string PARA_VLENGTH = "vLength";
+const std::string PARA_BOX = "box";
 const std::string PARA_VOLUME = "volume";
 const std::string PARA_BIN_NUMBER = "bin_number";
 const std::string PARA_RANGE = "range";
@@ -72,6 +77,8 @@ const std::string PARA_TEMPT = "temp_t";
 const std::string PARA_RBE_P = "rbeP";
 const std::string PARA_CENTER_TYPE = "center_type";
 const std::string PARA_TARGET_TYPE = "target_type";
+const std::string PARA_ATOMS_PAIR_TYPE = "atoms_pair_type";
+
 
 const std::string PARA_LOCATOR = "locator";
 const std::string NTYPES = "num_atom_ntypes";
@@ -81,4 +88,30 @@ const std::string EAM_PARA_RHOMAX = "eam_rhomax";
 const std::string EAM_PARA_NRHO = "eam_nrho";
 const std::string EAM_PARA_DRHO = "eam_drho";
 const std::string EAM_PARA_NR = "eam_nr";
-const std::string EAM_PARA_DR = "eam_dr";const std::string PARA_DIHEDRAL_ENERGY = "dihedral_energy";
+const std::string EAM_PARA_DR = "eam_dr";
+const std::string PARA_DIHEDRAL_ENERGY = "dihedral_energy";
+
+const std::string PARA_ATOM_MAP = "atom_map";
+const std::string PARA_FORCE_FIELD_TYPE = "force_field_type";
+const std::string PARA_POTENTIAL_FILE = "potential_file";
+const std::string PARA_NEIGHBOR_TYPE = "neighbor_type";
+const std::string PARA_FIX_SHAKE = "fix_shake";
+const std::string PARA_COULOMB_TYPE = "coulomb_type";
+const std::string PARA_ENSEMBLE = "ensemble";
+const std::string PARA_TEMPERATURE = "temperature";
+const std::string PARA_PRESSURE = "pressure";
+const std::string PARA_TEMP_CTRL_TYPE = "temp_ctrl_type";
+const std::string PARA_PRESS_CTRL_TYPE = "press_ctrl_type";
+const std::string PARA_TIMESTEP = "timestep";
+const std::string PARA_NUM_STEPS = "num_steps";
+const std::string PARA_READ_FILE = "read_file";
+
+const std::string PARA_FAR_FORCE = "far_force";
+const std::string PARA_DIHEDRALS_FORCE = "dihedrals_force";
+const std::string PARA_SPECIAL_BONDS = "special_bonds";
+
+const std::string PARA_INIT_WAY = "init_way";
+const std::string PARA_FILE_TYPE = "file_type";
+
+const std::string PARA_FILE_DIHEDRALS = "file_dihedrals";
+const std::string PARA_FILE_ANGLES = "file_angles";

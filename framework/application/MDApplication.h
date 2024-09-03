@@ -12,6 +12,11 @@ public:
   void Run() override;
   void RunExecutioner();
   void CreateActions() override;
+  void CreateCommand();
+  void InitConfigurationCommand();
+  void HyperParametersCommand();
+  void ExecutionCommand();
+  void OutputsCommand();
 
 private:
   std::string _ifile;

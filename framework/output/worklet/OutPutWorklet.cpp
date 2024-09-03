@@ -1,5 +1,4 @@
 ﻿#include "output/worklet/OutPutWorklet.h"
-#include "System.h"
 #include "Executioner.h"
 #include <vtkm/worklet/WorkletMapField.h>
 #include <vtkm/cont/Algorithm.h>
@@ -11,9 +10,9 @@ namespace OutPut
 {
     struct ComputeEAMrhoWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Real& Vlength)
+      ComputeEAMrhoWorklet(const Real& eam_cut_off, const Vec3f& box)
         : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
     
@@ -38,14 +37,14 @@ namespace OutPut
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           rho += force_function.ComputeEAMrhoOUT(_eam_cut_off, r_ij, rhor_spline);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
         EAM_rho = rho;
       }
       Real _eam_cut_off;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputeEmbeddingEnergyWorklet : vtkm::worklet::WorkletMapField
@@ -76,9 +75,9 @@ namespace OutPut
 
     struct ComputePairEnergyWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputePairEnergyWorklet(const Real& eam_cut_off, const Real& Vlength)
+      ComputePairEnergyWorklet(const Real& eam_cut_off, const Vec3f& box)
         : _eam_cut_off(eam_cut_off)
-        , _Vlength(Vlength)
+        , _box(box)
       {
       }
     
@@ -102,19 +101,20 @@ namespace OutPut
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
           //auto r_ij = p_j - p_i;
-          auto r_ij = locator.MinDistance(p_i, p_j, _Vlength);
+          auto r_ij = locator.MinDistanceVec(p_i, p_j, _box);
           pair_energy += force_function.ComputePairEnergy(_eam_cut_off, r_ij, z2r_spline);
         };
         locator.ExecuteOnNeighbor(atoms_id, function);
       }
       Real _eam_cut_off;
-      Real _Vlength;
+      Vec3f _box;
     };
 
     struct ComputePotentialEnWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputePotentialEnWorklet(const Real& cut_off)
+      ComputePotentialEnWorklet(const Real& cut_off, const Vec3f& box)
         : _cut_off(cut_off)
+        , _box(box)
       {
       }
 
@@ -142,7 +142,8 @@ namespace OutPut
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
           auto eps_ij = vtkm::Sqrt(eps_i * eps_j);
           auto sigma_ij = (sigma_i + sigma_j) / 2;
 
@@ -157,12 +158,14 @@ namespace OutPut
         PotentialEnergy = PE_ij;
       }
       Real _cut_off;
+      Vec3f _box;
     };
 
     struct ComputeSpecialBondsLJPotentialWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeSpecialBondsLJPotentialWorklet(const Real& cut_off)
+      ComputeSpecialBondsLJPotentialWorklet(const Real& cut_off, const Vec3f& box)
         : _cut_off(cut_off)
+        , _box(box)
       {
       }
 
@@ -196,7 +199,8 @@ namespace OutPut
           auto pts_type_j = topology.GetAtomsType(pts_id_j);
           auto eps_j = topology.GetEpsilon(pts_type_j);
           auto sigma_j = topology.GetSigma(pts_type_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
           auto eps_ij = vtkm::Sqrt(eps_i * eps_j);
           auto sigma_ij = (sigma_i + sigma_j) / 2;
 
@@ -221,13 +225,15 @@ namespace OutPut
         PotentialEnergy = PE_ij;
       }
       Real _cut_off;
+      Vec3f _box;
     };
     
     struct ComputeNearElePotentialWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeNearElePotentialWorklet(const Real& cut_off, const Real& nearalpha)
+      ComputeNearElePotentialWorklet(const Real& cut_off, const Real& nearalpha, const Vec3f& box)
         : _cut_off(cut_off)
         , _nearalpha(nearalpha)
+        , _box(box)
       {
       }
 
@@ -250,7 +256,8 @@ namespace OutPut
         auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
         {
           auto charge_j = topology.GetCharge(pts_id_j);
-          auto r_ij = p_j - p_i;
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
           PE_ij +=force_function.ComputeNearEleEnergy(r_ij, charge_i, charge_j, _cut_off, _nearalpha);
         };
@@ -261,6 +268,7 @@ namespace OutPut
 
       Real _cut_off; 
       Real _nearalpha;
+      Vec3f _box;
     };
 
     struct ComputeDensityWorklet : vtkm ::worklet::WorkletMapField
@@ -294,8 +302,8 @@ namespace OutPut
 
     struct ComputeSpecialFarCoulWorklet : vtkm ::worklet::WorkletMapField
     {
-        ComputeSpecialFarCoulWorklet(const Real& Vlength)
-      : _Vlength(Vlength)
+      ComputeSpecialFarCoulWorklet(const Vec3f& box)
+        : _box(box)
     {
     }
         using ControlSignature = void(FieldIn current_atoms_id,
@@ -333,20 +341,20 @@ namespace OutPut
 
                 auto atoms_charge_j = topology.GetCharge(id);
                 auto atoms_coord_j = locator.GetPtsPosition(id);
-                Vec3f rij = locator.MinDistanceIf(atoms_coord_i, atoms_coord_j, _Vlength);
+                Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
                 Real dis_ij = vtkm::Magnitude(rij);
                 Real energy_atom = charge_p_i * atoms_charge_j / dis_ij;
                 spec_far_coul_energy += energy_atom;
               }
             }
         }
-        Real _Vlength;
+        Vec3f _box;
     };
 
     struct ComputeSpecialBondsCoulWorklet : vtkm ::worklet::WorkletMapField
     {
-      ComputeSpecialBondsCoulWorklet(const Real& Vlength)
-        : _Vlength(Vlength)
+        ComputeSpecialBondsCoulWorklet(const Vec3f& box)
+          : _box(box)
       {
       }
       using ControlSignature = void(FieldIn current_atoms_id,
@@ -388,7 +396,7 @@ namespace OutPut
 
             auto atoms_charge_j = topology.GetCharge(id);
             auto atoms_coord_j = locator.GetPtsPosition(id);
-            Vec3f rij = locator.MinDistanceIf(atoms_coord_i, atoms_coord_j, _Vlength);
+            Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
             Real dis_ij = vtkm::Magnitude(rij);
             Real energy_atom = charge_p_i * atoms_charge_j / dis_ij;
             //spec_far_coul_energy += energy_atom;
@@ -407,7 +415,7 @@ namespace OutPut
           }
         }
       }
-      Real _Vlength;
+      Vec3f _box;
     };
     
     struct ComputeSqChargeWorklet : vtkm::worklet::WorkletMapField
@@ -519,8 +527,8 @@ namespace OutPut
 
     struct ComputeMSDWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeMSDWorklet(const Real& Vlength)
-        : _Vlength(Vlength)
+      ComputeMSDWorklet(const Vec3f& box)
+        : _box(box)
       {
       }
 
@@ -538,7 +546,11 @@ namespace OutPut
       {
         Vec3f temp_position,d_position;
         //temp_position = current_pts;
-        temp_position = current_pts + position_flag * _Vlength;
+        for (int i = 0; i < 3; i++)
+        {
+              temp_position[i] = current_pts[i] + position_flag[i] * _box[i];
+        }
+        //temp_position = current_pts + position_flag * _Vlength;
         d_position = temp_position - original_pts;
 
         MSDoutput[0] += d_position[0] * d_position[0];
@@ -548,13 +560,13 @@ namespace OutPut
           d_position[2] * d_position[2];
       }
 
-      Real _Vlength;
+     Vec3f _box;
     };
 
     struct ComputePrepareMSDWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputePrepareMSDWorklet(const Real& Vlength)
-        : _Vlength(Vlength)
+     ComputePrepareMSDWorklet(const Vec3f& box)
+       : _box(box)
       {
       }
 
@@ -571,8 +583,11 @@ namespace OutPut
                                 vtkm::Vec3f& diff_MSD_pts) const
       {
         Vec3f d_position;
-        
-        d_position = current_pts + position_flag * _Vlength - temp_MSD_pts;
+        for (int i = 0; i < 3; i++)
+        {
+              d_position[i] = current_pts[i] + position_flag[i] * _box[i] - temp_MSD_pts[i];
+        }
+        //d_position = current_pts + position_flag * _Vlength - temp_MSD_pts;
        
         for (int i = 0; i < 3; i++)
         {
@@ -581,13 +596,13 @@ namespace OutPut
             diff_MSD_pts[i] = d_position[i];
           }
           else
-            diff_MSD_pts[i] = d_position[i] - position_flag[i] * _Vlength;
+            diff_MSD_pts[i] = d_position[i] - position_flag[i] * _box[i];
         }
         
         
       }
 
-      Real _Vlength;
+     Vec3f _box;
     };
 
     struct ComputeVACFWorklet : vtkm::worklet::WorkletMapField
@@ -615,7 +630,7 @@ namespace OutPut
     };
 
     void EAM_rho(const Real& eam_cut_off,
-                 const Real& Vlength,
+                 const Vec3f& box,
                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                  const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
                  const ContPointLocator& locator,
@@ -623,7 +638,7 @@ namespace OutPut
                  const ContForceFunction& force_function,
                  vtkm::cont::ArrayHandle<Real>& EAM_rho)
     {
-      vtkm::cont::Invoker{}(ComputeEAMrhoWorklet{ eam_cut_off, Vlength },
+      vtkm::cont::Invoker{}(ComputeEAMrhoWorklet{ eam_cut_off, box },
                             atoms_id,
                             rhor_spline,
                             locator,
@@ -652,7 +667,7 @@ namespace OutPut
     }
 
     void EAM_PairEnergy(const Real& eam_cut_off,
-                        const Real& Vlength,
+                        const Vec3f& box,
                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                         const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
                         const ContPointLocator& locator,
@@ -661,7 +676,7 @@ namespace OutPut
                         vtkm::cont::ArrayHandle<Real>& pair_energy)
     {
 
-      vtkm::cont::Invoker{}(ComputePairEnergyWorklet{ eam_cut_off, Vlength },
+      vtkm::cont::Invoker{}(ComputePairEnergyWorklet{ eam_cut_off, box },
                             atoms_id,
                             z2r_spline,
                             locator,
@@ -672,13 +687,14 @@ namespace OutPut
 
     //Statistical PotentialEnergy
     void ComputePotentialEnergy(const Real& cutoff,
+                                const Vec3f& box,
                                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                 const ContPointLocator& locator,
                                 const ContTopology& topology,
                                 const ContForceFunction& force_function,
                                 vtkm::cont::ArrayHandle<Real>& potential_energy)
     {
-      vtkm::cont::Invoker{}(ComputePotentialEnWorklet{ cutoff },
+      vtkm::cont::Invoker{}(ComputePotentialEnWorklet{ cutoff, box },
                             atoms_id,
                             locator,
                             topology,
@@ -687,6 +703,7 @@ namespace OutPut
     }
 
     void ComputeSpecialBondsLJPotential(const Real& cutoff,
+                                        const Vec3f& box,
                                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                         const ContPointLocator& locator,
                                         const ContTopology& topology,
@@ -695,7 +712,7 @@ namespace OutPut
                                         const GroupRealIdType& group_weights,
                                         vtkm::cont::ArrayHandle<Real>& potential_energy)
     {
-      vtkm::cont::Invoker{}(ComputeSpecialBondsLJPotentialWorklet{ cutoff },
+      vtkm::cont::Invoker{}(ComputeSpecialBondsLJPotentialWorklet{ cutoff, box },
                             atoms_id,
                             locator,
                             topology,
@@ -707,13 +724,14 @@ namespace OutPut
 
     void ComputeNearElePotential(const Real& cutoff,
                                  const Real& alpha,
+                                 const Vec3f& box,
                                  const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                  const ContPointLocator& locator,
                                  const ContTopology& topology,
                                  const ContForceFunction& force_function,
                                  vtkm::cont::ArrayHandle<Real>& near_potential_energy)
     {
-      vtkm::cont::Invoker{}(ComputeNearElePotentialWorklet{ cutoff, alpha },
+      vtkm::cont::Invoker{}(ComputeNearElePotentialWorklet{ cutoff, alpha, box },
                             atoms_id,
                             locator,
                             topology,
@@ -733,7 +751,7 @@ namespace OutPut
 
     using GroupVecType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Id>, 
                                                                 vtkm::cont::ArrayHandle<vtkm::Id>>;
-    void ComputeSpecialFarCoul(const Real& Vlength,
+    void ComputeSpecialFarCoul(const Vec3f& box,
                                const vtkm::cont::ArrayHandle<Id>& atoms_id,
                                const GroupVecType& group_vec,
                                const ContPointLocator& locator,
@@ -741,20 +759,26 @@ namespace OutPut
                                const ContForceFunction& force_function,
                                vtkm::cont::ArrayHandle<Real>& SpecFarEnergy)
     {
-      vtkm::cont::Invoker{}(ComputeSpecialFarCoulWorklet{ Vlength }, atoms_id, group_vec, locator, topology, force_function, SpecFarEnergy);
+      vtkm::cont::Invoker{}(ComputeSpecialFarCoulWorklet{ box },
+                            atoms_id,
+                            group_vec,
+                            locator,
+                            topology,
+                            force_function,
+                            SpecFarEnergy);
     }
 
-    void ComputeSpecialBondsCoul(const Real& Vlength,
-                               const vtkm::cont::ArrayHandle<Id>& atoms_id,
-                               const GroupVecType& group_vec,
-                               const ContPointLocator& locator,
-                               const ContTopology& topology,
-                               const ContForceFunction& force_function,
-                               const GroupIdIdType& group_ids,
-                               const GroupRealIdType& group_weights,
-                               vtkm::cont::ArrayHandle<Real>& SpecFarEnergy)
+    void ComputeSpecialBondsCoul(const Vec3f& box,
+                                 const vtkm::cont::ArrayHandle<Id>& atoms_id,
+                                 const GroupVecType& group_vec,
+                                 const ContPointLocator& locator,
+                                 const ContTopology& topology,
+                                 const ContForceFunction& force_function,
+                                 const GroupIdIdType& group_ids,
+                                 const GroupRealIdType& group_weights,
+                                 vtkm::cont::ArrayHandle<Real>& SpecFarEnergy)
     {
-      vtkm::cont::Invoker{}(ComputeSpecialBondsCoulWorklet{ Vlength },
+      vtkm::cont::Invoker{}(ComputeSpecialBondsCoulWorklet{ box },
                             atoms_id,
                             group_vec,
                             locator,
@@ -800,13 +824,13 @@ namespace OutPut
     }
 
     // Statistical MSD
-    void ComputeMSD(const Real& _Vlength,
+    void ComputeMSD(const Vec3f& _box,
                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& original_position,
                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& current_pts_position,
                     const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
-                    vtkm::cont::ArrayHandle<vtkm::Vec4f>& MSDoutput) 
+                    vtkm::cont::ArrayHandle<vtkm::Vec4f>& MSDoutput)
     {
-      vtkm::cont::Invoker{}(ComputeMSDWorklet{ _Vlength },
+      vtkm::cont::Invoker{}(ComputeMSDWorklet{ _box },
                             original_position,
                             current_pts_position,
                             position_flag,
@@ -815,10 +839,10 @@ namespace OutPut
 
     // Statistical MSD
     void ComputePrepareMSD(const Real& _Vlength,
-                    const vtkm::cont::ArrayHandle<vtkm::Vec3f>& temp_MSD_position,
-                    const vtkm::cont::ArrayHandle<vtkm::Vec3f>& current_pts_position,
-                    const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
-                    vtkm::cont::ArrayHandle<vtkm::Vec3f>& diff_MSD_position)
+                           const vtkm::cont::ArrayHandle<vtkm::Vec3f>& temp_MSD_position,
+                           const vtkm::cont::ArrayHandle<vtkm::Vec3f>& current_pts_position,
+                           const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
+                           vtkm::cont::ArrayHandle<vtkm::Vec3f>& diff_MSD_position)
     {
       vtkm::cont::Invoker{}(ComputePrepareMSDWorklet{ _Vlength },
                             temp_MSD_position,

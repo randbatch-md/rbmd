@@ -8,6 +8,7 @@ VTKM_CONT ExecForceFunction ContForceFunction::PrepareForExecution(vtkm::cont::D
                            this->_alpha,
                            this->_volume,
                            this->_Vlength,
+                           this->_box,
                            this->Kmax,
                            this->RBEP,
                            this->_rhomax,

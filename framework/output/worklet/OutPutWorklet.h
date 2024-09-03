@@ -13,7 +13,7 @@ using GroupRealIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::Arra
 namespace OutPut
 {
 void EAM_rho(const Real& eam_cut_off,
-             const Real& Vlength,
+             const Vec3f& box,
              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
              const vtkm::cont::ArrayHandle<Vec7f>& rhor_spline,
              const ContPointLocator& locator,
@@ -30,7 +30,7 @@ void EAM_EmbeddingEnergy(const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                          vtkm::cont::ArrayHandle<Real>& embedding_energy);
 
 void EAM_PairEnergy(const Real& eam_cut_off,
-                    const Real& Vlength,
+                    const Vec3f& box,
                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                     const vtkm::cont::ArrayHandle<Vec7f>& z2r_spline,
                     const ContPointLocator& locator,
@@ -39,13 +39,15 @@ void EAM_PairEnergy(const Real& eam_cut_off,
                     vtkm::cont::ArrayHandle<Real>& pair_energy);
 
 void ComputePotentialEnergy(const Real& cutoff,
-                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                             const ContPointLocator& locator,
-                             const ContTopology& topology,
-                             const ContForceFunction& force_function,
-                             vtkm::cont::ArrayHandle<Real>& potential_energy);
+                            const Vec3f& box,
+                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                            const ContPointLocator& locator,
+                            const ContTopology& topology,
+                            const ContForceFunction& force_function,
+                            vtkm::cont::ArrayHandle<Real>& potential_energy);
 
 void ComputeSpecialBondsLJPotential(const Real& cutoff,
+                                    const Vec3f& box,
                                     const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                     const ContPointLocator& locator,
                                     const ContTopology& topology,
@@ -56,6 +58,7 @@ void ComputeSpecialBondsLJPotential(const Real& cutoff,
 
 void ComputeNearElePotential(const Real& cutoff,
                              const Real& alpha,
+                             const Vec3f& box,
                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                              const ContPointLocator& locator,
                              const ContTopology& topology,
@@ -73,14 +76,14 @@ void ComputeSqCharge(const vtkm::cont::ArrayHandle<Real>& charge,
 
 using GroupVecType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Id>,
                                                              vtkm::cont::ArrayHandle<vtkm::Id>>;
-void ComputeSpecialFarCoul(const Real& Vlength,
+void ComputeSpecialFarCoul(const Vec3f& box,
                            const vtkm::cont::ArrayHandle<Id>& atoms_id,
                            const GroupVecType& group_vec,
                            const ContPointLocator& locator,
                            const ContTopology& topology,
                            const ContForceFunction& force_function,
-                           vtkm::cont::ArrayHandle<Real>& SpecFarEnergy); 
-void ComputeSpecialBondsCoul(const Real& Vlength,
+                           vtkm::cont::ArrayHandle<Real>& SpecFarEnergy);
+void ComputeSpecialBondsCoul(const Vec3f& box,
                              const vtkm::cont::ArrayHandle<Id>& atoms_id,
                              const GroupVecType& group_vec,
                              const ContPointLocator& locator,
@@ -104,13 +107,13 @@ void ComputerKineticEnergy(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
                            const vtkm::cont::ArrayHandle<Real>& mass,
                            vtkm::cont::ArrayHandle<Real>& sq_velocity);
 
-void ComputeMSD(const Real& _Vlength,
+void ComputeMSD(const Vec3f& _box,
                 const vtkm::cont::ArrayHandle<vtkm::Vec3f>& original_position,
                 const vtkm::cont::ArrayHandle<vtkm::Vec3f>& current_pts_position,
                 const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
                 vtkm::cont::ArrayHandle<vtkm::Vec4f>& MSDoutput);
 
-void ComputePrepareMSD(const Real& _Vlength,
+void ComputePrepareMSD(const Vec3f& _box,
                        const vtkm::cont::ArrayHandle<vtkm::Vec3f>& temp_MSD_position,
                        const vtkm::cont::ArrayHandle<vtkm::Vec3f>& current_pts_position,
                        const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,

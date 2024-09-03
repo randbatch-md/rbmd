@@ -20,82 +20,63 @@ set(target ${project_name})
 
 set(host_src
 parser/Configuration.cpp
-
 application/Application.cpp
 application/MDApplication.cpp
-
-action/Action.cpp
-action/CreateSystemAction.cpp
-action/CreateExecutionerAction.cpp
-action/AddOutputAction.cpp
-action/SetupDeviceAction.cpp
-action/CreateInitConditionAction.cpp
-
 executioner/Executioner.cpp
-
 output/Output.cpp
 output/FileOutput.cpp
 output/ConsoleOutput.cpp
 output/Progress.cpp
-
 model/FormatTable.cpp
-model/Register.cpp
-
-system/System.cpp
 InitCondition/MeshFreeCondition.cpp
 InitCondition/ModelFileInitCondition.cpp
-InitCondition/MeshFreeFileInitCondition.cpp)
+InitCondition/MeshFreeFileInitCondition.cpp
+hyperparameters/Coulomb.cpp
+hyperparameters/Extend.cpp
+hyperparameters/ForceField.cpp
+hyperparameters/Neighbor.cpp
+)
 
 set(device_src
-system/MadelungSystem.cpp
-system/LennardJonesSystem.cpp
-system/MeshFreeSystem.cpp
-system/SalineSolutionSystem.cpp # Remove the "<vtkm/cont/Algorithm.h>" to move out of Devie_src
-system/H2OSystem.cpp
-system/NaClSystem.cpp
-system/EAMSystem.cpp
-system/PEOSystem.cpp
-output/MoleculesTableOutput.cpp
+output/ThermoOutput.cpp
 output/TempOutput.cpp
-output/MoleculesFileOutput.cpp
-output/AtomsTableOutput.cpp
-output/AtomsFileOutput.cpp
-#system/MolecularSystem.cpp
-#system/AtomicSystem.cpp
+output/RDFOutput.cpp
 output/MSDOutput.cpp
 output/VACFOutput.cpp
 output/worklet/OutPutWorklet.cpp
 output/TrajectoryOutput.cpp
-system/MDSystem.cpp
-system/worklet/SystemWorklet.cpp
-
 InitCondition/LJInitCondition.cpp
 InitCondition/MadelungInitCondition.cpp
 locator/ContPointLocator.cxx
 forceFunction/ContForceFunction.cpp
 topology/ContTopology.cpp
-system/InitGlobal.cpp
 staticTable/ContStaticTable.cpp
+run/ExecutionNPT.cpp
+run/ExecutionNVT.cpp
+run/ExecutionNVE.cpp
+run/ExecutionMD.cpp
+run/worklet/RunWorklet.cpp
+parser/InitGlobal.cpp
 )
 
 # 头文件引入
 add_library(_compiler_flags INTERFACE)
 target_include_directories(_compiler_flags INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/action
   ${CMAKE_CURRENT_SOURCE_DIR}/application
   ${CMAKE_CURRENT_SOURCE_DIR}/executioner
   ${CMAKE_CURRENT_SOURCE_DIR}/mesh
   ${CMAKE_CURRENT_SOURCE_DIR}/meshmodifier
   ${CMAKE_CURRENT_SOURCE_DIR}/output
   ${CMAKE_CURRENT_SOURCE_DIR}/parser
-  ${CMAKE_CURRENT_SOURCE_DIR}/system
   ${CMAKE_CURRENT_SOURCE_DIR}/userobject
   ${CMAKE_CURRENT_SOURCE_DIR}/model
   ${CMAKE_CURRENT_SOURCE_DIR}/InitCondition
   ${CMAKE_CURRENT_SOURCE_DIR}/locator
   ${CMAKE_CURRENT_SOURCE_DIR}/forceFunction
   ${CMAKE_CURRENT_SOURCE_DIR}/topology
+  ${CMAKE_CURRENT_SOURCE_DIR}/hyperparameters
+  ${CMAKE_CURRENT_SOURCE_DIR}/run
   ${JSON_INSTALL_PATH}/include
   ${CXXOPTS_INSTALL_PATH}/include
   )

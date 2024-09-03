@@ -3,6 +3,7 @@
 #include "Configuration.h"
 #include "Factory.h"
 #include "Application.h"
+#include <vtkm/Types.h>
 
 class Object// : public Factory<Object, Configuration&>
 {
@@ -20,6 +21,13 @@ public:
     return _cfg.Get<T>(name);
   }
 
+  //添加用来做判断
+  template<typename T>
+  T GetJudge(const std::string& name) const
+  {
+    return _cfg.GetJudge<T>(name);
+  }
+
   template<typename T>
   T Get(const std::string& name, const T& value) const
   {
@@ -32,17 +40,20 @@ public:
     return _cfg.GetVectorValue<T>(name);
   }
 
+  template<typename T>
+  std::vector<std::vector<T>> GetVectorOfVectorsValue(const std::string& name)
+  {
+    return _cfg.GetVectorOfVectorsValue<T>(name);
+  }
+
+  //添加用来做判断
+  template<typename T>
+  std::vector<T> GetVectorValueJudge(const std::string& name)
+  {
+    return _cfg.GetVectorValueJudge<T>(name);
+  }
+
 protected:
   const Configuration& _cfg;
 };
-
-//#define RegisterObject(ObjectName)                                                                 \
-//  template<>                                                                                       \
-//  template<>                                                                                       \
-//  volatile bool Object::Registar<ObjectName>::registered =                                         \
-//    Object::Register<ObjectName>(#ObjectName)
-using ObjectFactory = Factory<Object, Configuration&>;
-
-#define RegisterObject(ObjectName)                                                                 \
-  volatile bool registered_##ObjectName = ObjectFactory::Register<ObjectName>(#ObjectName)
 
