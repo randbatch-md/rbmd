@@ -85,7 +85,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     forcebond[0] = forcebondij;
     forcebond[1] = -forcebondij;
     bondVirial[0] = virialbondij;
-    bondVirial[1] = virialbondij;
+    bondVirial[1] = -virialbondij;
   }
   template<typename PositionType>
   VTKM_EXEC void ComputeijBondEnergyForce(const vtkm::IdComponent& bondi,
@@ -224,6 +224,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f force_anglei;
     Vec3f force_anglek;
     Vec6f angleVirial_pair;
+    Vec6f virial_i, virial_j, virial_k;
 
     ComputeijAngleEnergyForce(anglei,
                               anglej,
@@ -235,14 +236,16 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                               force_anglei,
                               force_anglek,
                               angleEnergy,
-                              angleVirial_pair,
+                              virial_i,
+                              virial_j,
+                              virial_k,
                               locator);
     forceangle[0] = force_anglei;
     forceangle[1] = -force_anglei - force_anglek;
     forceangle[2] = force_anglek;
-    angleVirial[0] = angleVirial_pair;
-    angleVirial[1] = angleVirial_pair;
-    angleVirial[2] = angleVirial_pair;
+    angleVirial[0] = virial_i;
+    angleVirial[1] = virial_j;
+    angleVirial[2] = virial_k;
 
   }
   template<typename WholePtsType>
@@ -256,7 +259,9 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                            Vec3f& force_anglei,
                                            Vec3f& force_anglek,
                                            Real& angleEnergy,
-                                           Vec6f&  angleVirial_pair,
+                                           Vec6f& virial_i,
+                                           Vec6f& virial_j,
+                                           Vec6f& virial_k,
                                            const ExecPointLocator& locator) const
   {
 
@@ -301,12 +306,39 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     //
     Real THIRD = 1.0 / 3.0;
 
-    angleVirial_pair[0] = -THIRD * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
-    angleVirial_pair[1] = -THIRD * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
-    angleVirial_pair[2] = -THIRD * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
-    angleVirial_pair[3] = -THIRD * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
-    angleVirial_pair[4] = -THIRD * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
-    angleVirial_pair[5] = -THIRD * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
+    // 计算原子 i 的 virial
+
+    virial_i[0] = -THIRD * (r_ij[0] * force_anglei[0]);
+    virial_i[1] = -THIRD * (r_ij[1] * force_anglei[1]);
+    virial_i[2] = -THIRD * (r_ij[2] * force_anglei[2]);
+    virial_i[3] = -THIRD * (r_ij[0] * force_anglei[1]);
+    virial_i[4] = -THIRD * (r_ij[0] * force_anglei[2]);
+    virial_i[5] = -THIRD * (r_ij[1] * force_anglei[2]);
+
+    // 计算原子 k 的 virial
+
+    virial_k[0] = -THIRD * (r_kj[0] * force_anglek[0]);
+    virial_k[1] = -THIRD * (r_kj[1] * force_anglek[1]);
+    virial_k[2] = -THIRD * (r_kj[2] * force_anglek[2]);
+    virial_k[3] = -THIRD * (r_kj[0] * force_anglek[1]);
+    virial_k[4] = -THIRD * (r_kj[0] * force_anglek[2]);
+    virial_k[5] = -THIRD * (r_kj[1] * force_anglek[2]);
+
+    // 计算原子 j 的 virial
+
+    virial_j[0] = -(virial_i[0] + virial_k[0]);
+    virial_j[1] = -(virial_i[1] + virial_k[1]);
+    virial_j[2] = -(virial_i[2] + virial_k[2]);
+    virial_j[3] = -(virial_i[3] + virial_k[3]);
+    virial_j[4] = -(virial_i[4] + virial_k[4]);
+    virial_j[5] = -(virial_i[5] + virial_k[5]);
+
+    //angleVirial_pair[0] = -THIRD * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+    //angleVirial_pair[1] = -THIRD * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+    //angleVirial_pair[2] = -THIRD * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+    //angleVirial_pair[3] = -THIRD * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+    //angleVirial_pair[4] = -THIRD * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+    //angleVirial_pair[5] = -THIRD * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
 
   }
 

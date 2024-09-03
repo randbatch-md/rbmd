@@ -1251,6 +1251,9 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
+  Vec6f lj_virial, ewald_long_virial, spec_coul_virial, 
+        bond_virial, angle_virial, dihedral_virial;
+
   //ComputeVerletlistLJVirial(_lj_virial_atom); 
   //auto lj_virial =vtkm::cont::Algorithm::Reduce(_lj_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
@@ -1258,51 +1261,78 @@ void ExecutionNVT::ComputeVirial()
   //auto coul_virial = vtkm::cont::Algorithm::Reduce(_coul_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) 
                      // * _unit_factor._qqr2e;
 
+  //
+   lj_virial =vtkm::cont::Algorithm::Reduce(_nearVirial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
   ComputeEwaldLongVirial(_Kmax, _ewald_long_virial_atom);
-  auto ewald_long_virial =vtkm::cont::Algorithm::Reduce(_ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization())
+  ewald_long_virial = vtkm::cont::Algorithm::Reduce(_ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization())
                     * _unit_factor._qqr2e;
 
-
-    // 将 _pair_virial_atom 输出到 txt 文件中
-  //std::ofstream outfilelj("lj_virial_atom.txt");
-  //for (vtkm::Id i = 0; i < _lj_virial_atom.GetNumberOfValues(); ++i)
+  //std::ofstream outfilelong("ewald_long_virial.txt");
+  //for (vtkm::Id i = 0; i < _ewald_long_virial_atom.GetNumberOfValues(); ++i)
   //{
-  //  auto virial_values = _lj_virial_atom.ReadPortal().Get(i);
-  //  outfilelj << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
-  //          << virial_values[3] << " " << virial_values[4] << " " << virial_values[5] << std::endl;
+  //  auto virial_values = _ewald_long_virial_atom.ReadPortal().Get(i);
+  //  outfilelong << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+  //              << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
+  //              << std::endl;
   //}
-  //outfilelj.close();
+  //outfilelong.close();
 
-  //std::ofstream outfilecoul("coul_virial_atom.txt");
-  //for (vtkm::Id i = 0; i < _coul_virial_atom.GetNumberOfValues(); ++i)
-  //{
-  //  auto virial_values = _coul_virial_atom.ReadPortal().Get(i);
-  //  outfilecoul << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
-  //          << virial_values[3] << " " << virial_values[4] << " " << virial_values[5] << std::endl;
-  //}
-  //outfilecoul.close();
-
-  //virial = lj_virial + coul_virial + ewald_long_virial;
-  
-  auto lj_virial = vtkm::cont::Algorithm::Reduce(_nearVirial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
   virial = lj_virial + ewald_long_virial;
 
+
+  //
   auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
   if ("CVFF" == force_field)
   {
-    auto spec_coul_virial = vtkm::cont::Algorithm::Reduce(
+     spec_coul_virial = vtkm::cont::Algorithm::Reduce(
       _spec_coul_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-    auto bond_virial = vtkm::cont::Algorithm::Reduce(
+     bond_virial = vtkm::cont::Algorithm::Reduce(
         _bond_virial_atom,vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-    auto angle_virial = vtkm::cont::Algorithm::Reduce(
+     angle_virial = vtkm::cont::Algorithm::Reduce(
       _angle_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-    auto dihedral_virial= vtkm::cont::Algorithm::Reduce(
-      _dihedral_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&_para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
+    {
+       dihedral_virial= vtkm::cont::Algorithm::Reduce( _dihedral_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+    }
+    
+    virial += bond_virial + angle_virial + dihedral_virial;
+    //+spec_coul_virial;
 
-    virial += bond_virial + angle_virial + dihedral_virial + spec_coul_virial;
+
+    // std::ofstream outfilebond("bond_virial.txt");
+    //for (vtkm::Id i = 0; i < _bond_virial_atom.GetNumberOfValues(); ++i)
+    //{
+    //   auto virial_values = _bond_virial_atom.ReadPortal().Get(i);
+    //   outfilebond << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+    //               << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
+    //               << std::endl;
+    //}
+    //outfilebond.close();
+
+
+    //std::ofstream outfileangle("angle_virial.txt");
+    //for (vtkm::Id i = 0; i < _angle_virial_atom.GetNumberOfValues(); ++i)
+    //{
+    //   auto virial_values = _angle_virial_atom.ReadPortal().Get(i);
+    //   outfileangle << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+    //                << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
+    //                << std::endl;
+    //}
+    //outfileangle.close();
+
+    //std::ofstream outfilespec_coul("spec_coul_virial.txt");
+    //for (vtkm::Id i = 0; i < _spec_coul_virial_atom.GetNumberOfValues(); ++i)
+    //{
+    //   auto virial_values = _spec_coul_virial_atom.ReadPortal().Get(i);
+    //   outfilespec_coul << virial_values[0] << " " << virial_values[1] << " " << virial_values[2]
+    //                    << " " << virial_values[3] << " " << virial_values[4] << " "
+    //                    << virial_values[5] << std::endl;
+    //}
+    //outfilespec_coul.close();
   }
 
   //RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);

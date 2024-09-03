@@ -80,6 +80,19 @@ namespace RunWorklet
                          const CoordOffsetType& coord_offset_j,
                          vtkm::cont::ArrayHandle<Vec3f>& nearforce);
 
+   void NearForceVerletVirial(const Real& cut_off,
+                         const Vec3f& box,
+                         const Real& qqr2e,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const GroupVecType& Group_j,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                         const CoordOffsetType& coord_offset_j,
+                         vtkm::cont::ArrayHandle<Vec3f>& nearforce,
+                         vtkm::cont::ArrayHandle<Vec6f>& nearvirial);
+
    void LJForceVerlet(const Real& cut_off,
                       const Vec3f& box,
                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
