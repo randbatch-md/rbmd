@@ -40,7 +40,7 @@ namespace RunWorklet
                             const CoordOffsetType& coord_offset_j,
                             vtkm::cont::ArrayHandle<Vec3f>& LJforce);
 
-   void NearForceVerlet(const Real& cut_off,
+   void NearForceVerletWeight(const Real& cut_off,
                          const Vec3f& box,
                          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                          const ContPointLocator& locator,
@@ -51,6 +51,33 @@ namespace RunWorklet
                          const CoordOffsetType& coord_offset_j,
                          const GroupIdIdType& group_ids,
                          const GroupRealIdType& group_weights,
+                         vtkm::cont::ArrayHandle<Vec3f>& nearforce);
+
+  void NearForceVerletWeightVirial(const Real& cut_off,
+                              const Vec3f& box,
+                              const Real& qqr2e,
+                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                              const ContPointLocator& locator,
+                              const ContTopology& topology,
+                              const ContForceFunction& force_function,
+                              const GroupVecType& Group_j,
+                              const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                              const CoordOffsetType& coord_offset_j,
+                              const GroupIdIdType& group_ids,
+                              const GroupRealIdType& group_weights,
+                              vtkm::cont::ArrayHandle<Vec3f>& nearforce,
+                              vtkm::cont::ArrayHandle<Vec6f>& nearvirial);
+
+    void NearForceVerlet(const Real& cut_off,
+                         const Vec3f& box,
+                         const Real& qqr2e,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                         const ContPointLocator& locator,
+                         const ContTopology& topology,
+                         const ContForceFunction& force_function,
+                         const GroupVecType& Group_j,
+                         const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                         const CoordOffsetType& coord_offset_j,
                          vtkm::cont::ArrayHandle<Vec3f>& nearforce);
 
    void LJForceVerlet(const Real& cut_off,

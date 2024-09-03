@@ -677,7 +677,7 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   RunWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
 }
 
-void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
+void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,ArrayHandle<Vec6f>& nearVirial_atom)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
@@ -705,24 +705,56 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
   RunWorklet::ComputeNeighbours( cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
 
-  auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
-  auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
-  auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
-  auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
-  auto weight_group =
-    vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
-  RunWorklet::NearForceVerlet(cut_off,
-                              box,
-                              _atoms_id,
-                              _locator,
-                              _topology,
-                              _force_function,
-                              id_verletlist_group,
-                              num_verletlist,
-                              offset_verletlist_group,
-                              ids_group,
-                              weight_group,
-                              nearforce);
+  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+  {
+       //
+    auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+    auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+    auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+    auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+    auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+    //
+    RunWorklet::NearForceVerletWeightVirial(cut_off,
+                                            box,
+                                             _unit_factor._qqr2e,
+                                            _atoms_id,
+                                            _locator,
+                                            _topology,
+                                            _force_function,
+                                            id_verletlist_group,
+                                            num_verletlist,
+                                            offset_verletlist_group,
+                                            ids_group,
+                                            weight_group,
+                                            nearforce,
+                                            nearVirial_atom);
+    // 将 _pair_virial_atom 输出到 txt 文件中
+    std::ofstream outfile("pair_virial_atom_output.txt");
+    for (vtkm::Id i = 0; i < nearVirial_atom.GetNumberOfValues(); ++i)
+    {
+      auto virial_values = nearVirial_atom.ReadPortal().Get(i);
+      outfile << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+              << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
+              << std::endl;
+    }
+    outfile.close();
+
+  }
+
+  else
+  {
+    RunWorklet::NearForceVerlet(cut_off,
+                                box,
+                                _unit_factor._qqr2e,
+                                _atoms_id,
+                                _locator,
+                                _topology,
+                                _force_function,
+                                id_verletlist_group,
+                                num_verletlist,
+                                offset_verletlist_group,
+                                nearforce);
+  }
 }
 
 void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
@@ -806,16 +838,44 @@ void ExecutionMD::ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& lj_virial)
                                 num_verletlist,
                                 offset_verletlist_group);
 
-  RunWorklet::ComputeLJVirial(cut_off,
-                              box,
-                              _atoms_id,
-                              _locator,
-                              _topology,
-                              _force_function,
-                              id_verletlist_group,
-                              num_verletlist,
-                              offset_verletlist_group,
-                              lj_virial);
+  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+  {
+    //
+    auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+    auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+    auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+    auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+    auto weight_group =
+      vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+    //
+    RunWorklet::ComputeLJVirialWight(cut_off,
+                                box,
+                                _atoms_id,
+                                _locator,
+                                _topology,
+                                _force_function,
+                                id_verletlist_group,
+                                num_verletlist,
+                                offset_verletlist_group,
+                                ids_group,
+                                weight_group,
+                                lj_virial);
+
+  }
+  else
+  {
+    RunWorklet::ComputeLJVirial(cut_off,
+                                box,
+                                _atoms_id,
+                                _locator,
+                                _topology,
+                                _force_function,
+                                id_verletlist_group,
+                                num_verletlist,
+                                offset_verletlist_group,
+                                lj_virial);
+  }
+
 }                             
 
 void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)

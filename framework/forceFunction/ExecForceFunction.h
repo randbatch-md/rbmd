@@ -81,6 +81,22 @@ public:
       return LJVirial;
   }
 
+  VTKM_EXEC Vec6f ComputeLJVirial0(const Vec3f& r_ij,
+                                      const Vec3f& fij) const
+  {
+      Vec6f LJVirial = { 0, 0, 0, 0, 0, 0 };
+      auto LJPair = -0.5 * fij;
+
+      //compute LJVirial
+      LJVirial[0] = r_ij[0] * LJPair[0]; //xx
+      LJVirial[1] = r_ij[1] * LJPair[1]; //yy
+      LJVirial[2] = r_ij[2] * LJPair[2]; //zz
+      LJVirial[3] = r_ij[0] * LJPair[1]; //xy
+      LJVirial[4] = r_ij[0] * LJPair[2]; //xz
+      LJVirial[5] = r_ij[1] * LJPair[2]; //yz
+      return LJVirial;
+  }
+
   VTKM_EXEC Vec6f ComputeCoulVirial(const Vec3f& r_ij,
                                          const Real& charge_pi,
                                          const Real& charge_pj,   
@@ -289,10 +305,32 @@ public:
     return force;
   }
 
+    VTKM_EXEC Vec3f ComputeNearEnergyForceRcsERF_box(const Vec3f& r_ij,
+                                               const Real& charge_pi,
+                                               const Real& charge_pj,
+                                               const Real& table_pij,
+                                               const Real& cut_off,
+                                               const Real& rs) const
+  {
+    const Real small_value = 0.0001;
+    Vec3f force{ 0, 0, 0 };
+
+    Real dis = vtkm::Magnitude(r_ij);
+    Real dis_2 = vtkm::MagnitudeSquared(r_ij);
+    auto rc_2 = cut_off * cut_off;
+    auto rs_2 = rs * rs;
+    if (dis_2 < rc_2 && dis_2 > rs_2)
+    {
+      force = -charge_pi * charge_pj * table_pij * r_ij / dis;
+    }
+    return force;
+  }
+
   VTKM_EXEC Vec3f ComputeNearEnergyForceERF_box(const Vec3f& r_ij,
                                                 const Real& charge_pi,
                                                 const Real& charge_pj,
-                                                const Real& table_pij) const
+                                                const Real& table_pij,
+                                                const Real& cut_off) const
   {
     const Real small_value = 0.0001;
     Vec3f force{ 0, 0, 0 };

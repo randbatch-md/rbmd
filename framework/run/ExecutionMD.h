@@ -33,7 +33,7 @@ protected:
 
   void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
   void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce);
-  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce);
+  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& nearVirial_atom);
   void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce);
@@ -83,4 +83,6 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
+  //
+  ArrayHandle<Vec6f> _pair_virial_atom;
 };

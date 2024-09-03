@@ -341,7 +341,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForce()
   }
   else if (_nearforce_type == "VERLETLIST")
   {
-    ComputeVerletlistNearForce(_nearforce);
+    ComputeVerletlistNearForce(_nearforce, _nearVirial_atom);
   }
   else if (_nearforce_type == "ORIGINAL")
   {
@@ -1251,28 +1251,50 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
 void ExecutionNVT::ComputeVirial()
 {
-  ComputeVerletlistLJVirial(_lj_virial_atom); 
-  auto lj_virial =vtkm::cont::Algorithm::Reduce(_lj_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+  //ComputeVerletlistLJVirial(_lj_virial_atom); 
+  //auto lj_virial =vtkm::cont::Algorithm::Reduce(_lj_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-  ComputeCoulVirial(_coul_virial_atom);
-  auto coul_virial = vtkm::cont::Algorithm::Reduce(_coul_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) 
-                      * _unit_factor._qqr2e;
+  //ComputeCoulVirial(_coul_virial_atom);
+  //auto coul_virial = vtkm::cont::Algorithm::Reduce(_coul_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) 
+                     // * _unit_factor._qqr2e;
 
   ComputeEwaldLongVirial(_Kmax, _ewald_long_virial_atom);
   auto ewald_long_virial =vtkm::cont::Algorithm::Reduce(_ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization())
                     * _unit_factor._qqr2e;
 
 
- 
-  virial = lj_virial + coul_virial + ewald_long_virial;
+    // 将 _pair_virial_atom 输出到 txt 文件中
+  //std::ofstream outfilelj("lj_virial_atom.txt");
+  //for (vtkm::Id i = 0; i < _lj_virial_atom.GetNumberOfValues(); ++i)
+  //{
+  //  auto virial_values = _lj_virial_atom.ReadPortal().Get(i);
+  //  outfilelj << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+  //          << virial_values[3] << " " << virial_values[4] << " " << virial_values[5] << std::endl;
+  //}
+  //outfilelj.close();
+
+  //std::ofstream outfilecoul("coul_virial_atom.txt");
+  //for (vtkm::Id i = 0; i < _coul_virial_atom.GetNumberOfValues(); ++i)
+  //{
+  //  auto virial_values = _coul_virial_atom.ReadPortal().Get(i);
+  //  outfilecoul << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+  //          << virial_values[3] << " " << virial_values[4] << " " << virial_values[5] << std::endl;
+  //}
+  //outfilecoul.close();
+
+  //virial = lj_virial + coul_virial + ewald_long_virial;
+  
+  auto lj_virial = vtkm::cont::Algorithm::Reduce(_nearVirial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+  virial = lj_virial + ewald_long_virial;
+
   auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
   if ("CVFF" == force_field)
   {
     auto spec_coul_virial = vtkm::cont::Algorithm::Reduce(
       _spec_coul_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-    auto bond_virial = vtkm::cont::Algorithm::Reduce(_bond_virial_atom,
-                                                     vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+    auto bond_virial = vtkm::cont::Algorithm::Reduce(
+        _bond_virial_atom,vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
     auto angle_virial = vtkm::cont::Algorithm::Reduce(
       _angle_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
@@ -1280,7 +1302,7 @@ void ExecutionNVT::ComputeVirial()
     auto dihedral_virial= vtkm::cont::Algorithm::Reduce(
       _dihedral_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
 
-    virial = bond_virial + angle_virial + dihedral_virial;
+    virial += bond_virial + angle_virial + dihedral_virial + spec_coul_virial;
   }
 
   //RunWorklet::SumVirial(LJVirial(), EwaldVirial(), _virial_atom);

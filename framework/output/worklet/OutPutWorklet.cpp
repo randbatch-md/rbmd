@@ -596,6 +596,90 @@ namespace OutPut
       Real _cut_off;
       Vec3f _box;
     };
+
+    struct ComputeSpecialBondsLJPotentialWorkletN : vtkm::worklet::WorkletMapField
+    {
+      ComputeSpecialBondsLJPotentialWorkletN(const Real& cut_off, const Vec3f& box)
+        : _cut_off(cut_off)
+        , _box(box)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldIn group_j,
+                                    FieldIn num_j,
+                                    FieldIn coord_offset_j,
+                                    FieldIn special_ids,
+                                    FieldIn special_weights,
+                                    FieldOut PotentialEnergy);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7,_8, _9,_10);
+
+      template<typename idsType,
+               typename weightsType,
+               typename NeighbourGroupVecType,
+               typename CoordOffsetj>
+      VTKM_EXEC void operator()(vtkm::Id atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const NeighbourGroupVecType& group_j,
+                                const Id& num_j,
+                                const CoordOffsetj& coord_offset_j,
+                                const idsType& special_ids,
+                                const weightsType& special_weights,
+                                Real& PotentialEnergy) const
+      {
+        Real PE_ij = 0;
+        const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+        const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+        auto eps_i = topology.GetEpsilon(pts_type_i);
+        auto sigma_i = topology.GetSigma(pts_type_i);
+        auto num_components = special_ids.GetNumberOfComponents();
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          auto pts_type_j = topology.GetAtomsType(pts_id_j);
+          auto eps_j = topology.GetEpsilon(pts_type_j);
+          auto sigma_j = topology.GetSigma(pts_type_j);
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+          auto eps_ij = vtkm::Sqrt(eps_i * eps_j);
+          auto sigma_ij = (sigma_i + sigma_j) / 2;
+
+          auto pe = force_function.ComputePotentialEn(r_ij, eps_ij, sigma_ij, _cut_off);
+
+          // special lj part
+          auto weight = 1.0;
+          for (auto i = 0; i < num_components; ++i)
+          {
+            if (special_ids[i] == pts_id_j)
+            {
+
+              weight = special_weights[i];
+            }
+          }
+
+          PE_ij += weight * pe;
+        };
+
+
+        auto p_i = locator.GetPtsPosition(atoms_id);
+
+        for (Id p = 0; p < num_j; p++)
+        {
+          auto idj = group_j[p];
+          auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+          function(p_i, p_j, idj);
+        }
+
+        PotentialEnergy = PE_ij;
+      }
+      Real _cut_off;
+      Vec3f _box;
+    };
     
     struct ComputeNearElePotentialWorklet : vtkm::worklet::WorkletMapField
     {
@@ -636,6 +720,65 @@ namespace OutPut
       }
 
       Real _cut_off; 
+      Real _nearalpha;
+      Vec3f _box;
+    };
+
+    struct ComputeNearElePotentialWorkletN : vtkm::worklet::WorkletMapField
+    {
+      ComputeNearElePotentialWorkletN(const Real& cut_off, const Real& nearalpha, const Vec3f& box)
+        : _cut_off(cut_off)
+        , _nearalpha(nearalpha)
+        , _box(box)
+      {
+      }
+
+      using ControlSignature = void(FieldIn atoms_id,
+                                    ExecObject locator,
+                                    ExecObject topology,
+                                    ExecObject force_function,
+                                    FieldIn group_j,
+                                    FieldIn num_j,
+                                    FieldIn coord_offset_j,
+                                    FieldOut PotentialEnergy); //pointer
+      using ExecutionSignature = void(_1, _2, _3, _4, _5,_6, _7, _8);
+
+      template<typename NeighbourGroupVecType, typename CoordOffsetj>
+      VTKM_EXEC void operator()(const Id& atoms_id,
+                                const ExecPointLocator& locator,
+                                const ExecTopology& topology,
+                                const ExecForceFunction& force_function,
+                                const NeighbourGroupVecType& group_j,
+                                const Id& num_j,
+                                const CoordOffsetj& coord_offset_j,
+                                Real& PotentialNearEleEnergy) const
+      {
+        Real PE_ij = 0;
+        const auto& charge_i = topology.GetCharge(atoms_id);
+
+        auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+        {
+          auto charge_j = topology.GetCharge(pts_id_j);
+          //auto r_ij = p_j - p_i;
+          auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+          PE_ij +=
+            force_function.ComputeNearEleEnergy(r_ij, charge_i, charge_j, _cut_off, _nearalpha);
+        };
+
+        auto p_i = locator.GetPtsPosition(atoms_id);
+
+        for (Id p = 0; p < num_j; p++)
+        {
+          auto idj = group_j[p];
+          auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+          function(p_i, p_j, idj);
+        }
+
+        PotentialNearEleEnergy = PE_ij;
+      }
+
+      Real _cut_off;
       Real _nearalpha;
       Vec3f _box;
     };
@@ -1225,6 +1368,32 @@ namespace OutPut
                             potential_energy);
     }
 
+     void ComputeSpecialBondsLJPotentialN(const Real& cutoff,
+                                        const Vec3f& box,
+                                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                        const ContPointLocator& locator,
+                                        const ContTopology& topology,
+                                        const ContForceFunction& force_function,
+                                        const GroupVecType& Group_j,
+                                        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                                        const CoordOffsetType& coord_offset_j,
+                                        const GroupIdIdType& group_ids,
+                                        const GroupRealIdType& group_weights,
+                                        vtkm::cont::ArrayHandle<Real>& potential_energy)
+    {
+      vtkm::cont::Invoker{}(ComputeSpecialBondsLJPotentialWorkletN{ cutoff, box },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            Group_j,
+                            num_j,
+                            coord_offset_j,
+                            group_ids,
+                            group_weights,
+                            potential_energy);
+    }
+
     void ComputeNearElePotential(const Real& cutoff,
                                  const Real& alpha,
                                  const Vec3f& box,
@@ -1239,6 +1408,29 @@ namespace OutPut
                             locator,
                             topology,
                             force_function,
+                            near_potential_energy);
+    }
+
+     void ComputeNearElePotentialN(const Real& cutoff,
+                                 const Real& alpha,
+                                 const Vec3f& box,
+                                 const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                 const ContPointLocator& locator,
+                                 const ContTopology& topology,
+                                 const ContForceFunction& force_function,
+                                 const GroupVecType& Group_j,
+                                 const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                                 const CoordOffsetType& coord_offset_j,
+                                 vtkm::cont::ArrayHandle<Real>& near_potential_energy)
+    {
+      vtkm::cont::Invoker{}(ComputeNearElePotentialWorkletN{ cutoff, alpha, box },
+                            atoms_id,
+                            locator,
+                            topology,
+                            force_function,
+                            Group_j,
+                            num_j,
+                            coord_offset_j,
                             near_potential_energy);
     }
 

@@ -143,6 +143,7 @@ private:
   std::vector<Id> map; // mapping from atom types to elements
 
       //
+  ArrayHandle<Vec6f> _nearVirial_atom;
   ArrayHandle<Vec6f> _lj_virial_atom;
   ArrayHandle<Vec6f> _coul_virial_atom;
   ArrayHandle<Vec6f> _ewald_long_virial_atom;

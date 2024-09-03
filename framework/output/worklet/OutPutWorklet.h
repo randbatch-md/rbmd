@@ -125,6 +125,20 @@ void ComputeSpecialBondsLJPotential(const Real& cutoff,
                                     const GroupRealIdType& group_weights,
                                     vtkm::cont::ArrayHandle<Real>& potential_energy);
 
+
+void ComputeSpecialBondsLJPotentialN(const Real& cutoff,
+                                    const Vec3f& box,
+                                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                                    const ContPointLocator& locator,
+                                    const ContTopology& topology,
+                                    const ContForceFunction& force_function,
+                                    const GroupVecType& Group_j,
+                                    const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                                     const CoordOffsetType& coord_offset_j,
+                                    const GroupIdIdType& group_ids,
+                                    const GroupRealIdType& group_weights,
+                                    vtkm::cont::ArrayHandle<Real>& potential_energy);
+
 void ComputeNearElePotential(const Real& cutoff,
                              const Real& alpha,
                              const Vec3f& box,
@@ -133,6 +147,19 @@ void ComputeNearElePotential(const Real& cutoff,
                              const ContTopology& topology,
                              const ContForceFunction& force_function,
                              vtkm::cont::ArrayHandle<Real>& near_potential_energy);
+
+void ComputeNearElePotentialN(const Real& cutoff,
+                             const Real& alpha,
+                             const Vec3f& box,
+                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+                             const ContPointLocator& locator,
+                             const ContTopology& topology,
+                             const ContForceFunction& force_function,
+                             const GroupVecType& Group_j,
+                             const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+                             const CoordOffsetType& coord_offset_j,
+                             vtkm::cont::ArrayHandle<Real>& near_potential_energy);
+
 
 void ComputeDensity(const vtkm::Vec3f& K,
                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
