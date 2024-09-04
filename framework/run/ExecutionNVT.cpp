@@ -88,6 +88,12 @@ void ExecutionNVT::Solve()
   ComputeTempe();
   UpdateVelocityByTempConType();
 
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) != "BERENDSEN")
+  {
+    Compute_Pressure_Scalar();
+  }
+
+
   if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "BERENDSEN")
   {
     fix_press_berendsen();

@@ -708,12 +708,12 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,Array
   if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
   {
        //
-    //auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
-    //auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
-    //auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
-    //auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
-    //auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
-    //
+    auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+    auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+    auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+    auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+    auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+    
     //RunWorklet::NearForceVerletWeightVirial(cut_off,
     //                                        box,
     //                                         _unit_factor._qqr2e,

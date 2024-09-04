@@ -2148,9 +2148,16 @@ namespace RunWorklet
                 auto atoms_charge_j = topology.GetCharge(id);
                 auto atoms_coord_j = locator.GetPtsPosition(id);
                 Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
-                Real dis_ij = vtkm::Magnitude(rij);
-                Real dis_ij3 = vtkm::Pow(dis_ij, 3);
-                Real force_component = -332.06371 * charge_p_i * atoms_charge_j / dis_ij3;
+                Real rsq = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
+                Real r2inv = 1.0 / rsq;
+                Real force_component = -332.06371 * charge_p_i * atoms_charge_j * vtkm::Sqrt(r2inv);
+
+
+                //Real dis_ij = vtkm::Magnitude(rij);
+                //Real dis_ij3 = vtkm::Pow(dis_ij, 3);
+                //Real force_component = -332.06371 * charge_p_i * atoms_charge_j / dis_ij3;
+
+
 
                 Real weight = 1.0;
                 for (auto i = 0; i < num_components; ++i)
