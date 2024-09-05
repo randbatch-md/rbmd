@@ -16,20 +16,25 @@ endif()
 
 find_package(VTKm REQUIRED QUIET)
 
+#add_definitions(-D _GLIBCXX_USE_CXX11_ABI=0)
 set(CUDAToolkit_DIR /usr/local/cuda-11.8)
 find_package(CUDAToolkit REQUIRED)
 set(CMAKE_CUDA_ARCHITECTURES "86")
-#set(Torch_DIR "/data/zkh_mace/libtorch/share/cmake/Torch")
-set(Torch_DIR "/data/zkh_mace/libtorch/share/cmake/Torch")
+#find_package(CUDNN REQUIRED)
+#find_package(CUSPARSELT REQUIRED)
+#set(CMAKE_PREFIX_PATH "/public/home/zkh/zkh_mace/libtorch/share/cmake/Torch")
+set(Torch_DIR "/public/software/life/libtorch-gpu/share/cmake/Torch")
 find_package(Torch REQUIRED)
-set(LIBTORCH_PATH "/data/zkh_mace/libtorch")
+#set(LIBTORCH_PATH "/public/home/zkh/zkh_mace/libtorch")
+message(STATUS "Torch CXX Flags: ${TORCH_CXX_FLAGS}")
+set(LIBTORCH_PATH "/public/software/life/libtorch-gpu")
 include_directories(${LIBTORCH_PATH}/include)
 include_directories(${LIBTORCH_PATH}/include/torch/csrc/api/include)
 include_directories(${LIBTORCH_PATH}/include/torch/csrc/autograd)
 include_directories(${LIBTORCH_PATH}/include/torch/csrc/cuda)
 
-#find_package(CUDAToolkit REQUIRED)
-#set(CMAKE_CUDA_ARCHITECTURES "86")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+
 set(target ${project_name})
 
 set(host_src
@@ -100,32 +105,45 @@ target_include_directories(_compiler_flags INTERFACE
   # 定义lib
 add_library(libsemd STATIC ${host_src} ${device_src})
 target_link_libraries(libsemd PUBLIC _compiler_flags)
-
+#set_target_properties(libsemd PROPERTIES
+#    CXX_STANDARD 17
+#    CXX_STANDARD_REQUIRED ON
+#)
+#target_compile_definitions(libsemd PUBLIC GLIBCXX_USE_CXX11_ABI=1)
 #链接json库
 #set(CMAKE_PREFIX_PATH ${JSON_INSTALL_PATH}/lib/cmake)
 #find_package(jsoncpp REQUIRED)
 target_link_directories(libsemd PUBLIC ${JSON_INSTALL_PATH}/lib)
 target_link_libraries(libsemd PRIVATE jsoncpp)
-
+#find_package(fmt REQUIRED)
 #加载 VTK-m 
 target_link_libraries(libsemd PUBLIC vtkm_cont vtkm_worklet vtkm_io)
 target_link_libraries(libsemd PRIVATE ${VTK_LIBRARIES})
+message(STATUS fmt::fmt)
 target_link_libraries(libsemd PUBLIC fmt::fmt)
 vtkm_add_target_information(libsemd DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES ${device_src})
 
-
+#add_library(precxxtorch INTERFACE)
+#set_target_properties(precxxtorch PROPERTIES    CXX_STANDARD 98    CXX_STANDARD_REQUIRED ON)
+#target_compile_features(precxxtorch INTERFACE cxx_std_17)
+#target_compile_definitions(precxxtorch INTERFACE GLIBCXX_USE_CXX11_ABI=0)
 #定义target
-target_include_directories(libsemd PRIVATE
+#target_include_directories(precxxtorch INTERFACE
+target_include_directories(libsemd PUBLIC
     ${LIBTORCH_PATH}/include
     ${LIBTORCH_PATH}/include/torch/csrc/api/include
     ${LIBTORCH_PATH}/include/torch/csrc/autograd
     ${LIBTORCH_PATH}/include/torch/csrc/cuda
 )
-# 设置链接目录
-target_link_directories(libsemd PRIVATE ${LIBTORCH_PATH}/lib)
+#target_link_directories(libsemd PUBLIC ${JSON_INSTALL_PATH}/lib)
+#target_link_libraries(libsemd PRIVATE jsoncpp)
 
+# 设置链接目录
+#target_link_directories(precxxtorch INTERFACE ${LIBTORCH_PATH}/lib)
+#target_link_directories(libsemd PUBLIC ${LIBTORCH_PATH}/lib)
 # 链接 libtorch 库
-#message(STATUS "Torch Libraries: ${TORCH_LIBRARIES}")
+message(STATUS "Torch Libraries: ${TORCH_LIBRARIES}")
+#target_link_libraries(precxxtorch INTERFACE
 target_link_libraries(libsemd PRIVATE
     ${TORCH_LIBRARIES}#torch
     #torch_library
@@ -136,31 +154,13 @@ target_link_libraries(libsemd PRIVATE
     #/usr/local/cuda-11.8/lib64/libnvToolsExt.so
     #/usr/local/cuda-11.8/lib64/libcudart.so
     #/data/zkh_mace/libtorch/lib/libc10_cuda.so
-    #torch torch_cuda
+    #torch# torch_cuda
     #torch_cpu
     #c10
     #c10_cuda
-    #${LIBTORCH_PATH}/lib/libtorch.so
-    #${LIBTORCH_PATH}/lib/libtorch_cuda.so
-    #${LIBTORCH_PATH}/lib/libtorch_cpu.so
-    #${LIBTORCH_PATH}/lib/libc10.so
-    #${LIBTORCH_PATH}/lib/libc10_cuda.so
-    #${LIBTORCH_PATH}/lib/libc10d_cuda_test.so
-    #${LIBTORCH_PATH}/lib/libbackend_with_compiler.so
-    #${LIBTORCH_PATH}/lib/libcaffe2_nvrtc.so
-    #${LIBTORCH_PATH}/lib/libtorch_cuda_linalg.so
-    #${LIBTORCH_PATH}/lib/libtorch_global_deps.so
-    #${LIBTORCH_PATH}/lib/libtorchbind_test.so
-    #${LIBTORCH_PATH}/lib/libtorch_python.so
-    #${LIBTORCH_PATH}/lib/libpytorch_jni.so
-    #${LIBTORCH_PATH}/lib/libshm.so
-    #${LIBTORCH_PATH}/lib/libnnapi_backend.so
-    #${LIBTORCH_PATH}/lib/libjitbackend_test.so
-    #${LIBTORCH_PATH}/lib/libfbjni.so
-
 )
-#target_link_libraries(libsemd PRIVATE   torch torch_cuda torch_cpu c10 c10_cuda )
-#target_link_libraries(libsemd PRIVATE    torch    torch_cpu    torch_cuda  )
+#torch_add_target_information(libsemd  MODIFY_CUDA_FLAGS DEVICE_SOURCES ${device_src})
+
 target_link_libraries(libsemd PRIVATE CUDA::cudart)
 target_link_libraries(libsemd PRIVATE ${CUDA_LIBRARIES})
 target_include_directories(libsemd PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -171,8 +171,10 @@ add_executable(${target} main.cpp)
 #file(COPY "../res" DESTINATION ${CMAKE_BINARY_DIR}/framework)
 
 
+#target_link_libraries(libsemd PRIVATE precxxtorch)
 
 target_link_libraries(${target} PUBLIC libsemd )
+#target_link_libraries(${target} PUBLIC libsemd precxxtorch)
 vtkm_add_target_information(${target} DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES main.cpp)
 
 install(TARGETS ${target} 

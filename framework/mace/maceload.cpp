@@ -11,7 +11,7 @@ void maceload::init(int nodes_, bool v_g, std::string path_)
 {
 
   n_nodes = nodes_;
-  //std::cout << n_nodes << std::endl;
+  std::cout << n_nodes << std::endl;
   vflag_global = bool(v_g);
     if (!torch::cuda::is_available()) {
         std::cout << "CUDA unavailable, setting device type to CPU" << std::endl;
@@ -25,7 +25,7 @@ void maceload::init(int nodes_, bool v_g, std::string path_)
         std::cout << "Loading MACE model from " << path_ << "\" ...";
     }
     catch (const c10::Error& e) {
-        std::cerr << "Error\n";
+        std::cerr << "Error load mace model\n";
     }
     mace_r_max = model.attr("r_max").toTensor().item<double>();
     double num_inter = model.attr("num_interactions").toTensor().item<double>();
