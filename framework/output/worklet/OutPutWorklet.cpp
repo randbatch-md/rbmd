@@ -663,6 +663,7 @@ namespace OutPut
           }
 
           PE_ij += weight * pe;
+          //PE_ij += pe;
         };
 
 

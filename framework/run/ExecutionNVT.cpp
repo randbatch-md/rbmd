@@ -149,7 +149,7 @@ void ExecutionNVT::ComputeAllForce()
   {
     RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force);
 
-    Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
+    //Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
 
     //all force with bondforce
     Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
@@ -694,16 +694,26 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
     auto weight_group =
       vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
 
-    RunWorklet::ComputeSpecialCoulGeneral(box,
-                                             _atoms_id,
-                                             groupVecArray,
-                                             _force_function,
-                                             _topology,
-                                             _locator,
-                                             ids_group,
-                                             weight_group,
-                                             _spec_coul_force,
-                                             _spec_coul_virial_atom);
+    //RunWorklet::ComputeSpecialCoulGeneral(box,
+    //                                         _atoms_id,
+    //                                         groupVecArray,
+    //                                         _force_function,
+    //                                         _topology,
+    //                                         _locator,
+    //                                         ids_group,
+    //                                         weight_group,
+    //                                         _spec_coul_force,
+    //                                         _spec_coul_virial_atom);
+
+        RunWorklet::ComputeSpecialCoul(box,
+                                   _atoms_id,
+                                   groupVecArray,
+                                   _force_function,
+                                   _topology,
+                                   _locator,
+                                   _spec_coul_force,
+                                   _spec_coul_virial_atom);
+
   }
   else
   {  
@@ -1305,8 +1315,7 @@ void ExecutionNVT::ComputeVirial()
        dihedral_virial= vtkm::cont::Algorithm::Reduce( _dihedral_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
     }
     
-    virial += bond_virial + angle_virial + dihedral_virial;
-    //+spec_coul_virial;
+    virial += bond_virial + angle_virial + dihedral_virial; // +spec_coul_virial;
 
 
     // std::ofstream outfilebond("bond_virial.txt");

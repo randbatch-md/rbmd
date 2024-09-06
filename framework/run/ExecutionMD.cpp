@@ -714,33 +714,33 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,Array
     auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
     auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
     
-    //RunWorklet::NearForceVerletWeightVirial(cut_off,
-    //                                        box,
-    //                                         _unit_factor._qqr2e,
-    //                                        _atoms_id,
-    //                                        _locator,
-    //                                        _topology,
-    //                                        _force_function,
-    //                                        id_verletlist_group,
-    //                                        num_verletlist,
-    //                                        offset_verletlist_group,
-    //                                        ids_group,
-    //                                        weight_group,
-    //                                        nearforce,
-    //                                        nearVirial_atom);
+    RunWorklet::NearForceVerletWeightVirial(cut_off,
+                                            box,
+                                             _unit_factor._qqr2e,
+                                            _atoms_id,
+                                            _locator,
+                                            _topology,
+                                            _force_function,
+                                            id_verletlist_group,
+                                            num_verletlist,
+                                            offset_verletlist_group,
+                                            ids_group,
+                                            weight_group,
+                                            nearforce,
+                                            nearVirial_atom);
 
-    RunWorklet::NearForceVerletVirial(cut_off,
-                                      box,
-                                      _unit_factor._qqr2e,
-                                      _atoms_id,
-                                      _locator,
-                                      _topology,
-                                      _force_function,
-                                      id_verletlist_group,
-                                      num_verletlist,
-                                      offset_verletlist_group,
-                                      nearforce,
-                                      nearVirial_atom);
+    //RunWorklet::NearForceVerletVirial(cut_off,
+    //                                  box,
+    //                                  _unit_factor._qqr2e,
+    //                                  _atoms_id,
+    //                                  _locator,
+    //                                  _topology,
+    //                                  _force_function,
+    //                                  id_verletlist_group,
+    //                                  num_verletlist,
+    //                                  offset_verletlist_group,
+    //                                  nearforce,
+    //                                  nearVirial_atom);
     // 将 _pair_virial_atom 输出到 txt 文件中
     //std::ofstream outfile("pair_virial_atom_output.txt");
     //for (vtkm::Id i = 0; i < nearVirial_atom.GetNumberOfValues(); ++i)
