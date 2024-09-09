@@ -585,14 +585,11 @@ namespace RunWorklet
                                 Vec3f& nearforce,
                                 Vec6f& nearVirial) const
       {
-        //Vec3f LJ_force = { 0, 0, 0 };
-        //Vec3f ele_force = { 0, 0, 0 };
+        Vec3f force_ij = { 0, 0, 0 };
+        Vec6f virial_ij = { 0, 0, 0, 0, 0, 0 };
 
-        Vec3f fij = { 0, 0, 0 };
-        Vec6f LJVirial = { 0, 0, 0, 0, 0, 0 };
-
-       // nearforce = { 0, 0, 0 };
-        //nearVirial = { 0, 0, 0, 0, 0, 0 };
+        nearforce = { 0, 0, 0 };
+        nearVirial = { 0, 0, 0, 0, 0, 0 };
 
         const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
         const auto& pts_type_i = topology.GetAtomsType(atoms_id);
@@ -624,10 +621,12 @@ namespace RunWorklet
             }
           }
           auto fpair = _qqr2e * ele_force + weight * LJ_force;
-          fij += fpair;
 
-          //
-          LJVirial += force_function.ComputeLJVirial0(r_ij, fpair);
+          //force_ij
+          force_ij += fpair;
+
+          //virial_ij
+          virial_ij += force_function.ComputePairVirial(r_ij, fpair);
         };
 
         auto p_i = locator.GetPtsPosition(atoms_id);
@@ -639,8 +638,8 @@ namespace RunWorklet
           function(p_i, p_j, idj);
         }
 
-        nearforce = fij;
-        nearVirial = LJVirial;
+        nearforce = force_ij;
+        nearVirial = virial_ij;
       }
       Real _cut_off;
       Vec3f _box;
@@ -751,13 +750,12 @@ namespace RunWorklet
                                 Vec3f& nearforce,
                                 Vec6f& nearVirial) const
       {
-        Vec3f LJ_force = { 0, 0, 0 };
-        Vec3f ele_force = { 0, 0, 0 };
-
-        Vec3f fij = { 0, 0, 0 };
-        Vec6f LJVirial = { 0, 0, 0, 0, 0, 0 };
+        Vec3f force_ij = { 0, 0, 0 };
+        Vec6f virial_ij = { 0, 0, 0, 0, 0, 0 };
 
         nearforce = { 0, 0, 0 };
+        nearVirial = { 0, 0, 0, 0, 0, 0 };
+
         const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
         const auto& pts_type_i = topology.GetAtomsType(atoms_id);
         auto eps_i = topology.GetEpsilon(pts_type_i);
@@ -774,16 +772,18 @@ namespace RunWorklet
           //auto r_ij = p_j - p_i;
           auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
 
-          ele_force =_qqr2e * force_function.ComputeNearEnergyForce1(r_ij, charge_pi, charge_pj, _cut_off);
+          Vec3f ele_force = _qqr2e * force_function.ComputeNearEnergyForce1(r_ij, charge_pi, charge_pj, _cut_off);
 
           if (molecular_id_i == molecular_id_j)
             return;
-          LJ_force = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          Vec3f LJ_force = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
           auto fpair = ele_force +  LJ_force;
-          fij += fpair;
 
-          //
-          LJVirial += force_function.ComputeLJVirial0(r_ij, fpair);
+          //force_ij
+          force_ij += fpair;
+
+          //virial_ij
+          virial_ij += force_function.ComputePairVirial(r_ij, fpair);
         };
 
         auto p_i = locator.GetPtsPosition(atoms_id);
@@ -794,8 +794,8 @@ namespace RunWorklet
           auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
           function(p_i, p_j, idj);
         }
-        nearforce = fij;
-        nearVirial = LJVirial;
+        nearforce = force_ij;
+        nearVirial = virial_ij;
 
       }
       Real _cut_off;
@@ -2147,12 +2147,8 @@ namespace RunWorklet
                 
                 auto atoms_charge_j = topology.GetCharge(id);
                 auto atoms_coord_j = locator.GetPtsPosition(id);
-                Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
-                //Real rsq = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
-                //Real r2inv = 1.0 / rsq;
-                //Real force_component = -332.06371 * charge_p_i * atoms_charge_j * vtkm::Sqrt(r2inv);
-
-
+                //Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
+                Vec3f rij = locator.MinDistanceVec(atoms_coord_j, atoms_coord_i, _box);
                 Real dis_ij = vtkm::Magnitude(rij);
                 Real dis_ij3 = vtkm::Pow(dis_ij, 3);
                 Real force_component = -332.06371 * charge_p_i * atoms_charge_j / dis_ij3;

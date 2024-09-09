@@ -81,11 +81,10 @@ public:
       return LJVirial;
   }
 
-  VTKM_EXEC Vec6f ComputeLJVirial0(const Vec3f& r_ij,
-                                      const Vec3f& fij) const
+  VTKM_EXEC Vec6f ComputePairVirial(const Vec3f& r_ij, const Vec3f& fpair) const
   {
       Vec6f LJVirial = { 0, 0, 0, 0, 0, 0 };
-      auto LJPair = -0.5 * fij;
+      auto LJPair = -0.5 * fpair;
 
       //compute LJVirial
       LJVirial[0] = r_ij[0] * LJPair[0]; //xx
