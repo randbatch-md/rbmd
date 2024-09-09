@@ -85,7 +85,7 @@ void ExecutionNPT::Solve()
   //  ConstraintB();
   //}
 
-  //ComputeTempe();
+ // ComputeTempe();
   //UpdateVelocityByTempConType();
 
   //if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) != "BERENDSEN")
@@ -128,6 +128,7 @@ void ExecutionNPT::InitialCondition()
   t_freq = 1 / t_period;
 
   //defult values
+  auto _dt = _executioner->Dt();
   dthalf = 0.5 * _dt;
   dt4 = 0.25 * _dt;
   dt8 = 0.125 * _dt;
