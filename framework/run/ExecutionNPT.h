@@ -59,6 +59,7 @@ private:
   void ComputeVirial();
   void ComputeVirial_r();
   void Compute_Pressure_Scalar();
+
   void Compute_Temp_Scalar();
   void Couple();
   void fix_press_berendsen();
@@ -68,6 +69,21 @@ private:
   void set_global_box();
   void remap();
   void ApplyPbc();
+
+  //
+  void SetUp();
+  void NoseHooverChain();
+  void ComputeTempTarget();
+  void ComputePressTarget();
+  void InitialIntegrate();
+  void FinalIntegrate();
+
+  void NHCTempIntegrate();
+  void NHCPressIntegrate();
+  void NVE_v();
+  void NVE_x();
+  void ComputeScalar();
+
 
 private:
   ArrayHandle<Vec3f> _nearforce;
@@ -157,12 +173,44 @@ private:
 
   Real _lj_potential_energy;
 
-  //
+  //pressure
   Vec3f p_start, p_stop;
-  Vec3f p_period, p_target;
+  Vec3f p_period, p_target, p_freq;
+  Real p_freq_max;
+  Real p_hydro; // hydrostatic target pressure
+
+  Id6 p_flag;
+  Id pdim; // number of barostatted dims
 
   Vec3f p_current, dilation;
   Real bulkmodulus;
+
+
+   //temp
+  Real t_start, t_stop, t_period, t_target, ke_target;
+  Real t_freq;
+
+
+  std::vector<Real> eta, eta_dot; // chain thermostat for particles
+  std::vector<Real> eta_dotdot;
+  std::vector<Real> eta_mass;
+  Id mtchain;              // length of chain
+  Id mtchain_default_flag; // 1 = mtchain is default
+
+  std::vector<Real> etap; // chain thermostat for barostat
+  std::vector<Real> etap_dot;
+  std::vector<Real> etap_dotdot;
+  std::vector<Real> etap_mass;
+  Id mpchain; // length of chain
+
+ Id nc_tchain, nc_pchain;
+ Real factor_eta;
+
+ Real dtv, dtf, dthalf, dt4, dt8, dto;
+ Id eta_mass_flag;
+ Real drag, tdrag_factor; // drag factor on particle thermostat
+
+  Vec6f omega_mass;
 
   //
   Vec6f h, h_inv; // shape matrix in Voigt ordering

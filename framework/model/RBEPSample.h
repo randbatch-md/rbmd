@@ -1,6 +1,8 @@
 ﻿#pragma once
 //#define TEST_CODE
 // Prepare P samples of \vec{k_l} for RBE force
+#include <math/Utiles.h >
+
 struct RBEPSAMPLE
 {
   Real _alpha;
