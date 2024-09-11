@@ -355,6 +355,9 @@ namespace RunWorklet
     void UpdateVelocityRescale(const Real& coeff_Berendsen,
                                vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity);
 
+    void UpdateVelocityRescale_press(const Vec3f& factor,
+                                     vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity);
+
     void UpdateVelocityNoseHoover(const Real& dt,
                                   const Real& unit_factor,
                                   const Real& nosehooverxi,

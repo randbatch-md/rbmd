@@ -61,6 +61,7 @@ const std::string PARA_NEIGHBOR_SAMPLE_NUM = "neighbor_sample_num";
 const std::string PARA_COULOMB_SAMPLE_NUM = "coulomb_sample_num";
 const std::string PARA_VLENGTH = "vLength";
 const std::string PARA_BOX = "box";
+const std::string PARA_POINTT = "fixedpoint";
 const std::string PARA_VOLUME = "volume";
 const std::string PARA_BIN_NUMBER = "bin_number";
 const std::string PARA_RANGE = "range";

@@ -147,6 +147,7 @@ void ExecutionNPT::InitialCondition()
   eta_mass_flag = 1;
   nc_tchain = nc_pchain = 1;
   mtchain = mpchain = 3;  //defult=3
+  mtk_flag = 1;
 
   // set timesteps and frequencies
   auto _dt = _executioner->Dt();
@@ -158,6 +159,7 @@ void ExecutionNPT::InitialCondition()
 
   drag = 0.0;
   tdrag_factor = 1.0 - (_dt * t_freq * drag / nc_tchain);
+  pdrag_factor = 1.0 - (_dt * p_freq_max * drag / nc_pchain);
 
 
   // Nose-Hoover temp and pressure init
@@ -172,10 +174,28 @@ void ExecutionNPT::InitialCondition()
     eta[ich] = eta_dot[ich] = eta_dotdot[ich] = 0.0;
   }
 
+  //pressure
+  omega[0] = omega[1] = omega[2] = 0.0;
+  omega_dot[0] = omega_dot[1] = omega_dot[2] = 0.0;
+  omega_mass[0] = omega_mass[1] = omega_mass[2] = 0.0;
+
+  omega[3] = omega[4] = omega[5] = 0.0;
+  omega_dot[3] = omega_dot[4] = omega_dot[5] = 0.0;
+  omega_mass[3] = omega_mass[4] = omega_mass[5] = 0.0;
+ 
+  etap.resize(mtchain);
+  etap_dot.resize(mpchain + 1);
+  etap_dot[mpchain] = 0.0;
+  etap_dotdot.resize(mtchain);
+  etap_mass.resize(mtchain);
+  for (Id ich = 0; ich < mpchain; ich++)
+  {
+    etap[ich] = etap_dot[ich] = etap_dotdot[ich] = 0.0;
+  }
 
   //
   SetUp(); 
-  ComputeTempe();
+
   //
   set_global_box();
 }
@@ -1316,6 +1336,13 @@ void ExecutionNPT::ComputeVirial()
     dihedral_virial;
 
   auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
+  if ("LJ/CUT" == force_field)
+  {
+    ComputeVerletlistLJVirial(_lj_virial_atom);
+    auto lj_virial =vtkm::cont::Algorithm::Reduce(_lj_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+    virial = lj_virial;
+  }
+  //
   if ("LJ/CUT/COUL/LONG" == force_field)
   {
     ComputeVerletlistLJVirial(_lj_virial_atom);
@@ -1449,6 +1476,12 @@ void ExecutionNPT::set_global_box()
   Vec3f box{ h[0], h[1], h[2] };
   _para.SetParameter(PARA_BOX, box);
 
+    // set fixed-point to default = center of cell
+  Real fixedpoint0 = 0.5 * (range[0].Min + range[0].Max);
+  Real fixedpoint1 = 0.5 * (range[1].Min + range[1].Max);
+  Real fixedpoint2 = 0.5 * (range[2].Min + range[2].Max);
+  Vec3f fixedpoint{ fixedpoint0, fixedpoint1, fixedpoint2 };
+  _para.SetParameter(PARA_POINTT, fixedpoint);
 
   //
   auto orthogonal = 1;
@@ -1568,8 +1601,18 @@ void ExecutionNPT::NoseHooverChain()
 
 void ExecutionNPT::SetUp() 
 {
-  ComputeTempTarget();
+  ComputeTempe();       //t_current
+  ComputeTempTarget();  //t_target
 
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    ComputePressTarget();        //p_target
+    Compute_Pressure_Scalar();   //p_current
+    Couple();
+  }
+
+
+  // masses and initial forces on thermostat variables
   auto natoms = _position.GetNumberOfValues();
   auto extra_dof = 3; //dimension =3
   auto tdof = 3 * natoms - extra_dof;
@@ -1579,7 +1622,6 @@ void ExecutionNPT::SetUp()
     tdof = tdof - natoms;
   }
 
-  // masses and initial forces on thermostat variables
   eta_mass[0] = tdof * _unit_factor._boltz * t_target / (t_freq * t_freq);
   for (Id ich = 1; ich < mtchain; ich++)
   {
@@ -1592,6 +1634,35 @@ void ExecutionNPT::SetUp()
   }
 
 
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    // masses and initial forces on barostat variables
+    Real kt = _unit_factor._boltz * t_target;
+    Real nkt = (natoms + 1) * kt;
+    for (Id i = 0; i < 3; i++)
+    {
+      if (p_flag[i])
+      {
+        omega_mass[i] = nkt / (p_freq[i] * p_freq[i]);
+      }
+    }
+    // masses and initial forces on barostat thermostat variables
+    if (mpchain)
+    {
+      etap_mass[0] = _unit_factor._boltz * t_target / (p_freq_max * p_freq_max);
+      for (Id ich = 1; ich < mpchain; ich++)
+      {
+        etap_mass[ich] = _unit_factor._boltz * t_target / (p_freq_max * p_freq_max);
+      }
+
+      for (Id ich = 1; ich < mpchain; ich++)
+      {
+        etap_dotdot[ich] = (etap_mass[ich - 1] * etap_dot[ich - 1] * etap_dot[ich - 1] -
+                            _unit_factor._boltz * t_target) /
+          etap_mass[ich];
+      }
+    }
+  }
 
 }
 
@@ -1634,7 +1705,7 @@ void ExecutionNPT::ComputePressTarget()
     delta = delta / static_cast<Real>(endstep - beginstep);
   }
 
-  for (int i = 0; i < 3; i++)
+  for (Id i = 0; i < 3; i++)
   {
     auto dt_over_period = _dt / p_period[i];
     auto bulkmodulus_inv = 1.0 / _bulkmodulus;
@@ -1653,25 +1724,74 @@ void ExecutionNPT::ComputePressTarget()
 
 void ExecutionNPT::InitialIntegrate()
 {
-  // update eta_press_dot
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    // update eta_press_dot
+    NHCPressIntegrate();  
+  }
 
 
   // update eta_dot
   ComputeTempTarget();
-  NHCTempIntegrate();
+  NHCTempIntegrate();  //perform half-step update of chain thermostat variables
 
+  // need to recompute pressure to account for change in KE
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    //Compute
+    ComputeTempe();
+    Compute_Pressure_Scalar();
+    Couple();
+
+     //
+    ComputePressTarget();
+    NHOmegaDot();
+    NH_V_Press();
+  }
 
   UpdateVelocity();  //NVE_v();
 
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    ReMap();    // remap simulation box by 1/2 step
+  }
+
   UpdatePosition(); // NVE_x();
+
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    ReMap(); // remap simulation box by 1/2 step
+  }
 }
 
 void ExecutionNPT::FinalIntegrate()
 {
   UpdateVelocity();   //NVE_v();
 
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    NH_V_Press();
+  }
+
+  // compute new T,P after velocities rescaled by nh_v_press()
+  // compute appropriately coupled elements of mvv_current
   ComputeTempe(); //t_current
+
+  // need to recompute pressure to account for change in KE
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    Compute_Pressure_Scalar();
+    Couple();
+    NHOmegaDot();
+  }
+
+  // update eta_dot
+  // update eta_press_dot
   NHCTempIntegrate();
+  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
+  {
+    NHCPressIntegrate();
+  }
 }
 
 void ExecutionNPT::NHCTempIntegrate()
@@ -1717,20 +1837,20 @@ void ExecutionNPT::NHCTempIntegrate()
                                                 //这样可以确保上游链节（更靠近粒子的链节）的更新能准确反映下游链节的影响。
                                                  
     {
-      expfac = exp(-ncfac * dt8 * eta_dot[ich + 1]);  // 使用 exp(-dt/8) 对速度进行指数更新, 第 ich 链节会受到后续链节 𝜂(ich + 1)的影响.
+      expfac = vtkm::Exp(-ncfac * dt8 * eta_dot[ich + 1]);  // 使用 exp(-dt/8) 对速度进行指数更新, 第 ich 链节会受到后续链节 𝜂(ich + 1)的影响.
       eta_dot[ich] *= expfac; 
       eta_dot[ich] += eta_dotdot[ich] * ncfac * dt4;  // 基于当前链节的加速度 eta_dotdot 更新链的速度，时间步长为 dt/4
       eta_dot[ich] *= tdrag_factor;                  // 乘以阻尼因子
       eta_dot[ich] *= expfac;                        // 再次使用 exp(-dt/8) 进行指数更新,完成另一个半步更新,这一步确保动量的完整更新，使其演化符合时间反演对称性。
     }                                                //两次应用指数缩放因子是为了模拟 Nose-Hoover 链系统的哈密顿力学方程。
 
-    expfac = exp(-ncfac * dt8 * eta_dot[1]);
+    expfac = vtkm::Exp(-ncfac * dt8 * eta_dot[1]);
     eta_dot[0] *= expfac;
     eta_dot[0] += eta_dotdot[0] * ncfac * dt4;
     eta_dot[0] *= tdrag_factor;
     eta_dot[0] *= expfac;
 
-    factor_eta = exp(-ncfac * dthalf * eta_dot[0]);
+    factor_eta = vtkm::Exp(-ncfac * dthalf * eta_dot[0]);
     RunWorklet::UpdateVelocityRescale(factor_eta, _velocity);     //nh_v_temp();  dt/2的更新
 
 
@@ -1759,7 +1879,7 @@ void ExecutionNPT::NHCTempIntegrate()
 
     for (Id ich = 1; ich < mtchain; ich++) //正向循环（从头到尾）：用于更新加速度
     {
-      expfac = exp(-ncfac * dt8 * eta_dot[ich + 1]);
+      expfac = vtkm::Exp(-ncfac * dt8 * eta_dot[ich + 1]);
       eta_dot[ich] *= expfac;
       eta_dotdot[ich] =(eta_mass[ich - 1] * eta_dot[ich - 1] * eta_dot[ich - 1] - _unit_factor._boltz * t_target) / eta_mass[ich];
       eta_dot[ich] += eta_dotdot[ich] * ncfac * dt4;
@@ -1772,6 +1892,87 @@ void ExecutionNPT::NHCTempIntegrate()
 
 void ExecutionNPT::NHCPressIntegrate()
 {
+  Id pdof;
+  Real expfac, factor_etap, kecurrent;
+  Real kt = _unit_factor._boltz * t_target;
+  Real lkt_press;
+
+  kecurrent = 0.0;
+  pdof = 0;
+  for (Id i = 0; i < 3; i++)
+  {
+    if (p_flag[i])
+    {
+      kecurrent += omega_mass[i] * omega_dot[i] * omega_dot[i];  
+      pdof++;
+    }
+  }
+
+  //
+  lkt_press = kt;  //iso
+  etap_dotdot[0] = (kecurrent - lkt_press) / etap_mass[0]; //压力浴链的加速度
+
+
+  //
+  Real ncfac = 1.0 / nc_pchain;
+  for (Id iloop = 0; iloop < nc_pchain; iloop++)
+  {
+
+    for (Id ich = mpchain - 1; ich > 0; ich--) //反向传播
+    {
+      expfac = vtkm::Exp(-ncfac * dt8 * etap_dot[ich + 1]);
+      etap_dot[ich] *= expfac;
+      etap_dot[ich] += etap_dotdot[ich] * ncfac * dt4;
+      etap_dot[ich] *= pdrag_factor;
+      etap_dot[ich] *= expfac;
+    }
+
+    expfac = vtkm::Exp(-ncfac * dt8 * etap_dot[1]);
+    etap_dot[0] *= expfac;
+    etap_dot[0] += etap_dotdot[0] * ncfac * dt4;
+    etap_dot[0] *= pdrag_factor;
+    etap_dot[0] *= expfac;              //压力浴链的速度
+     
+    for (Id ich = 0; ich < mpchain; ich++)
+    {
+      etap[ich] += ncfac * dthalf * etap_dot[ich];  //压力浴链的位置
+    }
+
+
+    factor_etap = vtkm::Exp(-ncfac * dthalf * etap_dot[0]);
+    for (Id i = 0; i < 3; i++)
+    {
+      if (p_flag[i])
+      {
+        omega_dot[i] *= factor_etap; //ISO
+      }
+    }   
+
+    kecurrent = 0.0;
+    for (Id i = 0; i < 3; i++)
+    {
+      if (p_flag[i])
+      {
+        kecurrent += omega_mass[i] * omega_dot[i] * omega_dot[i];
+      }
+    }
+
+    etap_dotdot[0] = (kecurrent - lkt_press) / etap_mass[0];
+
+    etap_dot[0] *= expfac;
+    etap_dot[0] += etap_dotdot[0] * ncfac * dt4;
+    etap_dot[0] *= expfac;
+
+    for (Id ich = 1; ich < mpchain; ich++) //正向循环（从头到尾）：用于更新加速度
+    {
+      expfac = vtkm::Exp(-ncfac * dt8 * etap_dot[ich + 1]);
+      etap_dot[ich] *= expfac;
+      etap_dotdot[ich] = (etap_mass[ich - 1] * etap_dot[ich - 1] * etap_dot[ich - 1] -
+                          _unit_factor._boltz * t_target) / etap_mass[ich];
+      etap_dot[ich] += etap_dotdot[ich] * ncfac * dt4;
+      etap_dot[ich] *= expfac;
+    }
+  }
 
 }
 
@@ -1798,4 +1999,134 @@ void ExecutionNPT::ComputeScalar()
   {
     energy += kt * eta[ich] + 0.5 * eta_mass[ich] * eta_dot[ich] * eta_dot[ich];
   }
+}
+
+void ExecutionNPT::NHOmegaDot()
+{
+  auto n = _position.GetNumberOfValues();
+  auto extra_dof = 3; //dimension =3
+  auto tdof = 3 * n - extra_dof;
+  auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+  if (shake == "true")
+  {
+    tdof = tdof - n;
+  }
+
+  //
+  Real f_omega, volume;
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX); //
+  volume = box[0] * box[1] * box[2];
+  mtk_term1 = 0.0;
+  if (mtk_flag)
+  {
+    mtk_term1 = tdof * _unit_factor._boltz * _tempT;
+    mtk_term1 /= pdim * n;
+  }
+  for (Id i = 0; i < 3; i++)
+  {
+    if (p_flag[i])
+    {
+      f_omega = (p_current[i] - p_hydro) * volume / (omega_mass[i] * _unit_factor._nktv2p) + mtk_term1 / omega_mass[i];
+      omega_dot[i] += f_omega * dthalf;
+      omega_dot[i] *= pdrag_factor;
+    }
+  }
+
+  mtk_term2 = 0.0;
+  if (mtk_flag)
+  {
+    for (Id i = 0; i < 3; i++)
+    {
+      if (p_flag[i])
+      {
+        mtk_term2 += omega_dot[i];
+      }
+    }
+    if (pdim > 0)
+    {
+      mtk_term2 /= pdim * n;
+    }
+
+  }
+
+}
+
+void ExecutionNPT::NH_V_Press()
+{
+  Vec3f factor;
+  factor[0] = vtkm::Exp(-dt4 * (omega_dot[0] + mtk_term2));
+  factor[1] = vtkm::Exp(-dt4 * (omega_dot[1] + mtk_term2));
+  factor[2] = vtkm::Exp(-dt4 * (omega_dot[2] + mtk_term2));
+
+  RunWorklet::UpdateVelocityRescale_press(factor, _velocity); // perform half-step barostat scaling of velocities
+  RunWorklet::UpdateVelocityRescale_press(factor, _velocity);
+}
+
+void ExecutionNPT::ReMap()
+{
+  Real oldlo, oldhi;
+  Real expfac;
+
+  auto n = _position.GetNumberOfValues();
+
+  //  convert lamda coords
+  x2lamda(n);
+  // Ordering of operations preserves time symmetry.
+
+  //double dto2 = dto / 2.0;
+  //double dto4 = dto / 4.0;
+  //double dto8 = dto / 8.0;
+
+  vtkm::Vec<vtkm::Range, 3> range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+  auto fixedpoint = _para.GetParameter<Vec3f>(PARA_POINTT); //
+
+  if (p_flag[0])
+  {
+    oldlo = range[0].Min;
+    oldhi = range[0].Max;
+    expfac = vtkm::Exp(dto * omega_dot[0]);
+    range[0].Min = (oldlo - fixedpoint[0]) * expfac + fixedpoint[0];
+    range[0].Max = (oldhi - fixedpoint[0]) * expfac + fixedpoint[0];
+  }
+
+  if (p_flag[1])
+  {
+    oldlo = range[1].Min;
+    oldhi = range[1].Max;
+    expfac = exp(dto * omega_dot[1]);
+    range[1].Min = (oldlo - fixedpoint[1]) * expfac + fixedpoint[1];
+    range[1].Max = (oldhi - fixedpoint[1]) * expfac + fixedpoint[1];
+    //if (scalexy)
+    //{
+    //  h[5] *= expfac;
+    //}
+  }
+
+  if (p_flag[2])
+  {
+    oldlo = range[2].Min;
+    oldhi = range[2].Max;
+    expfac = exp(dto * omega_dot[2]);
+    range[2].Min = (oldlo - fixedpoint[2]) * expfac + fixedpoint[2];
+    range[2].Max = (oldhi - fixedpoint[2]) * expfac + fixedpoint[2];
+    //if (scalexz)
+    //{
+    //  h[4] *= expfac;
+    //}
+    //if (scaleyz)
+    //{
+    //  h[3] *= expfac;
+    //}
+  }
+  _para.SetParameter(PARA_RANGE, range);
+
+  Vec3f left_bottom{ Real(range[0].Min), Real(range[1].Min), Real(range[2].Min) };
+  Vec3f right_top{ Real(range[0].Max), Real(range[1].Max), Real(range[2].Max) };
+  _locator.SetRange(left_bottom, right_top);
+  
+  set_global_box();
+
+  // convert real coords
+  lamda2x(n);
+
 }

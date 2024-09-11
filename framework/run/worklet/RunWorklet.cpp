@@ -2520,6 +2520,26 @@ namespace RunWorklet
     
       Real _coeff;
     };
+
+    struct UpdateVelocityRescalePressWorklet : vtkm::worklet::WorkletMapField
+    {
+      using ControlSignature = void(FieldInOut velocity);
+      using ExecutionSignature = void(_1);
+
+      UpdateVelocityRescalePressWorklet(const Vec3f& factor)
+        : _factor(factor)
+      {
+      }
+
+      VTKM_EXEC void operator()(Vec3f& velocity) const
+      { 
+          velocity[0] = _factor[0] * velocity[0]; 
+          velocity[1] = _factor[1] * velocity[1]; 
+          velocity[2] = _factor[2] * velocity[2]; 
+      }
+
+      Vec3f _factor;
+    };
     
     struct UpdatePositionWorklet : vtkm::worklet::WorkletMapField
     {
@@ -3280,6 +3300,11 @@ namespace RunWorklet
 {
       vtkm::cont::Invoker{}(UpdateVelocityRescaleWorklet{ coeff_Berendsen }, velocity);
 } 
+    void UpdateVelocityRescale_press(const Vec3f& factor,
+                                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity)
+ {
+      vtkm::cont::Invoker{}(UpdateVelocityRescalePressWorklet{ factor }, velocity);
+  } 
 
     void UpdateVelocityNoseHoover(const Real& dt,
                                   const Real& unit_factor,

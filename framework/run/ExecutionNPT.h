@@ -84,6 +84,11 @@ private:
   void NVE_x();
   void ComputeScalar();
 
+  //
+  void NHOmegaDot();
+  void NH_V_Press();
+  void ReMap();
+
 
 private:
   ArrayHandle<Vec3f> _nearforce;
@@ -95,8 +100,6 @@ private:
   ArrayHandle<Vec3f> _spec_coul_force;
   Real _dt;
   Real _kbT, _Tdamp;
-  Real _Pstart, _Pstop, _Pperiod, _Ptarget;
-  Real _bulkmodulus, _scale_factor, _pressure_coupling;
 
   std::string _farforce_type;
   std::string _nearforce_type;
@@ -174,8 +177,11 @@ private:
   Real _lj_potential_energy;
 
   //pressure
-  Vec3f p_start, p_stop;
-  Vec3f p_period, p_target, p_freq;
+  Real _Pstart, _Pstop, _Pperiod, _bulkmodulus; //read
+  Real _Ptarget, _scale_factor, _pressure_coupling;
+
+  Vec3f p_start, p_stop, p_period, p_target;
+  Vec3f p_freq;
   Real p_freq_max;
   Real p_hydro; // hydrostatic target pressure
 
@@ -183,8 +189,11 @@ private:
   Id pdim; // number of barostatted dims
 
   Vec3f p_current, dilation;
-  Real bulkmodulus;
 
+ Vec6f omega, omega_dot;
+ Vec6f omega_mass;
+ Real mtk_term1, mtk_term2; // Martyna-Tobias-Klein corrections
+ Id mtk_flag;              // 0 if using Hoover barostat
 
    //temp
   Real t_start, t_stop, t_period, t_target, ke_target;
@@ -209,8 +218,7 @@ private:
  Real dtv, dtf, dthalf, dt4, dt8, dto;
  Id eta_mass_flag;
  Real drag, tdrag_factor; // drag factor on particle thermostat
-
-  Vec6f omega_mass;
+ Real pdrag_factor;       // drag factor on barostat
 
   //
   Vec6f h, h_inv; // shape matrix in Voigt ordering
