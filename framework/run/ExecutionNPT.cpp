@@ -96,10 +96,18 @@ void ExecutionNPT::Solve()
 
   if (_para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE) == "NOSE_HOOVE")
   {
-    ComputeTempe();
+    //ComputeTempe();
     InitialIntegrate();
+    if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+    {
+      ConstraintA();
+    }
     ComputeForce();
     FinalIntegrate();
+    if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+    {
+      ConstraintB();
+    }
   }
 }
 
@@ -127,28 +135,32 @@ void ExecutionNPT::InitialCondition()
   p_freq[0] = p_freq[1] = p_freq[2] = 1 / _Pperiod;
   t_freq = 1 / t_period;
 
-  //defult values
-  auto _dt = _executioner->Dt();
-  dthalf = 0.5 * _dt;
-  dt4 = 0.25 * _dt;
-  dt8 = 0.125 * _dt;
-  dto = dthalf;
+
 
   p_freq_max = 0.0;
   p_freq_max = MAX(p_freq[0], p_freq[1]);
   p_freq_max = MAX(p_freq_max, p_freq[2]);
   p_flag[0] = p_flag[1] = p_flag[2] = 1;
   pdim = p_flag[0] + p_flag[1] + p_flag[2];
+
+  //defult values
   eta_mass_flag = 1;
   nc_tchain = nc_pchain = 1;
-  mtchain = mpchain = 3;
-  drag = 0.0;
+  mtchain = mpchain = 3;  //defult=3
 
+  // set timesteps and frequencies
+  auto _dt = _executioner->Dt();
+  dtf = _dt * _unit_factor._fmt2v;
+  dthalf = 0.5 * _dt;
+  dt4 = 0.25 * _dt;
+  dt8 = 0.125 * _dt;
+  dto = dthalf;
+
+  drag = 0.0;
   tdrag_factor = 1.0 - (_dt * t_freq * drag / nc_tchain);
 
 
-
-  // add one extra dummy thermostat, set to zero
+  // Nose-Hoover temp and pressure init
   eta.resize(mtchain);
   eta_dot.resize(mtchain+1);
   eta_dot[mtchain] = 0;
@@ -160,6 +172,11 @@ void ExecutionNPT::InitialCondition()
     eta[ich] = eta_dot[ich] = eta_dotdot[ich] = 0.0;
   }
 
+
+  //
+  SetUp(); 
+  ComputeTempe();
+  //
   set_global_box();
 }
 
@@ -1551,51 +1568,31 @@ void ExecutionNPT::NoseHooverChain()
 
 void ExecutionNPT::SetUp() 
 {
-  //t_current =ComputeTempe();
   ComputeTempTarget();
 
   auto natoms = _position.GetNumberOfValues();
   auto extra_dof = 3; //dimension =3
   auto tdof = 3 * natoms - extra_dof;
-
-  ComputePressTarget();
-
-  Compute_Pressure_Scalar();
-  Couple();
+  auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+  if (shake == "true")
+  {
+    tdof = tdof - natoms;
+  }
 
   // masses and initial forces on thermostat variables
-
-
   eta_mass[0] = tdof * _unit_factor._boltz * t_target / (t_freq * t_freq);
-  for (int ich = 1; ich < mtchain; ich++)
+  for (Id ich = 1; ich < mtchain; ich++)
   {
     eta_mass[ich] = _unit_factor._boltz * t_target / (t_freq * t_freq);
   }
 
-  for (int ich = 1; ich < mtchain; ich++)
+  for (Id ich = 1; ich < mtchain; ich++)
   {
     eta_dotdot[ich] = (eta_mass[ich - 1] * eta_dot[ich - 1] * eta_dot[ich - 1] - _unit_factor._boltz * t_target) /eta_mass[ich];
   }
 
-  // masses and initial forces on barostat variables
-  Real kt = _unit_factor._boltz * t_target;
-  Real nkt = (natoms + 1) * kt;
-  for (int i = 0; i < 3; i++)
-  {
 
-    omega_mass[i] = nkt / (p_freq[i] * p_freq[i]);
-  }
 
-    // masses and initial forces on barostat thermostat variables
-  if (mpchain)
-  {
-    etap_mass[0] = _unit_factor._boltz * t_target / (p_freq_max * p_freq_max);
-    for (int ich = 1; ich < mpchain; ich++)
-      etap_mass[ich] = _unit_factor._boltz * t_target / (p_freq_max * p_freq_max);
-    for (int ich = 1; ich < mpchain; ich++)
-      etap_dotdot[ich] = (etap_mass[ich - 1] * etap_dot[ich - 1] * etap_dot[ich - 1] -
-                          _unit_factor._boltz * t_target) / etap_mass[ich];
-  }
 }
 
 void ExecutionNPT::ComputeTempTarget()
@@ -1603,6 +1600,11 @@ void ExecutionNPT::ComputeTempTarget()
   auto n = _position.GetNumberOfValues();
   auto extra_dof = 3; //dimension =3
   auto tdof = 3 * n - extra_dof;
+  auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+  if (shake == "true")
+  {
+    tdof = tdof - n;
+  }
 
   auto currentstep = _app.GetExecutioner()->CurrentStep();
   auto beginstep = 0;
@@ -1667,9 +1669,8 @@ void ExecutionNPT::InitialIntegrate()
 void ExecutionNPT::FinalIntegrate()
 {
   UpdateVelocity();   //NVE_v();
-  ComputeTempe();  //t_current
 
-
+  ComputeTempe(); //t_current
   NHCTempIntegrate();
 }
 
@@ -1678,17 +1679,21 @@ void ExecutionNPT::NHCTempIntegrate()
   auto n = _position.GetNumberOfValues();
   auto extra_dof = 3; //dimension =3
   auto tdof = 3 * n - extra_dof;
-  auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
+  auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+  if (shake == "true")
+  {
+    tdof = tdof - n;
+  }
 
-  Id ich;
+  //auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
   Real expfac;
-  Real kecurrent = tdof * _unit_factor._boltz * temperature;
+  Real kecurrent = tdof * _unit_factor._boltz * _tempT;
 
   // Update masses, to preserve initial freq, if flag set
   if (eta_mass_flag)
   {
     eta_mass[0] = tdof * _unit_factor._boltz * t_target / (t_freq * t_freq);
-    for (ich = 1; ich < mtchain; ich++)
+    for (Id ich = 1; ich < mtchain; ich++)
     {
       eta_mass[ich] = _unit_factor._boltz * t_target / (t_freq * t_freq);
     }
@@ -1708,8 +1713,7 @@ void ExecutionNPT::NHCTempIntegrate()
   Real ncfac = 1.0 / nc_tchain;
   for (Id iloop = 0; iloop < nc_tchain; iloop++)
   {
-
-    for (ich = mtchain - 1; ich > 0; ich--)     // 反向传播,为了正确传播影响，必须从最后一个链节开始，逐步向前传播至第一个链节。
+    for (Id ich = mtchain - 1; ich > 0; ich--) // 反向传播,为了正确传播影响，必须从最后一个链节开始，逐步向前传播至第一个链节。
                                                 //这样可以确保上游链节（更靠近粒子的链节）的更新能准确反映下游链节的影响。
                                                  
     {
@@ -1727,32 +1731,33 @@ void ExecutionNPT::NHCTempIntegrate()
     eta_dot[0] *= expfac;
 
     factor_eta = exp(-ncfac * dthalf * eta_dot[0]);
-    RunWorklet::UpdateVelocityRescale(factor_eta, _velocity);     //nh_v_temp();
+    RunWorklet::UpdateVelocityRescale(factor_eta, _velocity);     //nh_v_temp();  dt/2的更新
 
 
     // rescale temperature due to velocity scaling
     // should not be necessary to explicitly recompute the temperature
 
-    temperature *= factor_eta * factor_eta;
-    _para.SetParameter(PARA_TEMPT, temperature);
+    _tempT *= factor_eta * factor_eta;
+    //temperature *= factor_eta * factor_eta;
+    //_para.SetParameter(PARA_TEMPT, temperature);
 
 
     //
-    kecurrent = tdof * _unit_factor._boltz * temperature;
+    kecurrent = tdof * _unit_factor._boltz * _tempT;
 
     if (eta_mass[0] > 0.0)
       eta_dotdot[0] = (kecurrent - ke_target) / eta_mass[0];
     else
       eta_dotdot[0] = 0.0;
 
-    for (ich = 0; ich < mtchain; ich++)
+    for (Id ich = 0; ich < mtchain; ich++)
       eta[ich] += ncfac * dthalf * eta_dot[ich];   //链的位置
 
     eta_dot[0] *= expfac;
     eta_dot[0] += eta_dotdot[0] * ncfac * dt4;
     eta_dot[0] *= expfac;
 
-    for (ich = 1; ich < mtchain; ich++)            //正向循环（从头到尾）：用于更新加速度
+    for (Id ich = 1; ich < mtchain; ich++) //正向循环（从头到尾）：用于更新加速度
     {
       expfac = exp(-ncfac * dt8 * eta_dot[ich + 1]);
       eta_dot[ich] *= expfac;

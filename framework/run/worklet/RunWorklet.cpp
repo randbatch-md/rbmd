@@ -2537,7 +2537,7 @@ namespace RunWorklet
                                 CoordType& position) const
       {
         position += velocity * _dt;
-        locator.UpdateOverRangePoint(position);
+        //locator.UpdateOverRangePoint(position);
       }
       Real _dt;
     };
