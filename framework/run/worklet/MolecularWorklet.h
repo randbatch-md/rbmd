@@ -91,8 +91,9 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     //bondVirial[0] = virialbondi;
     //bondVirial[1] = virialbondj;
 
-    bondVirial[0] = virialbondij;
-    bondVirial[1] = virialbondij;
+    //bondVirial[0] = virialbondij;
+    //bondVirial[1] = virialbondij;
+    bondVirial = virialbondij;
 
   }
   template<typename PositionType>
@@ -113,7 +114,8 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f p_j = _position.Get(bondj);
 
     // minimum image distance
-    Vec3f r_ij = locator.MinDistanceVec(p_i, p_j, _box);
+    Vec3f r_ij = locator.MinDistanceVec(p_i, p_j, _box);  //p_j - p_i; 
+    //Vec3f r_ij = p_i - p_j;    //p_i - p_j;
 
     Real dis_2 = vtkm::MagnitudeSquared(r_ij);
     Real disij = vtkm::Sqrt(dis_2);
@@ -130,14 +132,23 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     bondEnergy = rk * dr;
 
     //
-    auto bondij = -0.5 * forcebondij;
+    //auto bondij = -0.5 * forcebondij;
+    //virialbondij[0] = r_ij[0] * bondij[0];
+    //virialbondij[1] = r_ij[1] * bondij[1];
+    //virialbondij[2] = r_ij[2] * bondij[2];
+    //virialbondij[3] = r_ij[0] * bondij[1];
+    //virialbondij[4] = r_ij[0] * bondij[2];
+    //virialbondij[5] = r_ij[1] * bondij[2];
+
+
+    //newton_bond
+    auto bondij =  forcebondij;
     virialbondij[0] = r_ij[0] * bondij[0];
     virialbondij[1] = r_ij[1] * bondij[1];
     virialbondij[2] = r_ij[2] * bondij[2];
     virialbondij[3] = r_ij[0] * bondij[1];
     virialbondij[4] = r_ij[0] * bondij[2];
     virialbondij[5] = r_ij[1] * bondij[2];
-
 
     // i j 
     auto r_ji = -r_ij;
@@ -278,9 +289,10 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     //angleVirial[0] = virial_i;
     //angleVirial[1] = virial_j;
     //angleVirial[2] = virial_k;
-    angleVirial[0] = angleVirial_pair;
-    angleVirial[1] = angleVirial_pair;
-    angleVirial[2] = angleVirial_pair;
+    //angleVirial[0] = angleVirial_pair;
+    //angleVirial[1] = angleVirial_pair;
+    //angleVirial[2] = angleVirial_pair;
+    angleVirial = angleVirial_pair;
 
   }
   template<typename WholePtsType>
@@ -308,6 +320,8 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     // minimum image distance
     Vec3f r_ij = locator.MinDistanceVec(p_i, p_j, _box);
     Vec3f r_kj = locator.MinDistanceVec(p_k, p_j, _box);
+    //Vec3f r_ij = p_i - p_j; //p_i - p_j;
+    //Vec3f r_kj = p_k - p_j; //p_k - p_j;
 
     Real disij_2 = vtkm::MagnitudeSquared(r_ij);
     Real disij = vtkm::Sqrt(disij_2);
@@ -345,13 +359,20 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
 
 
     //fix
-    angleVirial_pair[0] = -THIRD * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
-    angleVirial_pair[1] = -THIRD * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
-    angleVirial_pair[2] = -THIRD * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
-    angleVirial_pair[3] = -THIRD * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
-    angleVirial_pair[4] = -THIRD * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
-    angleVirial_pair[5] = -THIRD * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
+    //angleVirial_pair[0] = -THIRD * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+    //angleVirial_pair[1] = -THIRD * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+    //angleVirial_pair[2] = -THIRD * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+    //angleVirial_pair[3] = -THIRD * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+    //angleVirial_pair[4] = -THIRD * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+    //angleVirial_pair[5] = -THIRD * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
 
+    //newton_bond
+    angleVirial_pair[0] =   (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+    angleVirial_pair[1] =   (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+    angleVirial_pair[2] =   (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+    angleVirial_pair[3] =   (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+    angleVirial_pair[4] =   (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+    angleVirial_pair[5] =   (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
 
 
 
@@ -738,10 +759,13 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     forcedihedral[2] = force_dihedralk;
     forcedihedral[3] = force_dihedralw;
 
-    dihedralVirial[0] = dihedralVirial_pair;
-    dihedralVirial[1] = dihedralVirial_pair;
-    dihedralVirial[2] = dihedralVirial_pair;
-    dihedralVirial[3] = dihedralVirial_pair;
+    //dihedralVirial[0] = dihedralVirial_pair;
+    //dihedralVirial[1] = dihedralVirial_pair;
+    //dihedralVirial[2] = dihedralVirial_pair;
+    //dihedralVirial[3] = dihedralVirial_pair;
+
+    dihedralVirial = dihedralVirial_pair;
+
   }
   template<typename WholePtsType>
   VTKM_EXEC void ComputeijDihedralHarmonicEnergyForce(
@@ -930,23 +954,41 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
 
 
     //dihedralVirial
-    dihedralVirial_pair[0] =  -0.25 * (vb1[0] * force_dihedrali[0] + vb2[0] * force_dihedralk[0] +
-      (vb3[0] + vb2[0]) * force_dihedralw[0]);
+    //dihedralVirial_pair[0] =  -0.25 * (vb1[0] * force_dihedrali[0] + vb2[0] * force_dihedralk[0] +
+    //  (vb3[0] + vb2[0]) * force_dihedralw[0]);
 
-    dihedralVirial_pair[1] =  -0.25 * (vb1[1] * force_dihedrali[1] + vb2[1] * force_dihedralk[1] +
+    //dihedralVirial_pair[1] =  -0.25 * (vb1[1] * force_dihedrali[1] + vb2[1] * force_dihedralk[1] +
+    //   (vb3[1] + vb2[1]) * force_dihedralw[1]);
+
+    //dihedralVirial_pair[2] =  -0.25 * (vb1[2] * force_dihedrali[2] + vb2[2] * force_dihedralk[2] +
+    //  (vb3[2] + vb2[2]) * force_dihedralw[2]);
+
+    //dihedralVirial_pair[3] =  -0.25 * (vb1[0] * force_dihedrali[1] + vb2[0] * force_dihedralk[1] +
+    //  (vb3[0] + vb2[0]) * force_dihedralw[1]);
+
+    //dihedralVirial_pair[4] =  -0.25 * (vb1[0] * force_dihedrali[2] + vb2[0] * force_dihedralk[2] +
+    //  (vb3[0] + vb2[0]) * force_dihedralw[2]);
+
+    //dihedralVirial_pair[5] =  -0.25 * (vb1[1] * force_dihedrali[2] + vb2[1] * force_dihedralk[2] +
+    //  (vb3[1] + vb2[1]) * force_dihedralw[2]);
+
+    dihedralVirial_pair[0] = (vb1[0] * force_dihedrali[0] + vb2[0] * force_dihedralk[0] +
+       (vb3[0] + vb2[0]) * force_dihedralw[0]);
+
+    dihedralVirial_pair[1] = (vb1[1] * force_dihedrali[1] + vb2[1] * force_dihedralk[1] +
        (vb3[1] + vb2[1]) * force_dihedralw[1]);
 
-    dihedralVirial_pair[2] =  -0.25 * (vb1[2] * force_dihedrali[2] + vb2[2] * force_dihedralk[2] +
-      (vb3[2] + vb2[2]) * force_dihedralw[2]);
+    dihedralVirial_pair[2] = (vb1[2] * force_dihedrali[2] + vb2[2] * force_dihedralk[2] +
+       (vb3[2] + vb2[2]) * force_dihedralw[2]);
 
-    dihedralVirial_pair[3] =  -0.25 * (vb1[0] * force_dihedrali[1] + vb2[0] * force_dihedralk[1] +
-      (vb3[0] + vb2[0]) * force_dihedralw[1]);
+    dihedralVirial_pair[3] = (vb1[0] * force_dihedrali[1] + vb2[0] * force_dihedralk[1] +
+       (vb3[0] + vb2[0]) * force_dihedralw[1]);
 
-    dihedralVirial_pair[4] =  -0.25 * (vb1[0] * force_dihedrali[2] + vb2[0] * force_dihedralk[2] +
-      (vb3[0] + vb2[0]) * force_dihedralw[2]);
+    dihedralVirial_pair[4] = (vb1[0] * force_dihedrali[2] + vb2[0] * force_dihedralk[2] +
+       (vb3[0] + vb2[0]) * force_dihedralw[2]);
 
-    dihedralVirial_pair[5] =  -0.25 * (vb1[1] * force_dihedrali[2] + vb2[1] * force_dihedralk[2] +
-      (vb3[1] + vb2[1]) * force_dihedralw[2]);
+    dihedralVirial_pair[5] =  (vb1[1] * force_dihedrali[2] + vb2[1] * force_dihedralk[2] +
+       (vb3[1] + vb2[1]) * force_dihedralw[2]);
 
   }
 
@@ -2344,11 +2386,13 @@ struct ConstraintShakeForceStepWaterBondAngleWorklet : vtkm::worklet::WorkletMap
 
 struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 {
-  NewConstraintAWaterBondAngleWorklet(const Vec3f& box,
+  NewConstraintAWaterBondAngleWorklet(const Id& N,
+                                      const Vec3f& box,
                                       const Real& dt,
                                       const Real fmt2v,
                                       const Vec<Vec2f, 3>& range)
-    : _box(box)
+    : _N(N),
+      _box(box)
     , _dt(dt)
     , _fmt2v(fmt2v)
     , _range(range)
@@ -2361,8 +2405,9 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 
                                 const WholeArrayIn whole_mass , 
                                 WholeArrayInOut whole_pts_flag,
-                                ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5 ,_6,_7);
+                                ExecObject locator,
+                                FieldOut ShakeVirial);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5 ,_6,_7,_8);
 
   template<typename AngleListType,
            typename PositionType,
@@ -2376,7 +2421,8 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
                             const AllForceType& whole_all_force,
                             const MassType& whole_mass,
                             PtsFlagType& whole_pts_flag,
-                            const ExecPointLocator& locator) const
+                            const ExecPointLocator& locator,
+                            Vec6f& ShakeVirial) const
   {
     IdComponent i0 = anglelist[0]; //H
     IdComponent i1 = anglelist[1]; //O
@@ -2595,12 +2641,36 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
       whole_pts.Set(anglelist[i], whole_position_pbc[i]);
       whole_pts_flag.Set(anglelist[i], whole_pts_flag_pbc[i]);
     }
+
+    //ShakeVirial
+
+     Real dtfsq = 0.5 * _dt * _dt * _fmt2v;
+    lamda01 = lamda01 / dtfsq;
+    lamda20 = lamda20 / dtfsq;
+    lamda12 = lamda12 / dtfsq;
+    //
+    Real fraction = _N / 3;
+
+    ShakeVirial[0] =  lamda01 * r01[0] * r01[0] + lamda20 * r20[0] * r20[0] + lamda12 * r12[0] * r12[0];
+    ShakeVirial[1] =  lamda01 * r01[1] * r01[1] + lamda20 * r20[1] * r20[1] + lamda12 * r12[1] * r12[1];
+    ShakeVirial[2] =  lamda01 * r01[2] * r01[2] + lamda20 * r20[2] * r20[2] + lamda12 * r12[2] * r12[2];
+    ShakeVirial[3] =  lamda01 * r01[0] * r01[1] + lamda20 * r20[0] * r20[1] + lamda12 * r12[0] * r12[1];
+    ShakeVirial[4] =  lamda01 * r01[0] * r01[2] + lamda20 * r20[0] * r20[2] + lamda12 * r12[0] * r12[2];
+    ShakeVirial[5] =  lamda01 * r01[1] * r01[2] + lamda20 * r20[1] * r20[2] + lamda12 * r12[1] * r12[2];
+
+    //ShakeVirial[0] = fraction * ShakeVirial[0];
+    //ShakeVirial[1] = fraction * ShakeVirial[1];
+    //ShakeVirial[2] = fraction * ShakeVirial[2];
+    //ShakeVirial[3] = fraction * ShakeVirial[3];
+    //ShakeVirial[4] = fraction * ShakeVirial[4];
+    //ShakeVirial[5] = fraction * ShakeVirial[5];
   }
 
   Vec3f _box;
   Real _dt;
   Vec<Vec2f, 3> _range;
   Real _fmt2v;
+  Id _N;
 };
 
 struct NewConstraintBWaterBondAngleWorklet : vtkm::worklet::WorkletMapField

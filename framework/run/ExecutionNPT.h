@@ -171,6 +171,8 @@ private:
   ArrayHandle<Vec6f> _dihedral_virial_atom;
   ArrayHandle<Vec6f> _spec_coul_virial_atom;
 
+  ArrayHandle<Vec6f> _shake_first_virial_atom;
+
   Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
   Real _pressure_scalar; // computed global pressure scalar
 

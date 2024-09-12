@@ -366,6 +366,14 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   else if (_nearforce_type == "VERLETLIST")
   {
     ComputeVerletlistLJForce(_all_force);
+    //std::ofstream outfile("force.txt");
+    //for (vtkm::Id i = 0; i < _all_force.GetNumberOfValues(); ++i)
+    //{
+    //  auto _all_force_values = _all_force.ReadPortal().Get(i);
+    //  outfile << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
+    //          << std::endl;
+    //}
+    //outfile.close();
   }
   else if (_nearforce_type == "ORIGINAL")
   {
@@ -408,10 +416,10 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
 
   // forcebond
   vtkm::cont::ArrayHandle<Vec3f> forcebond;
-  vtkm::cont::ArrayHandle<Vec6f> bond_virial_temp;
+  //vtkm::cont::ArrayHandle<Vec6f> bond_virial_temp;
   vtkm::cont::ArrayHandle<Real> bond_energy;
   auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
-  auto&& bond_virial_group = vtkm::cont::make_ArrayHandleGroupVec<2>(bond_virial_temp);
+  //auto&& bond_virial_group = vtkm::cont::make_ArrayHandleGroupVec<2>(bond_virial_temp);
   Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _box },
             bond_type,
             bondlist_group,
@@ -420,7 +428,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
             _position,
             forcebond_group,
             bond_energy,
-            bond_virial_group,
+            _bond_virial_atom,
             _locator);
 
 
@@ -463,20 +471,20 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
               reduce_force_bond);
 
 
-    //append bond_virial
-    std::vector<Vec6f> new_bond_virial(original_number);
-    memcpy(&new_bond_virial[0],
-           bond_virial_temp.ReadPortal().GetArray(),
-           original_number * sizeof(Vec6f));
+    ////append bond_virial
+    //std::vector<Vec6f> new_bond_virial(original_number);
+    //memcpy(&new_bond_virial[0],
+    //       bond_virial_temp.ReadPortal().GetArray(),
+    //       original_number * sizeof(Vec6f));
 
-    std::vector<Vec6f> value_virial(atom_id_number, Vec6f{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
-    new_bond_virial.insert(new_bond_virial.end(), value_virial.begin(), value_virial.end());
+    //std::vector<Vec6f> value_virial(atom_id_number, Vec6f{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
+    //new_bond_virial.insert(new_bond_virial.end(), value_virial.begin(), value_virial.end());
 
-    
-    Invoker{}(MolecularWorklet::ReduceVirialWorklet{},
-              keys_bond,
-              vtkm::cont::make_ArrayHandle(new_bond_virial),
-              _bond_virial_atom);
+    //
+    //Invoker{}(MolecularWorklet::ReduceVirialWorklet{},
+    //          keys_bond,
+    //          vtkm::cont::make_ArrayHandle(new_bond_virial),
+    //          _bond_virial_atom);
   }
   else
   {
@@ -502,9 +510,9 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
   // force_angle
   vtkm::cont::ArrayHandle<Vec3f> force_angle;
   vtkm::cont::ArrayHandle<Real> angle_energy;
-  vtkm::cont::ArrayHandle<Vec6f> virial_angle_temp;
+  //vtkm::cont::ArrayHandle<Vec6f> virial_angle_temp;
   auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
-  auto&& virialangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(virial_angle_temp);
+  //auto&& virialangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(virial_angle_temp);
 
   Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _box },
             angle_type,
@@ -514,7 +522,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
             _position,
             forceangle_group,
             angle_energy,
-            virialangle_group,
+            _angle_virial_atom,
             _locator);
 
   //  std::cout << _angle_virial_atom.GetNumberOfValues() << std::endl;
@@ -562,19 +570,19 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
               reduce_force_angle);
 
 
-     //append virial bond
-    std::vector<Vec6f> new_virial_angle(original_number);
-    memcpy(&new_virial_angle[0],
-           virial_angle_temp.ReadPortal().GetArray(),
-           original_number * sizeof(Vec6f));
-    std::vector<Vec6f> value_virial(atom_id_number, Vec6f{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
-    new_virial_angle.insert(new_virial_angle.end(), value_virial.begin(), value_virial.end());
+  //   //append virial bond
+  //  std::vector<Vec6f> new_virial_angle(original_number);
+  //  memcpy(&new_virial_angle[0],
+  //         virial_angle_temp.ReadPortal().GetArray(),
+  //         original_number * sizeof(Vec6f));
+  //  std::vector<Vec6f> value_virial(atom_id_number, Vec6f{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
+  //  new_virial_angle.insert(new_virial_angle.end(), value_virial.begin(), value_virial.end());
 
-    
-    Invoker{}(MolecularWorklet::ReduceVirialWorklet{},
-              keys_angle,
-              vtkm::cont::make_ArrayHandle(new_virial_angle),
-              _angle_virial_atom);
+  //  
+  //  Invoker{}(MolecularWorklet::ReduceVirialWorklet{},
+  //            keys_angle,
+  //            vtkm::cont::make_ArrayHandle(new_virial_angle),
+  //            _angle_virial_atom);
   }
   else
   {
@@ -869,6 +877,7 @@ void ExecutionNVT::TimeIntegration() {}
 
 void ExecutionNVT::ConstraintA()
 {
+  auto N = _position.GetNumberOfValues();
   auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
   auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
 
@@ -882,14 +891,15 @@ void ExecutionNVT::ConstraintA()
   auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
 
   Invoker{}(
-    MolecularWorklet::NewConstraintAWaterBondAngleWorklet{ _box, _dt, _unit_factor._fmt2v, range },
+    MolecularWorklet::NewConstraintAWaterBondAngleWorklet{ N,_box, _dt, _unit_factor._fmt2v, range },
     anglelist_group,
     _old_position,
     _old_velocity,
     _all_force,
     _mass,
     position_flag,
-    _locator);
+    _locator,
+    _shake_first_virial_atom);
 
   vtkm::cont::ArrayCopy(_old_position, _position);
   vtkm::cont::ArrayCopy(_old_velocity, _velocity);
@@ -1316,26 +1326,26 @@ void ExecutionNVT::ComputeVirial()
              + bond_virial + angle_virial + dihedral_virial;
       
 
-     std::ofstream outfilebond("bond_virial.txt");
-    for (vtkm::Id i = 0; i < _bond_virial_atom.GetNumberOfValues(); ++i)
-    {
-       auto virial_values = _bond_virial_atom.ReadPortal().Get(i);
-       outfilebond << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
-                   << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
-                   << std::endl;
-    }
-    outfilebond.close();
+    // std::ofstream outfilebond("bond_virial.txt");
+    //for (vtkm::Id i = 0; i < _bond_virial_atom.GetNumberOfValues(); ++i)
+    //{
+    //   auto virial_values = _bond_virial_atom.ReadPortal().Get(i);
+    //   outfilebond << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+    //               << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
+    //               << std::endl;
+    //}
+    //outfilebond.close();
 
 
-    std::ofstream outfileangle("angle_virial.txt");
-    for (vtkm::Id i = 0; i < _angle_virial_atom.GetNumberOfValues(); ++i)
-    {
-       auto virial_values = _angle_virial_atom.ReadPortal().Get(i);
-       outfileangle << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
-                    << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
-                    << std::endl;
-    }
-    outfileangle.close();
+    //std::ofstream outfileangle("angle_virial.txt");
+    //for (vtkm::Id i = 0; i < _angle_virial_atom.GetNumberOfValues(); ++i)
+    //{
+    //   auto virial_values = _angle_virial_atom.ReadPortal().Get(i);
+    //   outfileangle << virial_values[0] << " " << virial_values[1] << " " << virial_values[2] << " "
+    //                << virial_values[3] << " " << virial_values[4] << " " << virial_values[5]
+    //                << std::endl;
+    //}
+    //outfileangle.close();
 
     //std::ofstream outfilespec_coul("spec_coul_virial.txt");
     //for (vtkm::Id i = 0; i < _spec_coul_virial_atom.GetNumberOfValues(); ++i)
