@@ -456,4 +456,21 @@ namespace RunWorklet
      void Lamda2X(const Vec6f& h,
                   const vtkm::Vec<vtkm::Range, 3>& range,
                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& position);
+
+     void UnWarpPostion(const Vec3f& _box,
+         const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
+         vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position);
+
+     void ComputeCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+         const vtkm::cont::ArrayHandle<Real>& mass,
+         vtkm::cont::ArrayHandle<vtkm::Vec3f>& com);
+
+     void ComputeVCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
+         const vtkm::cont::ArrayHandle<Real>& mass,
+         vtkm::cont::ArrayHandle<vtkm::Vec3f>& vcom);
+
+     void ComputeOmega(const Vec3f& com,
+                       const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+                      const vtkm::cont::ArrayHandle<Real>& mass,
+                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& omega);
  }

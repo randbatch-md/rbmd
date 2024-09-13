@@ -2137,3 +2137,38 @@ void ExecutionNPT::ReMap()
   lamda2x(n);
 
 }
+
+void ExecutionNPT::ComputePCOM()
+{
+
+    auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
+    RunWorklet::UnWarpPostion(_box, position_flag, _position);
+
+    RunWorklet::ComputeCOM(_position, _mass, _com);
+
+    Vec3f com_all = vtkm::cont::Algorithm::Reduce( _com, vtkm::TypeTraits<Vec3f>::ZeroInitialization());
+    Real mass_all = vtkm::cont::Algorithm::Reduce(_mass, vtkm::TypeTraits<Real>::ZeroInitialization());
+    com_all = com_all / mass_all;
+
+    //std::cout<< "mass_all="<<  mass_all  << ",com_all=" << com_all << std::endl;
+
+    std::ofstream outfile("com_all.txt");
+    outfile << mass_all <<  " "  << com_all[0] << " " << com_all[1] << " " << com_all[2] << std::endl;
+    outfile.close();
+}
+
+void ExecutionNPT::ComputeVCOM()
+{
+    RunWorklet::ComputeVCOM(_velocity, _mass, _vcom);
+
+    Vec3f vcom_all = vtkm::cont::Algorithm::Reduce(_vcom, vtkm::TypeTraits<Vec3f>::ZeroInitialization());
+    Real mass_all = vtkm::cont::Algorithm::Reduce(_mass, vtkm::TypeTraits<Real>::ZeroInitialization());
+    vcom_all = vcom_all / mass_all;
+
+
+}
+
+void ExecutionNPT::FixMomentum()
+{
+
+}

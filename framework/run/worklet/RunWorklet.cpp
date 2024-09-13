@@ -11,6 +11,92 @@
 
 namespace RunWorklet
 {
+    struct UnWarpPostionWorklet : vtkm::worklet::WorkletMapField
+    {
+        UnWarpPostionWorklet(const Vec3f& box)
+            : _box(box)
+        {
+        }
+
+        using ControlSignature = void(FieldIn position_flag,
+            FieldInOut unwarp_position);
+        using ExecutionSignature = void(_1, _2);
+
+        template<typename PositionFlagType>
+        VTKM_EXEC void operator()(const PositionFlagType& position_flag,
+            Vec3f& unwarp_position) const
+        {
+            Vec3f current_pts_temp;
+
+            current_pts_temp[0] = position_flag[0] * _box[0];
+            current_pts_temp[1] = position_flag[1] * _box[1];
+            current_pts_temp[2] = position_flag[2] * _box[2];
+
+            unwarp_position += current_pts_temp;
+
+        }
+
+        Vec3f _box;
+    };
+
+    struct ComputeCOMWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputeCOMWorklet()
+        {
+        }
+
+        using ControlSignature = void( FieldIn unwarp_position,
+                                       FieldIn mass,
+                                       FieldOut com);
+        using ExecutionSignature = void(_1, _2,_3);
+
+        template<typename UnWarpPositionType, typename MassType>
+        VTKM_EXEC void operator()(const UnWarpPositionType& unwarp_position,
+                                  const MassType& mass,
+                                  Vec3f& com) const
+        {
+            com[0] = unwarp_position[0] * mass;
+            com[1] = unwarp_position[1] * mass;
+            com[2] = unwarp_position[2] * mass;
+        }
+
+    };
+
+    struct ComputOmegaWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputOmegaWorklet(Vec3f& com)
+            :_com(com)
+        {
+        }
+
+        using ControlSignature = void(FieldIn unwarp_position,
+                                      FieldIn mass,
+                                      FieldOut omega);
+        using ExecutionSignature = void(_1, _2,_3);
+
+        template<typename UnWarpPositionTyp, typename MassType>
+        VTKM_EXEC void operator()(const UnWarpPositionTyp& unwarp_position,
+                                  const  MassType& mass,
+                                   Vec3f& omega) const
+        {
+           Vec6f inertia{0,0,0,0,0,0};
+           Real dx, dy, dz;
+           dx = unwarp_position[0] - _com;
+           dy = unwarp_position[1] - _com;
+           dz = unwarp_position[2] - _com;
+
+           inertia[0] += mass * (dy * dy + dz * dz);
+           inertia[1] += mass * (dx * dx + dz * dz);
+           inertia[2] += mass * (dx * dx + dy * dy);
+           inertia[3] -= mass * dx * dy;
+           inertia[4] -= mass * dy * dz;
+           inertia[5] -= mass * dx * dz;
+
+        }
+        Vec3f _com;
+    };
+
+
     struct ComputeLJVirialWorklet : vtkm::worklet::WorkletMapField
     {
   ComputeLJVirialWorklet(const Real& cut_off, const Vec3f& box)
@@ -3499,4 +3585,33 @@ namespace RunWorklet
      {
          vtkm::cont::Invoker{}(Lamda2XWorklet{ h, range }, position);
      } 
+
+      void UnWarpPostion(const Vec3f& _box,
+          const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
+          vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position)
+      {
+          vtkm::cont::Invoker{}(UnWarpPostionWorklet{ _box }, position_flag, unwarp_position);
+      }
+
+      void ComputeCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+                      const vtkm::cont::ArrayHandle<Real>& mass,
+                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& com)
+      {
+          vtkm::cont::Invoker{}(ComputeCOMWorklet{}, unwarp_position, mass, com);
+      }
+
+      void ComputeVCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
+          const vtkm::cont::ArrayHandle<Real>& mass,
+          vtkm::cont::ArrayHandle<vtkm::Vec3f>& vcom)
+      {
+          vtkm::cont::Invoker{}(ComputeCOMWorklet{}, velocity, mass, vcom);
+      }
+
+      //void ComputeOmega(const Vec3f& com,
+      //    const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+      //    const vtkm::cont::ArrayHandle<Real>& mass,
+      //    vtkm::cont::ArrayHandle<vtkm::Vec3f>& omega);
+      //{
+      //    vtkm::cont::Invoker{}(ComputOmegaWorklet{ com }, unwarp_position, mass, omega);
+      //}
  }

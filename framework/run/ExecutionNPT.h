@@ -89,8 +89,14 @@ private:
   void NH_V_Press();
   void ReMap();
 
+  void ComputePCOM();
+  void ComputeVCOM();
+  void FixMomentum();
+
 
 private:
+  ArrayHandle<Vec3f>   _com;
+  ArrayHandle<Vec3f>   _vcom;
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
   ArrayHandle<Vec6f> _LJVirial;
