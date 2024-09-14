@@ -70,21 +70,28 @@ namespace RunWorklet
         }
 
         using ControlSignature = void(FieldIn unwarp_position,
+                                      FieldIn velocity,
                                       FieldIn mass,
                                       FieldOut omega);
-        using ExecutionSignature = void(_1, _2,_3);
+        using ExecutionSignature = void(_1, _2,_3, _4);
 
-        template<typename UnWarpPositionTyp, typename MassType>
+        template<typename UnWarpPositionTyp, 
+                  typename VelocityType, 
+                  typename MassType>
         VTKM_EXEC void operator()(const UnWarpPositionTyp& unwarp_position,
+                                  const VelocityType& velocity,
                                   const  MassType& mass,
                                    Vec3f& omega) const
         {
            Vec6f inertia{0,0,0,0,0,0};
+           Vec3f angmom{ 0,0,0 };         // 角动量
            Real dx, dy, dz;
+           // 计算质心与原子坐标的差值
            dx = unwarp_position[0] - _com;
            dy = unwarp_position[1] - _com;
            dz = unwarp_position[2] - _com;
 
+           // 计算惯性张量
            inertia[0] += mass * (dy * dy + dz * dz);
            inertia[1] += mass * (dx * dx + dz * dz);
            inertia[2] += mass * (dx * dx + dy * dy);
@@ -92,6 +99,54 @@ namespace RunWorklet
            inertia[4] -= mass * dy * dz;
            inertia[5] -= mass * dx * dz;
 
+           //// 计算角动量 L = r x p
+           //angmom[0] += mass * (dy * velocity[2] - dz * velocity[1]);
+           //angmom[1] += mass * (dz * velocity[0] - dx * velocity[2]);
+           //angmom[2] += mass * (dx * velocity[1] - dy * velocity[0]);
+
+           //// 计算惯性张量的行列式
+           //Real determinant = inertia[0] * (inertia[1] * inertia[2] - inertia[4] * inertia[4]) +
+           //    inertia[3] * (inertia[4] * inertia[5] - inertia[3] * inertia[2]) +
+           //    inertia[5] * (inertia[3] * inertia[4] - inertia[1] * inertia[5]);
+
+           //// 计算惯性张量的逆矩阵并计算 omega
+           //Real EPSILON =1.0e-6;
+           //if (determinant > EPSILON)
+           //{
+           //    // 惯性张量逆矩阵的计算
+           //    Vec3f inv_inertia[3];
+           //    inv_inertia[0][0] = inertia[1] * inertia[2] - inertia[4] * inertia[4];
+           //    inv_inertia[0][1] = -(inertia[3] * inertia[2] - inertia[5] * inertia[4]);
+           //    inv_inertia[0][2] = inertia[3] * inertia[4] - inertia[5] * inertia[1];
+
+           //    inv_inertia[1][0] = -(inertia[0] * inertia[2] - inertia[5] * inertia[5]);
+           //    inv_inertia[1][1] = inertia[0] * inertia[2] - inertia[5] * inertia[3];
+           //    inv_inertia[1][2] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
+
+           //    inv_inertia[2][0] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
+           //    inv_inertia[2][1] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
+           //    inv_inertia[2][2] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
+
+           //    // 乘以行列式的倒数
+           //    Real invdet = 1.0 / determinant;
+           //    for (int i = 0; i < 3; i++)
+           //    {
+           //        for (int j = 0; j < 3; j++)
+           //        {
+           //            inv_inertia[i][j] *= invdet;
+           //        }
+           //    }
+
+           //    // 使用逆矩阵求解 omega = I^-1 * L
+           //    omega[0] = inv_inertia[0][0] * angmom[0] + inv_inertia[0][1] * angmom[1] + inv_inertia[0][2] * angmom[2];
+           //    omega[1] = inv_inertia[1][0] * angmom[0] + inv_inertia[1][1] * angmom[1] + inv_inertia[1][2] * angmom[2];
+           //    omega[2] = inv_inertia[2][0] * angmom[0] + inv_inertia[2][1] * angmom[1] + inv_inertia[2][2] * angmom[2];
+           //}
+           //else
+           //{
+           //    // 若惯性张量接近奇异，则使用其他方法计算 omega
+           //    omega = Vec3f{ 0, 0, 0 };  // 这里可以根据具体需求调整
+           //}
         }
         Vec3f _com;
     };

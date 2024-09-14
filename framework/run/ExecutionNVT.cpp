@@ -196,7 +196,7 @@ void ExecutionNVT::UpdateVelocity()
   for (vtkm::Id i = 0; i < _velocity.GetNumberOfValues(); ++i)
   {
       auto _velocity_values = _velocity.ReadPortal().Get(i);
-      outfile << _velocity_values[0] << " " << _velocity_values[1] << " " << _velocity_values[2]
+      outfile << "id" << " " << i << " "<< _velocity_values[0] << " " << _velocity_values[1] << " " << _velocity_values[2]
           << std::endl;
   }
   outfile.close();
@@ -219,6 +219,16 @@ void ExecutionNVT::UpdatePosition()
   ApplyPbc();
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
+
+
+  std::ofstream outfile("_position.txt");
+  for (vtkm::Id i = 0; i < _position.GetNumberOfValues(); ++i)
+  {
+      auto _position_values = _position.ReadPortal().Get(i);
+      outfile <<"id" << " " << i << " " <<_position_values[0] << " " << _position_values[1] << " " << _position_values[2]
+          << std::endl;
+  }
+  outfile.close();
 }
 
 void ExecutionNVT::UpdateVelocityByTempConType()
@@ -383,14 +393,16 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   else if (_nearforce_type == "VERLETLIST")
   {
     ComputeVerletlistLJForce(_all_force);
-    //std::ofstream outfile("force.txt");
-    //for (vtkm::Id i = 0; i < _all_force.GetNumberOfValues(); ++i)
-    //{
-    //  auto _all_force_values = _all_force.ReadPortal().Get(i);
-    //  outfile << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-    //          << std::endl;
-    //}
-    //outfile.close();
+
+    std::ofstream outfile("force.txt");
+    for (vtkm::Id i = 0; i < _all_force.GetNumberOfValues(); ++i)
+    {
+      auto _all_force_values = _all_force.ReadPortal().Get(i);
+      outfile <<"id" << " "<< i << " " << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
+              << std::endl;
+    }
+    outfile.close();
+
   }
   else if (_nearforce_type == "ORIGINAL")
   {
@@ -820,6 +832,8 @@ void ExecutionNVT::ComputeTempe()
   {
     _tempT = 0.5 * _tempT_sum / ((3 * n - n - 3) * temperature_kB / 2.0);
   }
+  std::cout << "_tempT=" << _tempT << std::endl;
+
   _para.SetParameter(PARA_TEMPT_SUM, _tempT_sum);
   _para.SetParameter(PARA_TEMPT, _tempT);
 }
