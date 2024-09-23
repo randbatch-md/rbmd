@@ -458,19 +458,29 @@ namespace RunWorklet
                   vtkm::cont::ArrayHandle<vtkm::Vec3f>& position);
 
      void UnWarpPostion(const Vec3f& _box,
-         const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
-         vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position);
+                        const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
+                        vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position);
 
      void ComputeCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
-         const vtkm::cont::ArrayHandle<Real>& mass,
-         vtkm::cont::ArrayHandle<vtkm::Vec3f>& com);
+                     const vtkm::cont::ArrayHandle<Real>& mass,
+                     vtkm::cont::ArrayHandle<vtkm::Vec3f>& com);
 
      void ComputeVCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
-         const vtkm::cont::ArrayHandle<Real>& mass,
-         vtkm::cont::ArrayHandle<vtkm::Vec3f>& vcom);
-
-     void ComputeOmega(const Vec3f& com,
-                       const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
                       const vtkm::cont::ArrayHandle<Real>& mass,
-                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& omega);
+                      vtkm::cont::ArrayHandle<vtkm::Vec3f>& vcom);
+
+     void ComputeOmega(const vtkm::Vec3f& com,
+                       const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+                       const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
+                       const vtkm::cont::ArrayHandle<Real>& mass,
+                       const ContForceFunction& force_function,
+                         vtkm::cont::ArrayHandle<vtkm::Vec3f>& omega);
+
+     void FixMomentum(const vtkm::Vec3f& pcom,
+                      const vtkm::Vec3f& vcom,
+                      const vtkm::Vec3f& omega,
+                      const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+                      const vtkm::cont::ArrayHandle<Real>& mass,
+                      const ContForceFunction& force_function,
+                      vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity);
  }

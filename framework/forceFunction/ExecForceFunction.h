@@ -16,6 +16,7 @@ public:
   using IdPortalTypeId = typename vtkm::cont::ArrayHandle<vtkm::Id>::ReadPortalType;
   using IdPortalTypeReal = typename vtkm::cont::ArrayHandle<Real>::ReadPortalType;
   using IdPortalTypeVec2 = typename vtkm::cont::ArrayHandle<vtkm::Vec2i>::ReadPortalType;
+  using Matrix3x3 = vtkm::Vec<vtkm::Vec3f, 3>; // 定义 3x3 矩阵
 
   ExecForceFunction(const Real cut_off,
                     const Real& alpha,
@@ -45,6 +46,200 @@ public:
       _sum_gauss = Compute_S();
   }
  
+
+  VTKM_EXEC void angmom_to_omega(const Vec3f& m,
+                                  const Vec3f& ex,
+                                  const Vec3f& ey,
+                                  const Vec3f& ez,
+                                  const Vec3f& idiag,
+                                  Vec3f& w) const
+  {
+     Vec3f wbody;
+
+      // 计算主体坐标系下的角速度 wbody
+      wbody[0] = (idiag[0] == 0.0) ? 0.0 : (vtkm::Dot(m, ex) / idiag[0]);
+      wbody[1] = (idiag[1] == 0.0) ? 0.0 : (vtkm::Dot(m, ey) / idiag[1]);
+      wbody[2] = (idiag[2] == 0.0) ? 0.0 : (vtkm::Dot(m, ez) / idiag[2]);
+
+      // 将主体坐标系下的角速度转换为空间坐标系下的角速度
+      w[0] = wbody[0] * ex[0] + wbody[1] * ey[0] + wbody[2] * ez[0];
+      w[1] = wbody[0] * ex[1] + wbody[1] * ey[1] + wbody[2] * ez[1];
+      w[2] = wbody[0] * ex[2] + wbody[1] * ey[2] + wbody[2] * ez[2];
+  }
+
+  VTKM_EXEC  Id jacobi3(Matrix3x3& mat, Vec3f& eval, Matrix3x3& evec) const
+  {
+      // 1. 复制输入矩阵以便后续修改
+      Matrix3x3 mat_cpy = mat;
+
+      // 2. 初始化特征值、特征向量
+      eval = Vec3f(0.0f, 0.0f, 0.0f); // 存储特征值
+      evec = Matrix3x3();                   // 存储特征向量
+
+      // 3. 调用 Jacobi 迭代法进行对角化
+      // max_num_sweeps=50;
+      Id ierror = Diagonalize(mat_cpy, eval, evec, true, 50);
+
+      if (ierror != 0) {
+          return ierror;  // 如果计算失败，则返回错误代码
+      }
+
+      // 4. 转置特征向量矩阵
+      for (vtkm::Id i = 0; i < 3; i++) {
+          for (vtkm::Id j = i + 1; j < 3; j++) {
+              std::swap(evec[i][j], evec[j][i]);
+          }
+      }
+
+      return 0;  // 成功完成
+  }
+
+  // Jacobi 对角化函数实现
+  VTKM_EXEC  Id Diagonalize(const Matrix3x3& mat, Vec3f& eval, Matrix3x3& evec, bool calc_evec, int max_num_sweeps) const
+  {
+      // 初始化：将输入矩阵拷贝到本地矩阵
+      Matrix3x3 M = mat;
+
+      // 初始化特征值向量和特征向量矩阵
+      eval = Vec3f(0.0, 0.0, 0.0);
+      evec = Matrix3x3();  // 初始化为单位矩阵
+      if (calc_evec) 
+      {
+          for (vtkm::Id i = 0; i < 3; i++) 
+          {
+              for (vtkm::Id j = 0; j < 3; j++) {
+                  evec[i][j] = (i == j) ? 1.0f : 0.0f;
+              }
+          }
+      }
+
+      // 初始化最大值索引
+     Id3 max_idx_row = { MaxEntryRow(M, 0), MaxEntryRow(M, 1), MaxEntryRow(M, 2) };
+
+      // 迭代过程
+      Id n_iters;
+      Id max_num_iters = max_num_sweeps * 3 * (3 - 1) / 2;
+      for (n_iters = 0; n_iters < max_num_iters; ++n_iters) {
+          Id i, j;
+          MaxEntry(M, i, j);  // 找到最大值的位置
+
+          // 检查是否接近零
+          if ((M[i][i] + M[i][j] == M[i][i]) && (M[j][j] + M[i][j] == M[j][j])) {
+              M[i][j] = 0.0;
+              max_idx_row[i] = MaxEntryRow(M, i);
+          }
+
+          // 如果 M[i][j] 已经为 0，则停止迭代
+          if (M[i][j] == 0.0) {
+              break;
+          }
+
+          // 否则，计算旋转矩阵并应用旋转
+          vtkm::FloatDefault c, s;
+          CalcRot(M, i, j, c, s);  // 计算旋转矩阵参数
+          ApplyRot(M, i, j, c, s); // 应用旋转到矩阵 M
+
+          // 如果需要计算特征向量，则应用旋转到特征向量矩阵
+          if (calc_evec) {
+              ApplyRotLeft(evec, i, j, c, s);
+          }
+      }
+
+      // 提取对角线元素作为特征值
+      for (Id i = 0; i < 3; ++i) {
+          eval[i] = M[i][i];
+      }
+
+      // 对特征值和特征向量进行排序
+      SortRows(eval, evec);
+
+      return (n_iters == max_num_iters) ? 1 : 0; // 1 表示达到最大迭代次数，0 表示成功
+  }
+
+  // 计算 M 的第 row 行中非对角元素最大值的索引
+  VTKM_EXEC  Id MaxEntryRow(const Matrix3x3& M, Id row) const
+  {
+      vtkm::FloatDefault max_val = 0.0;
+      Id max_idx = row;
+      for (Id j = 0; j < 3; ++j) {
+          if (j != row && vtkm::Abs(M[row][j]) > max_val) {
+              max_val = vtkm::Abs(M[row][j]);
+              max_idx = j;
+          }
+      }
+      return max_idx;
+  }
+
+  // 找到矩阵中最大的非对角元素
+  VTKM_EXEC void MaxEntry(const Matrix3x3& M, Id& i, Id& j) const
+  {
+      vtkm::FloatDefault max_val = 0.0;
+      for (Id row = 0; row < 3; ++row) {
+          for (Id col = row + 1; col < 3; ++col) {
+              vtkm::FloatDefault val = vtkm::Abs(M[row][col]);
+              if (val > max_val) {
+                  max_val = val;
+                  i = row;
+                  j = col;
+              }
+          }
+      }
+  }
+
+  // 计算旋转矩阵参数 c 和 s
+  VTKM_EXEC void CalcRot(Matrix3x3& M, Id i, Id j, vtkm::FloatDefault& c, vtkm::FloatDefault& s) const
+  {
+      vtkm::FloatDefault theta = (M[j][j] - M[i][i]) / (2.0 * M[i][j]);
+      vtkm::FloatDefault t;
+
+      if (theta >= 0.0) {
+          t = 1.0 / (theta + vtkm::Sqrt(1.0 + theta * theta));
+      }
+      else {
+          t = -1.0 / (-theta + vtkm::Sqrt(1.0 + theta * theta));
+      }
+
+      c = 1.0 / vtkm::Sqrt(1.0 + t * t);
+      s = t * c;
+  }
+
+  // 应用旋转到矩阵 M
+  VTKM_EXEC  void ApplyRot(Matrix3x3& M, Id i, Id j, vtkm::FloatDefault c, vtkm::FloatDefault s) const
+  {
+      for (Id k = 0; k < 3; ++k) {
+          vtkm::FloatDefault Mik = M[i][k];
+          vtkm::FloatDefault Mjk = M[j][k];
+          M[i][k] = c * Mik - s * Mjk;
+          M[j][k] = s * Mik + c * Mjk;
+      }
+  }
+
+  // 应用旋转到特征向量矩阵 evec
+  VTKM_EXEC  void ApplyRotLeft(Matrix3x3& evec, Id i, Id j, vtkm::FloatDefault c, vtkm::FloatDefault s) const
+  {
+      for (Id k = 0; k < 3; ++k) {
+          vtkm::FloatDefault eik = evec[i][k];
+          vtkm::FloatDefault ejk = evec[j][k];
+          evec[i][k] = c * eik - s * ejk;
+          evec[j][k] = s * eik + c * ejk;
+      }
+  }
+
+  // 对特征值和特征向量排序
+  VTKM_EXEC void SortRows(Vec3f& eval, Matrix3x3& evec) const
+  {
+      for (Id i = 0; i < 3; ++i) {
+          for (Id j = i + 1; j < 3; ++j) {
+              if (eval[j] > eval[i]) {
+                  std::swap(eval[i], eval[j]);
+                  for (Id k = 0; k < 3; ++k) {
+                      std::swap(evec[i][k], evec[j][k]);
+                  }
+              }
+          }
+      }
+  }
+
   VTKM_EXEC Vec6f ComputeLJVirial(const Vec3f& r_ij,
                                   const Real& eps_i,
                                   const Real& eps_j,

@@ -2146,14 +2146,14 @@ void ExecutionNPT::ComputePCOM()
 
     RunWorklet::ComputeCOM(_position, _mass, _com);
 
-    Vec3f com_all = vtkm::cont::Algorithm::Reduce( _com, vtkm::TypeTraits<Vec3f>::ZeroInitialization());
-    Real mass_all = vtkm::cont::Algorithm::Reduce(_mass, vtkm::TypeTraits<Real>::ZeroInitialization());
-    com_all = com_all / mass_all;
+    _com_all = vtkm::cont::Algorithm::Reduce(_com, vtkm::TypeTraits<Vec3f>::ZeroInitialization());
+    _mass_all = vtkm::cont::Algorithm::Reduce(_mass, vtkm::TypeTraits<Real>::ZeroInitialization());
+    _com_all = _com_all / _mass_all;
 
     //std::cout<< "mass_all="<<  mass_all  << ",com_all=" << com_all << std::endl;
 
     std::ofstream outfile("com_all.txt");
-    outfile << mass_all <<  " "  << com_all[0] << " " << com_all[1] << " " << com_all[2] << std::endl;
+    outfile << "com_all:" << " " << _com_all[0] << " " << _com_all[1] << " " << _com_all[2] << std::endl;
     outfile.close();
 }
 
@@ -2161,14 +2161,23 @@ void ExecutionNPT::ComputeVCOM()
 {
     RunWorklet::ComputeVCOM(_velocity, _mass, _vcom);
 
-    Vec3f vcom_all = vtkm::cont::Algorithm::Reduce(_vcom, vtkm::TypeTraits<Vec3f>::ZeroInitialization());
-    Real mass_all = vtkm::cont::Algorithm::Reduce(_mass, vtkm::TypeTraits<Real>::ZeroInitialization());
-    vcom_all = vcom_all / mass_all;
+    _vcom_all = vtkm::cont::Algorithm::Reduce(_vcom, vtkm::TypeTraits<Vec3f>::ZeroInitialization());
+    _mass_all = vtkm::cont::Algorithm::Reduce(_mass, vtkm::TypeTraits<Real>::ZeroInitialization());
+    _vcom_all = _vcom_all / _mass_all;
 
 
 }
 
 void ExecutionNPT::FixMomentum()
 {
+    auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
+    RunWorklet::UnWarpPostion(_box, position_flag, _unwarp_position);
 
+    RunWorklet::ComputeCOM(_unwarp_position, _mass, _com);
+
+    _com_all = vtkm::cont::Algorithm::Reduce(_com, vtkm::TypeTraits<Vec3f>::ZeroInitialization());
+    _mass_all = vtkm::cont::Algorithm::Reduce(_mass, vtkm::TypeTraits<Real>::ZeroInitialization());
+    _com_all = _com_all / _mass_all;
+
+    RunWorklet::ComputeOmega(_com_all, _unwarp_position,_velocity,_mass, _force_function, _omega);
 }

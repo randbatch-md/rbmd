@@ -8,6 +8,7 @@
 #include "forceFunction/ContForceFunction.h"
 #include "topology/ContTopology.h"
 #include "math/Utiles.h"
+using Matrix3x3 = vtkm::Vec<vtkm::Vec3f, 3>; // 定义 3x3 矩阵
 
 namespace RunWorklet
 {
@@ -64,7 +65,7 @@ namespace RunWorklet
 
     struct ComputOmegaWorklet : vtkm::worklet::WorkletMapField
     {
-        ComputOmegaWorklet(Vec3f& com)
+        ComputOmegaWorklet(const Vec3f& com)
             :_com(com)
         {
         }
@@ -72,8 +73,9 @@ namespace RunWorklet
         using ControlSignature = void(FieldIn unwarp_position,
                                       FieldIn velocity,
                                       FieldIn mass,
+                                      ExecObject force_function,
                                       FieldOut omega);
-        using ExecutionSignature = void(_1, _2,_3, _4);
+        using ExecutionSignature = void(_1, _2,_3, _4,_5);
 
         template<typename UnWarpPositionTyp, 
                   typename VelocityType, 
@@ -81,15 +83,16 @@ namespace RunWorklet
         VTKM_EXEC void operator()(const UnWarpPositionTyp& unwarp_position,
                                   const VelocityType& velocity,
                                   const  MassType& mass,
+                                  const ExecForceFunction& force_function,
                                    Vec3f& omega) const
         {
            Vec6f inertia{0,0,0,0,0,0};
            Vec3f angmom{ 0,0,0 };         // 角动量
-           Real dx, dy, dz;
+
            // 计算质心与原子坐标的差值
-           dx = unwarp_position[0] - _com;
-           dy = unwarp_position[1] - _com;
-           dz = unwarp_position[2] - _com;
+           Real dx = unwarp_position[0] - _com[0];
+           Real dy = unwarp_position[1] - _com[1];
+           Real dz = unwarp_position[2] - _com[2];
 
            // 计算惯性张量
            inertia[0] += mass * (dy * dy + dz * dz);
@@ -100,55 +103,168 @@ namespace RunWorklet
            inertia[5] -= mass * dx * dz;
 
            //// 计算角动量 L = r x p
-           //angmom[0] += mass * (dy * velocity[2] - dz * velocity[1]);
-           //angmom[1] += mass * (dz * velocity[0] - dx * velocity[2]);
-           //angmom[2] += mass * (dx * velocity[1] - dy * velocity[0]);
+           angmom[0] += mass * (dy * velocity[2] - dz * velocity[1]);
+           angmom[1] += mass * (dz * velocity[0] - dx * velocity[2]);
+           angmom[2] += mass * (dx * velocity[1] - dy * velocity[0]);
+
 
            //// 计算惯性张量的行列式
-           //Real determinant = inertia[0] * (inertia[1] * inertia[2] - inertia[4] * inertia[4]) +
-           //    inertia[3] * (inertia[4] * inertia[5] - inertia[3] * inertia[2]) +
-           //    inertia[5] * (inertia[3] * inertia[4] - inertia[1] * inertia[5]);
+           Real determinant, invdeterminant;
+           Vec3f idiag, ex, ey, ez, cross;
+           Matrix3x3  ione,inv_inertia, evectors;
 
-           //// 计算惯性张量的逆矩阵并计算 omega
-           //Real EPSILON =1.0e-6;
-           //if (determinant > EPSILON)
-           //{
-           //    // 惯性张量逆矩阵的计算
-           //    Vec3f inv_inertia[3];
-           //    inv_inertia[0][0] = inertia[1] * inertia[2] - inertia[4] * inertia[4];
-           //    inv_inertia[0][1] = -(inertia[3] * inertia[2] - inertia[5] * inertia[4]);
-           //    inv_inertia[0][2] = inertia[3] * inertia[4] - inertia[5] * inertia[1];
+           determinant = inertia[0] * (inertia[1] * inertia[2] - inertia[4] * inertia[4]) +
+                         inertia[3] * (inertia[4] * inertia[5] - inertia[3] * inertia[2]) +
+                         inertia[5] * (inertia[3] * inertia[4] - inertia[1] * inertia[5]);
 
-           //    inv_inertia[1][0] = -(inertia[0] * inertia[2] - inertia[5] * inertia[5]);
-           //    inv_inertia[1][1] = inertia[0] * inertia[2] - inertia[5] * inertia[3];
-           //    inv_inertia[1][2] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
+           ione[0][0] = inertia[0];
+           ione[1][1] = inertia[1];
+           ione[2][2] = inertia[2];
+           ione[0][1] = ione[1][0] = inertia[3];
+           ione[1][2] = ione[2][1] = inertia[4];
+           ione[0][2] = ione[2][0] = inertia[5];
 
-           //    inv_inertia[2][0] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
-           //    inv_inertia[2][1] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
-           //    inv_inertia[2][2] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
 
-           //    // 乘以行列式的倒数
-           //    Real invdet = 1.0 / determinant;
-           //    for (int i = 0; i < 3; i++)
-           //    {
-           //        for (int j = 0; j < 3; j++)
-           //        {
-           //            inv_inertia[i][j] *= invdet;
-           //        }
-           //    }
+           // 计算惯性张量的逆矩阵并计算 omega
+           Real EPSILON =1.0e-6;
+           if (determinant > EPSILON)
+           {
+               // 惯性张量逆矩阵的计算
 
-           //    // 使用逆矩阵求解 omega = I^-1 * L
-           //    omega[0] = inv_inertia[0][0] * angmom[0] + inv_inertia[0][1] * angmom[1] + inv_inertia[0][2] * angmom[2];
-           //    omega[1] = inv_inertia[1][0] * angmom[0] + inv_inertia[1][1] * angmom[1] + inv_inertia[1][2] * angmom[2];
-           //    omega[2] = inv_inertia[2][0] * angmom[0] + inv_inertia[2][1] * angmom[1] + inv_inertia[2][2] * angmom[2];
-           //}
-           //else
-           //{
-           //    // 若惯性张量接近奇异，则使用其他方法计算 omega
-           //    omega = Vec3f{ 0, 0, 0 };  // 这里可以根据具体需求调整
-           //}
+               inv_inertia[0][0] = inertia[1] * inertia[2] - inertia[4] * inertia[4];
+               inv_inertia[0][1] = -(inertia[3] * inertia[2] - inertia[5] * inertia[4]);
+               inv_inertia[0][2] = inertia[3] * inertia[4] - inertia[5] * inertia[1];
+
+               inv_inertia[1][0] = -(inertia[0] * inertia[2] - inertia[5] * inertia[5]);
+               inv_inertia[1][1] = inertia[0] * inertia[2] - inertia[5] * inertia[3];
+               inv_inertia[1][2] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
+
+               inv_inertia[2][0] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
+               inv_inertia[2][1] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
+               inv_inertia[2][2] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
+
+               // 乘以行列式的倒数
+               invdeterminant = 1.0 / determinant;
+               for (int i = 0; i < 3; i++)
+               {
+                   for (int j = 0; j < 3; j++)
+                   {
+                       inv_inertia[i][j] *= invdeterminant;
+                   }
+               }
+
+               // 使用逆矩阵求解 omega = I^-1 * L
+               omega[0] = inv_inertia[0][0] * angmom[0] + inv_inertia[0][1] * angmom[1] + inv_inertia[0][2] * angmom[2];
+               omega[1] = inv_inertia[1][0] * angmom[0] + inv_inertia[1][1] * angmom[1] + inv_inertia[1][2] * angmom[2];
+               omega[2] = inv_inertia[2][0] * angmom[0] + inv_inertia[2][1] * angmom[1] + inv_inertia[2][2] * angmom[2];
+           }
+           else
+           {
+               //omega = Vec3f{ 0, 0, 0 };  
+               Id ierror = force_function.jacobi3(ione, idiag, evectors);
+               if (ierror)
+               {
+                   printf("Insufficient Jacobi rotations for omega");
+               }
+
+               ex[0] = evectors[0][0];
+               ex[1] = evectors[1][0];
+               ex[2] = evectors[2][0];
+               ey[0] = evectors[0][1];
+               ey[1] = evectors[1][1];
+               ey[2] = evectors[2][1];
+               ez[0] = evectors[0][2];
+               ez[1] = evectors[1][2];
+               ez[2] = evectors[2][2];
+               // 计算叉乘，使用 VTK-m 的 Cross 函数
+               vtkm::Vec3f cross = vtkm::Cross(ex, ey);
+
+               // 使用点积验证右手系, 如果 dot3 < 0 则反转 ez
+               if (vtkm::Dot(cross, ez) < 0.0)
+               {
+                   ez = -ez;  // 直接反转向量
+               }
+
+               // 如果任何惯性矩小于阈值 EPSILON * max，则设为0
+               Real max;
+               max = vtkm::Max(idiag[0], idiag[1]);
+               max = vtkm::Max(max, idiag[2]);
+
+               if (idiag[0] < EPSILON * max) idiag[0] = 0.0;
+               if (idiag[1] < EPSILON * max) idiag[1] = 0.0;
+               if (idiag[2] < EPSILON * max) idiag[2] = 0.0;
+               force_function.angmom_to_omega(angmom, ex, ey, ez, idiag, omega);
+
+           }
         }
         Vec3f _com;
+    };
+
+    struct FixMomentumWorklet : vtkm::worklet::WorkletMapField
+    {
+        FixMomentumWorklet(const Vec3f& pcom, const Vec3f& vcom, const Vec3f& omega )
+            :_pcom(pcom)
+            , _vcom(vcom)
+            , _omega(omega)
+        {
+        }
+
+        using ControlSignature = void(FieldIn unwarp_position,
+                                      FieldIn mass,
+                                      ExecObject force_function,
+                                      FieldInOut velocity);
+        using ExecutionSignature = void(_1, _2, _3, _4);
+
+        template<typename UnWarpPositionTyp,
+                 typename MassType>
+        VTKM_EXEC void operator()(const UnWarpPositionTyp& unwarp_position,
+                                  const  MassType& mass,
+                                  const ExecForceFunction& force_function,
+                                  Vec3f& velocity) const
+        {
+            //Id linear = angular = rescale = 1;
+            //Id xflag = yflag = zflag = 1;
+            //Real  dx, dy, dz;
+
+            //Vec3f angmom;
+
+            //Real ke =0 .0;
+
+
+            ////
+            //ke = mass * (velocity[0] * velocity[0] + 
+            //              velocity[1] * velocity[1] + velocity[2] * velocity[2]);
+
+
+            //if (linear) 
+            //{
+            //    if (xflag) velocity[0] -= _vcom[0];
+            //    if (yflag) velocity[1] -= _vcom[1];
+            //    if (zflag) velocity[2] -= _vcom[2];
+
+            //}
+            ////angmom
+            //if (angular)
+            //{
+            //    dx = unwarp_position[0] - _pcom[0];
+            //    dy = unwarp_position[1] - _pcom[1];
+            //    dz = unwarp_position[2] - _pcom[2];
+
+            //    angmom[0] = mass * (dy * velocity[2] - dz * velocity[1]);
+            //    angmom[1] = mass * (dz * velocity[0] - dx * velocity[2]);
+            //    angmom[2] = mass * (dx * velocity[1] - dy * velocity[0]);
+            //}
+
+            //if (rescale)
+            //{
+
+            //}
+
+
+        }
+        Vec3f _pcom;
+        Vec3f _vcom;
+        Vec3f _omega;
     };
 
 
@@ -3662,11 +3778,25 @@ namespace RunWorklet
           vtkm::cont::Invoker{}(ComputeCOMWorklet{}, velocity, mass, vcom);
       }
 
-      //void ComputeOmega(const Vec3f& com,
-      //    const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
-      //    const vtkm::cont::ArrayHandle<Real>& mass,
-      //    vtkm::cont::ArrayHandle<vtkm::Vec3f>& omega);
-      //{
-      //    vtkm::cont::Invoker{}(ComputOmegaWorklet{ com }, unwarp_position, mass, omega);
-      //}
+      void ComputeOmega(const vtkm::Vec3f& com,
+          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
+          const vtkm::cont::ArrayHandle<Real>& mass,
+          const ContForceFunction& force_function,
+          vtkm::cont::ArrayHandle<vtkm::Vec3f>& omega)
+      {
+          vtkm::cont::Invoker{}(ComputOmegaWorklet{ com }, unwarp_position, velocity, mass, force_function, omega);
+      }
+
+      void FixMomentum(const vtkm::Vec3f& pcom,
+          const vtkm::Vec3f& vcom,
+          const vtkm::Vec3f& omega,
+          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+          const vtkm::cont::ArrayHandle<Real>& mass,
+          const ContForceFunction& force_function,
+          vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity)
+      {
+          vtkm::cont::Invoker{}(FixMomentumWorklet{ pcom,vcom ,omega }, unwarp_position, mass, force_function, velocity);
+      }
+
  }

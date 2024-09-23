@@ -19,6 +19,7 @@
 #include <vtkm/worklet/Keys.h>
 #include <vtkm/worklet/WorkletMapField.h>
 #include <vtkm/worklet/WorkletReduceByKey.h>
+#include <chrono>  // 添加计时功能的库
 
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
@@ -71,6 +72,9 @@ void ExecutionNVT::PreSolve()
 
 void ExecutionNVT::Solve()
 {
+  // 记录开始时间
+  auto start_time = std::chrono::high_resolution_clock::now();
+
   // stage1:
   UpdateVelocity();
 
@@ -96,10 +100,10 @@ void ExecutionNVT::Solve()
   ComputeTempe();
   UpdateVelocityByTempConType();
 
-  if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) != "BERENDSEN")
-  {
-    Compute_Pressure_Scalar();
-  }
+  //if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) != "BERENDSEN")
+  //{
+  //  Compute_Pressure_Scalar();
+  //}
 
 
   if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "BERENDSEN")
@@ -107,6 +111,13 @@ void ExecutionNVT::Solve()
     fix_press_berendsen();
     //fix_press_berendsen_scale();
   }
+
+  // 记录结束时间
+  auto end_time = std::chrono::high_resolution_clock::now();
+
+  // 计算耗时
+  std::chrono::duration<Real> duration = end_time - start_time;
+  std::cout << " time pre step: " << duration.count() << " seconds" << std::endl;
 }
 
 void ExecutionNVT::PostSolve() {}

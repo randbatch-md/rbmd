@@ -237,4 +237,10 @@ private:
   Real xprd_half, yprd_half, zprd_half; // half dimensions
   Vec3f prd;                            // array form of dimensions
   Vec3f prd_half;                       // array form of half dimensions
+
+  ArrayHandle<Vec3f> _omega;
+  ArrayHandle<Vec3f> _unwarp_position;
+  Vec3f _com_all;
+  Vec3f _vcom_all;
+  Real _mass_all;
 };
