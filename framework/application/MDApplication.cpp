@@ -31,6 +31,20 @@ MDApplication::MDApplication(int argc, char** argv)
 void MDApplication::PrintLogo()
 {
   std::string logo = R"( SEMD )";
+
+  std::ofstream log_file("rbmd.log");
+  try
+  {
+    log_file << "RBMD (V2.0)" << std::endl
+             << "========================================================" << std::endl
+             << _parser->GetFileStr() << std::endl;
+    log_file.close();
+  }
+  catch (const std::exception& e)
+  {
+    log_file.close();
+    console::Error(e.what());
+  }
 }
 void MDApplication::Run()
 {

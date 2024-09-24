@@ -98,6 +98,8 @@ void ModelFileInitCondition::Header(std::ifstream& file)
 {
   std::string line;
   Real x_low, x_high, y_low, y_high, z_low, z_high;
+  std::ofstream log_file("rbmd.log", std::ios::app);
+  log_file << "========================================================" << std::endl;
   while (getline(file, line))
   {
     if (!line.empty() && line != "\r")
@@ -106,21 +108,25 @@ void ModelFileInitCondition::Header(std::ifstream& file)
       {
         std::istringstream iss(line);
         iss >> _header._num_atoms;
+        log_file << _header._num_atoms << " atoms" << std::endl;
       }
       else if (line.find("bonds") != std::string::npos)
       {
         std::istringstream iss(line);
         iss >> _header._num_bonds;
+        log_file << _header._num_bonds << " bonds" << std::endl;
       }
       else if (line.find("angles") != std::string::npos)
       {
         std::istringstream iss(line);
         iss >> _header._num_angles;
+        log_file << _header._num_angles << " angles" << std::endl;
       }
       else if (line.find("dihedrals") != std::string::npos)
       {
         std::istringstream iss(line);
         iss >> _header._num_dihedrals;
+        log_file << _header._num_dihedrals << " dihedrals" << std::endl;
       }
       else if (line.find("impropers") != std::string::npos)
       {
@@ -165,6 +171,8 @@ void ModelFileInitCondition::Header(std::ifstream& file)
       }
     }
   }
+  log_file << "========================================================" << std::endl;
+  log_file.close();
 
   auto xLength = x_high - x_low;
   auto yLength = y_high - y_low;

@@ -31,6 +31,12 @@ RDFOutput::RDFOutput(const Configuration& cfg)
   if (init_way != "inbuild")
   {
     _atoms_pair = GetVectorOfVectorsValue<int>("atoms_pair");
+    for (int i = 0; i < _atoms_pair.size(); i++)
+    {
+      vtkm::cont::ArrayHandle<Real> rdf_pair;
+      rdf_pair.AllocateAndFill(_vRadius.size(), 0);
+      _rdf.push_back(rdf_pair);
+    }
     std::vector<int> atoms_pair_type;
     int i, type;
     int size = _atoms_pair.size() * 2 - 1;
@@ -41,10 +47,6 @@ RDFOutput::RDFOutput(const Configuration& cfg)
       if (atoms_pair_type.size() == 0)
       {
         atoms_pair_type.push_back(type);
-        vtkm::cont::ArrayHandle<Real> rdf_pair;
-        rdf_pair.AllocateAndFill(_vRadius.size(), 0);
-        _rdf.push_back(rdf_pair);
-
       }
       else
       {
@@ -53,9 +55,10 @@ RDFOutput::RDFOutput(const Configuration& cfg)
           if (type != atoms_pair_type[i] && i == atoms_pair_type.size() - 1)
           {
             atoms_pair_type.push_back(type);
-            vtkm::cont::ArrayHandle<Real> rdf_pair;
-            rdf_pair.AllocateAndFill(_vRadius.size(), 0);
-            _rdf.push_back(rdf_pair);
+          }
+          else if (type == atoms_pair_type[i])
+          {
+            break;
           }
           else
             i++;
@@ -165,9 +168,8 @@ void RDFOutput::ComputeRDF()
     }
     else
     {
-
       std::map<Id, ArrayHandle<Vec3f>> atom_pair_position;
-      std::map<Id, ArrayHandle<Id>> atom_pair_id;
+      std::map<Id, std::vector<Id>> atom_pair_id;
       auto atom_pair_type = _para.GetParameter<std::vector<int>>(PARA_ATOMS_PAIR_TYPE);
       auto rdf_id = _para.GetFieldAsArrayHandle<Id>(field::atom_pair_id);
       auto rdf_position = _para.GetFieldAsArrayHandle<Vec3f>(field::atom_pair_position);
@@ -192,22 +194,25 @@ void RDFOutput::ComputeRDF()
           id_data[j] = id_vec[j];
           position_data[j] = position_Vec[j].Get();
         }
-        vtkm::cont::ArrayHandle<Id> id_array;
-        vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(id_data), id_array);
+        //vtkm::cont::ArrayHandle<Id> id_array;
+        //vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(id_data), id_array);
         vtkm::cont::ArrayHandle<Vec3f> atom_type_position;
-        atom_type_position.Allocate(id_vec.GetNumberOfComponents());
         vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(position_data), atom_type_position);
         atom_pair_position[atom_pair_type[i]] = atom_type_position;
-        atom_pair_id[atom_pair_type[i]] = id_array;
-        //OutPut::GetPositionByType(id_array, position, atom_type_position);
+        atom_pair_id[atom_pair_type[i]] = id_data;
       }
 
       for (int i = 0; i < _atoms_pair.size(); i++)
       {
         auto center_position = atom_pair_position[_atoms_pair[i][0]];
         auto target_position = atom_pair_position[_atoms_pair[i][1]];
-        auto atom_id_center = atom_pair_id[_atoms_pair[i][0]];
-        auto atom_id_target = atom_pair_id[_atoms_pair[i][1]];
+
+        vtkm::cont::ArrayHandle<Id> atom_id_center;
+        vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atom_pair_id[_atoms_pair[i][0]]), atom_id_center);
+        
+        vtkm::cont::ArrayHandle<Id> atom_id_target;
+        vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(atom_pair_id[_atoms_pair[i][1]]), atom_id_target);
+
         auto num_center_pos = center_position.GetNumberOfValues();
         ContPointLocator locator;
         SetLocator(locator);

@@ -8,7 +8,7 @@ FormatTable::FormatTable()
   : _header_spacing(16)
   , _column_width(16)
   , _row_count(0)
-  , _log_file("LogFile.csv")
+  , _log_file("rbmd.log", std::ios::app)
 {
 }
 

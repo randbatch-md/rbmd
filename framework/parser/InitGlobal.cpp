@@ -6,7 +6,7 @@
 
 InitGlobal::InitGlobal(const std::string& device,int argc, char** argv)
 {
-  if (device == "duc")
+  if (device == "dcu")
   {
     KokkosInit(argc, argv);
   }

@@ -161,7 +161,7 @@ public:
     return vec;
   }
 
-  VTKM_EXEC Vec3f MinDistanceVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
+  VTKM_EXEC Vec3f MinDistanceVec0(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const
   {
     Vec3f p12 = p1 - p2;
     //case1:  orthogonal box
@@ -195,6 +195,45 @@ public:
     //case2:  triclinic box
     return p12;
   }
+
+  VTKM_EXEC Vec3f MinDistanceVec(const Vec3f& p1, const Vec3f& p2, const Vec3f& _box) const  // Optimized
+  {
+    Id periodicX = 1;
+    Id periodicY = 1;
+    Id periodicZ = 1;
+    Vec3f vec = p1 - p2;
+
+    // X
+    if (periodicX)
+    {
+      if (vtkm::Abs(vec[0]) > _box[0] * 0.5)
+      {
+        vec[0] -= (vec[0] > 0 ? _box[0] : -_box[0]);
+      }
+    }
+
+    // Y
+    if (periodicY)
+    {
+      if (vtkm::Abs(vec[1]) > _box[1] * 0.5)
+      {
+        vec[1] -= (vec[1] > 0 ? _box[1] : -_box[1]);
+      }
+    }
+
+    // Z
+    if (periodicZ)
+    {
+      if (vtkm::Abs(vec[2]) > _box[2] * 0.5)
+      {
+        vec[2] -= (vec[2] > 0 ? _box[2] : -_box[2]);
+      }
+    }
+
+    return vec;
+  }
+
+
 
   VTKM_EXEC vtkm::Vec3f GetPtsPosition(const Id& atoms_id) const
   {
