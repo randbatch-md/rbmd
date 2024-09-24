@@ -188,7 +188,7 @@ void ModelFileInitCondition::Header(std::ifstream& file)
   _para.SetParameter(PARA_BIN_NUMBER, bin_number);
   _para.SetParameter(PARA_RANGE, range);
 
-  std::string path = "/data/zkh_mace/mace_agnesi_small.model-lammps.pt";
+  std::string path = "../../../mace_agnesi_small.model-lammps.pt";
   macetest.init(_header._num_atoms, false, path);
   Real mace_cutoff = macetest.mace_r_max;
   

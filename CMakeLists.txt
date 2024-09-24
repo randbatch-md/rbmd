@@ -7,7 +7,8 @@ set(project_name rbmd)
 project(${project_name} CXX)
 
 set(_this ${project_name})
-
+#test
+add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 # 第三方库
 add_subdirectory(contrib) 
 # 框架核心

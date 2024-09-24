@@ -11,7 +11,7 @@ void maceload::init(int nodes_, bool v_g, std::string path_)
 {
 
   n_nodes = nodes_;
-  //std::cout << n_nodes << std::endl;
+  std::cout << n_nodes<<" atoms " << std::endl;
   vflag_global = bool(v_g);
     if (!torch::cuda::is_available()) {
         std::cout << "CUDA unavailable, setting device type to CPU" << std::endl;
@@ -22,14 +22,14 @@ void maceload::init(int nodes_, bool v_g, std::string path_)
     }
     try {
         model = torch::jit::load(path_, device);
-        std::cout << "Loading MACE model from " << path_ << "\" ...";
+        std::cout << "Loading MACE model from " << path_ << "\" ..."<< std::endl;
     }
     catch (const c10::Error& e) {
-        std::cerr << "Error\n";
+        std::cerr << "Error load mace model\n";
     }
     mace_r_max = model.attr("r_max").toTensor().item<double>();
     double num_inter = model.attr("num_interactions").toTensor().item<double>();
-    std::cout << num_inter <<std::endl;
+    //std::cout << num_inter <<std::endl;
     auto mace_atom_table = model.attr("atomic_numbers").toTensor();
     n_node_feats = mace_atom_table.numel();
     std::string transsymbol;
@@ -109,15 +109,15 @@ void maceload::loadmass(std::vector<float> masslist)
   {
     mask[i] = true;
   }
-  std::cout << "masses" << std::endl;
+  //std::cout << "masses" << std::endl;
 }
 void maceload::loadcell(const Vec3f& box)
 {
     cell[0][0] = box[0];
     cell[1][1] = box[1];
     cell[2][2] = box[2];
-    std::cout << "cell" << std::endl;
-    std::cout << cell << std::endl;
+    //std::cout << "cell" << std::endl;
+    //std::cout << cell << std::endl;
     /*
     h[0] = xprd;
     h[1] = yprd;
@@ -146,7 +146,7 @@ void maceload::loadpositions(const vtkm::cont::ArrayHandle<Vec3f>& position_rbmd
     positions[i][1] = read_position.Get(i)[1];
     positions[i][2] = read_position.Get(i)[2];
     }
-    std::cout << "positions" << std::endl;
+    //std::cout << "positions" << std::endl;
 }
 void maceload::loadedges_index(std::vector<Id> edge0,
                                std::vector<Id> edge1,
@@ -207,7 +207,7 @@ void maceload::loadedges_index(std::vector<Id> edge0,
             }
         }
     }*/
-    std::cout << "edges_start" << std::endl;
+    //std::cout << "edges_start" << std::endl;
     torch::TensorOptions optsint64 = torch::TensorOptions().dtype(torch::kInt64);
     torch::TensorOptions optsdouble = torch::TensorOptions().dtype(torch::kF64);
     int64_t index = edge0.size();
@@ -226,7 +226,7 @@ void maceload::loadedges_index(std::vector<Id> edge0,
       shifts[i][1] = _shifts[i][1];
       shifts[i][2] = _shifts[i][2];
     }
-    std::cout << "edges_index" << std::endl;
+    //std::cout << "edges_index" << std::endl;
     /*
     torch::TensorOptions opts = torch::TensorOptions().dtype(torch::kInt64);
     int edges = edge0.size();
@@ -347,10 +347,10 @@ c10::impl::GenericDict maceload::forward() {
     input.insert("shifts", shifts);
     input.insert("unit_shifts", unit_shifts);
     input.insert("weight", weight);
-    std::cout << "数据载入完成" << std::endl;
+    //std::cout << "数据载入完成" << std::endl;
     model.eval();
     c10::impl::GenericDict output = model.forward({ input, mask.to(device), bool(vflag_global) }).toGenericDict();
-    std::cout << "模型前向完成" << std::endl;
+    //std::cout << "模型前向完成" << std::endl;
     return output;
 }
 
