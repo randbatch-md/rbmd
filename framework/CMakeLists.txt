@@ -101,48 +101,49 @@ target_include_directories(_compiler_flags INTERFACE
   ${JSON_INSTALL_PATH}/include
   ${CXXOPTS_INSTALL_PATH}/include
   )
-  # 看来要在res 文件下建立cmake文件
   # 定义lib
-add_library(libsemd STATIC ${host_src} ${device_src})
-target_link_libraries(libsemd PUBLIC _compiler_flags)
+add_library(librbmd STATIC ${host_src} ${device_src})
+target_link_libraries(librbmd PUBLIC _compiler_flags)
 
 #链接json库
-#set(CMAKE_PREFIX_PATH ${JSON_INSTALL_PATH}/lib/cmake)
-#find_package(jsoncpp REQUIRED)
-target_link_directories(libsemd PUBLIC ${JSON_INSTALL_PATH}/lib)
-target_link_libraries(libsemd PRIVATE jsoncpp)
+target_link_directories(librbmd PUBLIC ${JSON_INSTALL_PATH}/lib)
+target_link_libraries(librbmd PRIVATE jsoncpp)
 
 #加载 VTK-m 
-target_link_libraries(libsemd PUBLIC vtkm_cont vtkm_worklet vtkm_io)
-target_link_libraries(libsemd PRIVATE ${VTK_LIBRARIES})
-target_link_libraries(libsemd PUBLIC fmt::fmt)
-vtkm_add_target_information(libsemd DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES ${device_src})
+target_link_libraries(librbmd PUBLIC vtkm_cont vtkm_worklet vtkm_io)
+target_link_libraries(librbmd PRIVATE ${VTK_LIBRARIES})
+target_link_libraries(librbmd PUBLIC fmt::fmt)
+vtkm_add_target_information(librbmd DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES ${device_src})
 
   # 定义target
 add_executable(${target} main.cpp)
-#file(COPY ${CMAKE_SOURCE_DIR}/framework/res/Gnear_table_geq2_2.txt DESTINATION ${CMAKE_BINARY_DIR}/framework/res)
-#file(COPY ${CMAKE_SOURCE_DIR}/framework/res/Gnear_table_leq2_2.txt DESTINATION ${CMAKE_BINARY_DIR}/framework/res)
-#file(COPY "../res" DESTINATION ${CMAKE_BINARY_DIR}/framework)
-#file(COPY "../res" DESTINATION ${CMAKE_BINARY_DIR}/framework)
 
 
 
-target_link_libraries(${target} PUBLIC libsemd )
+target_link_libraries(${target} PUBLIC librbmd )
 vtkm_add_target_information(${target} DROP_UNUSED_SYMBOLS MODIFY_CUDA_FLAGS DEVICE_SOURCES main.cpp)
 
 install(TARGETS ${target} 
   DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
   )
+  
+  # 在可执行文件的目标目录下创建 lib 文件夹
+set_target_properties(librbmd PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
+)
 
-#install(DIRECTORY "../res"
-#        DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
-        #FILES_MATCHING
-        #PATTERN "Gnear_table_geq2_2.txt"
-        #PATTERN "Gnear_table_leq2_2.txt")
+# 确保 lib 文件夹在构建时存在
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
 
-#install(DIRECTORY "../res/"
-#        DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
-#        FILES_MATCHING
-#        PATTERN "LJFluid.json"
-#        PATTERN "rbmd.data"
-#        PATTERN "rbmd.json")
+   # 设置 VTKM 许可证文件路径
+ set(VTKM_LICENSE_PATH "${CMAKE_CURRENT_LIST_DIR}/../licenses/LICENSE.TXT")
+ 
+ # 在生成 librbmd 静态库后复制许可证文件
+ add_custom_command(TARGET librbmd POST_BUILD
+     COMMAND ${CMAKE_COMMAND} -E copy ${VTKM_LICENSE_PATH} $<TARGET_FILE_DIR:librbmd>
+ )
+ 
+ # 在生成可执行文件后复制许可证文件
+ add_custom_command(TARGET ${target} POST_BUILD
+     COMMAND ${CMAKE_COMMAND} -E copy ${VTKM_LICENSE_PATH} $<TARGET_FILE_DIR:${target}>
+ )
