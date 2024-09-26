@@ -1,5 +1,5 @@
 ﻿//==================================================================================
-//  RBMD 1.0 is developed for random batch molecular dynamics calculation.
+//  RBMD 2.1.0 is developed for random batch molecular dynamics calculation.
 //
 //  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
 //
