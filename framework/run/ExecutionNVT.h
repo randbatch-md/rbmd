@@ -55,7 +55,8 @@ private:
   void SetEAM();
   void InitStyle();
 
-       //
+  //
+  void Computedof();
   void ComputeVirial();
   void ComputeVirial_r();
   void Compute_Pressure_Scalar();
@@ -104,7 +105,7 @@ private:
   Real _alpha;
   Real _tempT_sum;
   Real _tempT;
-
+  Real tdof;
 
   
   std::ifstream _potential_file;

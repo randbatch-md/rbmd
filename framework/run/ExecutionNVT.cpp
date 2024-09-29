@@ -137,6 +137,8 @@ void ExecutionNVT::InitialCondition()
   }
   _nosehooverxi = 0.0;
 
+  Computedof();
+
     //
   //bulkmodulus = 100.0;
   p_start[0] = p_start[1] = p_start[2] = _Pstart;
@@ -827,7 +829,7 @@ void ExecutionNVT::ComputeTempe()
   //dof_shake is important!!!
   //It is used only for shake option, which may be modified in the future.
   //When shake is called, dof_shake = n(number of atoms of water); otherwise, dof_shake = 0
-  // 3 is the extra dof
+  // 3 is the extra tdof
   ///////////////////////////////////////////////////////////////////////
   auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
   Real temperature_kB = _unit_factor._kB;
@@ -1276,6 +1278,18 @@ void ExecutionNVT::fix_press_berendsen_scale()
   _locator.SetPosition(_position);
 }
 
+void ExecutionNVT::Computedof()
+{
+    auto n = _position.GetNumberOfValues();
+    auto extra_dof = 3; //dimension =3
+    tdof = 3 * n - extra_dof;
+    auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+    if (shake == "true")
+    {
+        tdof = tdof - n;
+    }
+}
+
 void ExecutionNVT::Compute_Pressure_Scalar()
 {
   //compute temperature
@@ -1289,13 +1303,8 @@ void ExecutionNVT::Compute_Pressure_Scalar()
 
   ComputeVirial();
 
-  //compute dof
-  auto n = _position.GetNumberOfValues();
-  auto extra_dof = 3; //dimension =3
-  auto dof = 3 * n - extra_dof;
-
   //compute pressure_scalar
-  _pressure_scalar = (dof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
+  _pressure_scalar = (tdof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
     3.0 * inv_volume * _unit_factor._nktv2p;
 
   _para.SetParameter(PARA_PRESSURE, _pressure_scalar);

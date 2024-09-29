@@ -71,6 +71,7 @@ private:
   void ApplyPbc();
 
   //
+  void Computedof();
   void SetUp();
   void NoseHooverChain();
   void ComputeTempTarget();
@@ -93,7 +94,12 @@ private:
   void ComputeVCOM();
   void FixMomentum();
 
-
+  //Shake
+  void ShakeSetUp();
+  void correct_coordinates();
+  void correct_velocities();
+  void PostForce();
+  void Shake_Run();
 private:
   ArrayHandle<Vec3f>   _com;
   ArrayHandle<Vec3f>   _vcom;
@@ -206,7 +212,7 @@ private:
    //temp
   Real t_start, t_stop, t_period, t_target, ke_target;
   Real t_freq;
-
+  Real tdof;
 
   std::vector<Real> eta, eta_dot; // chain thermostat for particles
   std::vector<Real> eta_dotdot;
@@ -243,4 +249,11 @@ private:
   Vec3f _com_all;
   Vec3f _vcom_all;
   Real _mass_all;
+
+  ArrayHandle<Vec3f>  _force_tmp;
+  ArrayHandle<Vec3f>  _velocity_tmp;
+
+  ArrayHandle<Vec3f> _shake_force;
+  ArrayHandle<Vec3f> _shake_position;
+  ArrayHandle<Vec3f>  _velocity_p;
 };

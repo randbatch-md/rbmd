@@ -63,38 +63,40 @@ void ExecutionNPT::PreSolve()
 
 void ExecutionNPT::Solve()
 {
-  //// stage1:
-  //UpdateVelocity();
+  if(_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "BERENDSEN")
+  {
+       // stage1:
+       UpdateVelocity();
 
-  //// stage2:
-  //UpdatePosition();
+       // stage2:
+       UpdatePosition();
 
-  ////New added
-  //if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
-  //{
-  //  ConstraintA();
-  //}
+       //New added
+       if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+       {
+           ConstraintA();
+       }
 
-  //// stage3:
-  //ComputeForce();
-  //UpdateVelocity();
+       // stage3:
+       ComputeForce();
+       UpdateVelocity();
 
-  ////New added
-  //if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
-  //{
-  //  ConstraintB();
-  //}
+       //New added
+       if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+       {
+           ConstraintB();
+       }
 
- // ComputeTempe();
-  //UpdateVelocityByTempConType();
+       ComputeTempe();
+       UpdateVelocityByTempConType();
 
-  //if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) != "BERENDSEN")
-  //{
-  //  Compute_Pressure_Scalar();
-  //}
+       fix_press_berendsen();
+       //fix_press_berendsen_scale();
+  }
 
 
-  if (_para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE) == "NOSE_HOOVE")
+
+  else if (_para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE) == "NOSE_HOOVE")
   {
     //ComputeTempe();
     InitialIntegrate();
@@ -128,6 +130,8 @@ void ExecutionNPT::InitialCondition()
   }
   _nosehooverxi = 0.0;
 
+  //tdof
+  Computedof();
 
   p_start[0] = p_start[1] = p_start[2] = _Pstart;
   p_stop[0] = p_stop[1] = p_stop[2] = _Pstop;
@@ -853,7 +857,7 @@ void ExecutionNPT::ComputeTempe()
   //dof_shake is important!!!
   //It is used only for shake option, which may be modified in the future.
   //When shake is called, dof_shake = n(number of atoms of water); otherwise, dof_shake = 0
-  // 3 is the extra dof
+  // 3 is the extra tdof
   ///////////////////////////////////////////////////////////////////////
   auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
   Real temperature_kB = _unit_factor._kB;
@@ -997,6 +1001,109 @@ void ExecutionNPT::ConstraintB()
 
 
   vtkm::cont::ArrayCopy(_old_velocity, _velocity);
+}
+
+void ExecutionNPT::correct_coordinates()
+{
+    //store current value of forces and velocities
+    vtkm::cont::ArrayCopy(_all_force, _force_tmp);
+    vtkm::cont::ArrayCopy(_velocity, _velocity_tmp);
+
+    //set f and v to zero for SHAKE
+    vtkm::cont::Algorithm::Fill(_all_force, vtkm::Vec3f{ 0.0f });
+    vtkm::cont::Algorithm::Fill(_velocity, vtkm::Vec3f{ 0.0f });
+
+    //
+    PostForce(); //shake_force 
+
+
+
+    Invoker{}(MolecularWorklet::IntegratePostionWorklet{ _dt, _unit_factor._fmt2v },
+        _shake_force,
+        _mass,
+        _position);
+
+    // copy forces and velocities back
+    vtkm::cont::ArrayCopy(_force_tmp, _all_force);
+    vtkm::cont::ArrayCopy(_velocity_tmp, _velocity);
+
+
+
+    // communicate changes
+    ArrayHandle<Vec3f> _shake_position_tmp;
+    vtkm::cont::ArrayCopy(_shake_position, _shake_position_tmp);
+
+    //communicate
+
+    vtkm::cont::ArrayCopy(_position, _shake_position);
+    vtkm::cont::ArrayCopy(_shake_position_tmp, _shake_position);
+
+
+}
+
+void ExecutionNPT::correct_velocities()
+{
+    vtkm::cont::ArrayCopy(_velocity, _velocity_p);
+
+    //Velocity3angle
+    auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
+    auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
+
+
+    Invoker{}(
+        MolecularWorklet::Velocity3angleWorklet{ _box, _dt },
+        anglelist_group,
+        _position,
+        _velocity_p,
+        _mass,
+        _locator,
+        _velocity);
+
+}
+
+void ExecutionNPT::PostForce()
+{
+
+    // xshake = unconstrained move with current v,f
+    // communicate results if necessary
+    Invoker{}(MolecularWorklet::UnConstrainedUpdateWorklet{ _dt, _unit_factor._fmt2v },
+        _all_force,
+        _mass,
+        _position,
+        _velocity,
+        _shake_position);
+
+
+    // loop over clusters to add constraint forces == Shake3Angle
+    auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
+    auto shake_num = angle_list.GetNumberOfValues();
+    auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
+
+    Invoker{}(MolecularWorklet::Shake3AngleWorklet{ shake_num, _box, _dt, _unit_factor._fmt2v },
+        anglelist_group,
+        _position,
+        _shake_position,
+        _mass,
+        _locator,
+        _shake_force,
+        _shake_first_virial_atom);
+
+}
+
+void ExecutionNPT::Shake_Run()
+{
+    //   add coordinate constraining forces ,
+    // this method is called at the end of a timestep
+    PostForce();
+}
+
+void ExecutionNPT::ShakeSetUp()
+{
+    correct_coordinates();
+
+    correct_velocities();
+
+    Shake_Run();
 }
 
 void ExecutionNPT::ReadPotentialFile(std::ifstream& input_file)
@@ -1319,13 +1426,8 @@ void ExecutionNPT::Compute_Pressure_Scalar()
 
   ComputeVirial();
 
-  //compute dof
-  auto n = _position.GetNumberOfValues();
-  auto extra_dof = 3; //dimension =3
-  auto dof = 3 * n - extra_dof;
-
   //compute pressure_scalar
-  _pressure_scalar = (dof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
+  _pressure_scalar = (tdof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
     3.0 * inv_volume * _unit_factor._nktv2p;
 
   _para.SetParameter(PARA_PRESSURE, _pressure_scalar);
@@ -1606,6 +1708,18 @@ void ExecutionNPT::NoseHooverChain()
 
 }
 
+void ExecutionNPT::Computedof()
+{
+    auto n = _position.GetNumberOfValues();
+    auto extra_dof = 3; //dimension =3
+    tdof = 3 * n - extra_dof;
+    auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+    if (shake == "true")
+    {
+        tdof = tdof - n;
+    }
+}
+
 void ExecutionNPT::SetUp() 
 {
   ComputeTempe();       //t_current
@@ -1675,15 +1789,6 @@ void ExecutionNPT::SetUp()
 
 void ExecutionNPT::ComputeTempTarget()
 {
-  auto n = _position.GetNumberOfValues();
-  auto extra_dof = 3; //dimension =3
-  auto tdof = 3 * n - extra_dof;
-  auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
-  if (shake == "true")
-  {
-    tdof = tdof - n;
-  }
-
   auto currentstep = _app.GetExecutioner()->CurrentStep();
   auto beginstep = 0;
   auto endstep = _app.GetExecutioner()->NumStep();
