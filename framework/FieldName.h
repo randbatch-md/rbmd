@@ -94,6 +94,7 @@ const std::string PARA_DIHEDRAL_ENERGY = "dihedral_energy";
 const std::string PARA_ATOM_MAP = "atom_map";
 const std::string PARA_FORCE_FIELD_TYPE = "force_field_type";
 const std::string PARA_POTENTIAL_FILE = "potential_file";
+const std::string PARA_MODEL_FILE = "model_file";
 const std::string PARA_NEIGHBOR_TYPE = "neighbor_type";
 const std::string PARA_FIX_SHAKE = "fix_shake";
 const std::string PARA_COULOMB_TYPE = "coulomb_type";

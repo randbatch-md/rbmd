@@ -18,6 +18,7 @@ void ForceField::Execute()
   }
   else if (Get<std::string>("type") == "MACE")
   {
+    _para.SetParameter(PARA_MODEL_FILE, Get<std::string>("model_file"));
     _para.SetParameter(PARA_FILE_TYPE, (std::string) "MACE");
   }
 }
