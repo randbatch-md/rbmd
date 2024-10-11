@@ -37,7 +37,7 @@ endif()
 if(CUSPARSELT_FOUND)
     add_definitions(-DUSE_CUSPARSELT=1)
 endif()
-
+find_package(PythonInterp REQUIRED)
 #set(CMAKE_PREFIX_PATH "/public/home/zkh/zkh_mace/libtorch/share/cmake/Torch")
 #set(Torch_DIR "/public/software/life/libtorch-gpu/share/cmake/Torch")
 #set(TORCH_CUDA_ARCH_LIST "6.1;7.0;8.0;8.6;8.9;9.0")

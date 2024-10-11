@@ -195,12 +195,15 @@ void ModelFileInitCondition::Header(std::ifstream& file)
     { z_low, z_high }};
   _para.SetParameter(PARA_BIN_NUMBER, bin_number);
   _para.SetParameter(PARA_RANGE, range);
-  std::string path = _para.GetParameter<std::string>(PARA_MODEL_FILE);
-  //std::string path = "../../../mace_agnesi_small.model-lammps.pt";
-  macetest.init(_header._num_atoms, false, path);
-  Real mace_cutoff = macetest.mace_r_max;
-  
-  _para.SetParameter(PARA_CUTOFF, mace_cutoff);
+    
+  if (_para.GetParameter<std::string>(PARA_FILE_TYPE) == "MACE")
+  {  
+    std::string path = _para.GetParameter<std::string>(PARA_MODEL_FILE);
+    //std::string path = "../../../mace_agnesi_small.model-lammps.pt";
+    macetest.init(_header._num_atoms, false, path);
+    Real mace_cutoff = macetest.mace_r_max;  
+    _para.SetParameter(PARA_CUTOFF, mace_cutoff);
+  }
 }
 
 void ModelFileInitCondition::Parser(std::ifstream& file) 
