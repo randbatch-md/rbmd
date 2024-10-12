@@ -63,6 +63,7 @@ protected:
   Para& _para;
   Execution& _run;
   Timer& _timer;
+  Timer _time_count;
   int _num_steps;
   int _current_step;
   Real _dt, _current_time;
