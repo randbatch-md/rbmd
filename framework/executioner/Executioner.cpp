@@ -20,6 +20,7 @@ Executioner::Executioner(const Configuration& cfg)
   _current_step = 0;
   _end_time = _dt * _num_steps;
   _timer.Start();
+  _time_count.Start();
 }
 
 void Executioner::Init() 
@@ -50,9 +51,9 @@ void Executioner::Execute()
 
 void Executioner::PostExecute()
 {
-  console::Success("运行完成.  运行时间: ", _timer.GetElapsedTime());
-  console::Info("当前步: ", _current_step-1, "总步数: ", _num_steps);
-  console::Info("当前时间: ", _current_time-_dt, "结束时间: ",  _end_time);
+  console::Success("Running successfully.  Total time: ", _time_count.GetElapsedTime(), "s");
+  //console::Info("当前步: ", _current_step-1, "总步数: ", _num_steps);
+  console::Info("Time step: ", _dt, "fs      ", "Total simulation time: ", _end_time, "fs");
   std::ofstream log_file("rbmd.log",std::ios::app);
   try
   {
