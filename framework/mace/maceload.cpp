@@ -4,22 +4,27 @@
 #include <iostream>
 #include <array>
 #include <mace/maceload.h>
-
 maceload macetest;
+
 maceload::maceload(){};
-void maceload::init(int nodes_, bool v_g, std::string path_)
+void maceload::init(int nodes_, bool v_g, std::string path_, std::string device_name)
 {
 
   n_nodes = nodes_;
   std::cout << n_nodes<<" atoms " << std::endl;
   vflag_global = bool(v_g);
+  if (device_name != "cuda" && device_name != "dcu")
+  {
+    device = c10::Device(torch::kCPU);
+  }
+      /*
     if (!torch::cuda::is_available()) {
         std::cout << "CUDA unavailable, setting device type to CPU" << std::endl;
         device = c10::Device(torch::kCPU);
     }
     else {
         device = torch::Device(torch::DeviceType::CUDA);
-    }
+    }*/
     try {
         model = torch::jit::load(path_, device);
         std::cout << "Loading MACE model from " << path_ << "\" ..."<< std::endl;
@@ -287,13 +292,14 @@ double maceload::energyout(c10::impl::GenericDict ouput)
 
 
 c10::impl::GenericDict maceload::forward() {
-    if (!torch::cuda::is_available()) {
+  /*if (!torch::cuda::is_available())
+   {
         std::cout << "CUDA unavailable, setting device type to CPU" << std::endl;
       device = c10::Device(torch::DeviceType::CPU);
     }
     else {
         device = torch::Device(torch::DeviceType::CUDA);
-    }
+    }*/
     c10::Dict<std::string, torch::Tensor> input;
     //std::cout << cell << std::endl;
     try

@@ -200,7 +200,9 @@ void ModelFileInitCondition::Header(std::ifstream& file)
   {  
     std::string path = _para.GetParameter<std::string>(PARA_MODEL_FILE);
     //std::string path = "../../../mace_agnesi_small.model-lammps.pt";
-    macetest.init(_header._num_atoms, false, path);
+    auto device_name = _para.GetParameter<std::string>(PARA_DEVICE_NAME);
+
+    macetest.init(_header._num_atoms, false, path, device_name);
     Real mace_cutoff = macetest.mace_r_max;  
     _para.SetParameter(PARA_CUTOFF, mace_cutoff);
   }

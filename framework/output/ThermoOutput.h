@@ -62,6 +62,6 @@ private:
   Real _temperature;
 
   Real _dihedrals_energy;
-
+  Real _mace_energy;
   std::map<STATUS, std::vector<Real>> _status;
 };

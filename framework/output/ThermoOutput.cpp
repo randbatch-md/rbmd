@@ -34,6 +34,7 @@ ThermoOutput::ThermoOutput(const Configuration& cfg)
   , _bond_energy(0.0)
   , _angle_energy(0.0)
   , _dihedrals_energy(0.0)
+  , _mace_energy(0.0)
   , _rho(0.0)
   , _tempT_sum(0.0)
   , _tempT(0.0)
@@ -327,11 +328,16 @@ auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
     }
   }
 
+  else if ("MACE" == force_field)
+  {
+    auto a = _para.GetParameter<Real>(PARA_MACE_ENERGY);
+    _mace_energy = _para.GetParameter<Real>(PARA_MACE_ENERGY);
+  }
 
   //TOTAL:
 
   _potential_energy_avr = _lj_potential_energy_avr + _far_ele_potential_energy_avr + _near_ele_potential_energy_avr;
-  _potential_energy = _potential_energy_avr + _bond_energy + _angle_energy + _dihedrals_energy; //
+  _potential_energy = _potential_energy_avr + _bond_energy + _angle_energy + _dihedrals_energy + _mace_energy; //
 
   _kinteic_energy = _tempT_sum / N * 0.5;
 
@@ -394,8 +400,10 @@ void ThermoOutput::Residual()
   _potential_energy_avr_old = _potential_energy_avr;
 }
 
+#pragma optimize("", off)
 void ThermoOutput::AddDataToTable()
 {
+  _output_screen = true;
   if (_output_screen)
   {
     AddData(HEADER_POTENTIAL_ENERGY_NAME, _potential_energy);
@@ -414,6 +422,7 @@ void ThermoOutput::AddDataToTable()
     
   }
 }
+#pragma optimize("", on)
 
 void ThermoOutput::WriteToFile()
 {

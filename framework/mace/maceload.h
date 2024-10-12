@@ -7,15 +7,17 @@
 #include <vector>
 #include <vtkm/Types.h>
 #include"Types.h"
+
+
 //#include "locator/ContPointLocator.h"
 
 class maceload 
 {
     public:
-         maceload();
+        maceload();
         virtual ~maceload()=default;
         //maceload(){};
-        void init(int nodes_, bool x_, std::string path_);
+        void init(int nodes_, bool x_, std::string path_, std::string device_name);
         void loadpositions(const vtkm::cont::ArrayHandle<Vec3f>& position_rbmd); 
         void loadcell(const Vec3f& box);
         //void loadatoms();

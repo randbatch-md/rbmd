@@ -83,7 +83,7 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
-  std::ofstream _energy_file;
-  std::ofstream _force_file;
-  std::ofstream _positions_file;
+  //std::ofstream _energy_file;
+  //std::ofstream _force_file;
+  //std::ofstream _positions_file;
 };

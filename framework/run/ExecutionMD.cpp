@@ -144,9 +144,9 @@ struct SetValue_New : vtkm::worklet::WorkletMapField
 ExecutionMD::ExecutionMD(const Configuration& cfg)
   : Execution(cfg)
 {
-  _energy_file.open("energy_data.txt");
-  _force_file.open("force_data.txt");
-  _positions_file.open("posi_data.txt");
+ // _energy_file.open("energy_data.txt");
+ // _force_file.open("force_data.txt");
+ // _positions_file.open("posi_data.txt");
 }
 
 void ExecutionMD::Init()
@@ -985,10 +985,10 @@ void ExecutionMD::ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce)
   macetest.loadcell(box);
   //输出posi
   auto posi_read = _position.ReadPortal();
-  for (size_t i = 0; i < _position.GetNumberOfValues(); i++)
-  {
-    _positions_file << posi_read.Get(i) << std::endl;
-  }
+  //for (size_t i = 0; i < _position.GetNumberOfValues(); i++)
+  //{
+  //  _positions_file << posi_read.Get(i) << std::endl;
+  //}
   macetest.loadpositions(_position);
 
   auto N = _position.GetNumberOfValues();
@@ -1072,15 +1072,15 @@ void ExecutionMD::ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce)
 
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(all_force_temp),allforce);
   auto allforce_read = allforce.ReadPortal();
-  for (size_t i = 0; i < allforce.GetNumberOfValues(); i++)
-  {
-    _force_file << allforce_read.Get(i)<<std::endl;
-  }
+  //for (size_t i = 0; i < allforce.GetNumberOfValues(); i++)
+  //{
+  //  _force_file << allforce_read.Get(i)<<std::endl;
+  //}
 
   // 输出能量
 
-  auto energy = macetest.energyout(mace_output);
-
-  _energy_file << energy << std::endl;
+  Real energy = macetest.energyout(mace_output);
+  _para.SetParameter(PARA_MACE_ENERGY, energy);
+  //_energy_file << energy << std::endl;
   
 }

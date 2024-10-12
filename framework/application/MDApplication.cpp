@@ -26,6 +26,7 @@ MDApplication::MDApplication(int argc, char** argv)
   _parameter = std::make_shared<Para>(); 
   _parameter->SetParameter(PARA_FAR_FORCE, false);
   _parameter->SetParameter(PARA_DIHEDRALS_FORCE, false);
+  _parameter->SetParameter(PARA_DEVICE_NAME, std::string(argv[1]));
 }
 
 void MDApplication::PrintLogo()
