@@ -422,6 +422,7 @@ void ThermoOutput::Residual()
 
 void ThermoOutput::AddDataToTable()
 {
+  _output_screen = true;
   if (_output_screen)
   {
     AddData(HEADER_POTENTIAL_ENERGY_NAME, _potential_energy);
