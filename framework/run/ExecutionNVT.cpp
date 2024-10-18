@@ -46,14 +46,7 @@ void ExecutionNVT::Init()
   InitialCondition();
 
   ComputeForce(); 
-//  std::ofstream outfile("force.txt");
-//for (vtkm::Id i = 0; i < _all_force.GetNumberOfValues(); ++i)
-//{
-//  auto _all_force_values = _all_force.ReadPortal().Get(i);
-//  outfile << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-//          << std::endl;
-//}
-//outfile.close();
+
 }
 
 void ExecutionNVT::PreSolve()
@@ -204,15 +197,6 @@ void ExecutionNVT::UpdateVelocity()
   {
     std::cout << e.what() << std::endl;
   }
-
-  std::ofstream outfile("_velocity.txt");
-  for (vtkm::Id i = 0; i < _velocity.GetNumberOfValues(); ++i)
-  {
-      auto _velocity_values = _velocity.ReadPortal().Get(i);
-      outfile << "id" << " " << i << " "<< _velocity_values[0] << " " << _velocity_values[1] << " " << _velocity_values[2]
-          << std::endl;
-  }
-  outfile.close();
 }
 
 void ExecutionNVT::UpdatePosition()
@@ -232,16 +216,6 @@ void ExecutionNVT::UpdatePosition()
   ApplyPbc();
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
-
-
-  std::ofstream outfile("_position.txt");
-  for (vtkm::Id i = 0; i < _position.GetNumberOfValues(); ++i)
-  {
-      auto _position_values = _position.ReadPortal().Get(i);
-      outfile <<"id" << " " << i << " " <<_position_values[0] << " " << _position_values[1] << " " << _position_values[2]
-          << std::endl;
-  }
-  outfile.close();
 }
 
 void ExecutionNVT::UpdateVelocityByTempConType()
@@ -406,15 +380,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   else if (_nearforce_type == "VERLETLIST")
   {
     ComputeVerletlistLJForce(_all_force);
-
-    std::ofstream outfile("force.txt");
-    for (vtkm::Id i = 0; i < _all_force.GetNumberOfValues(); ++i)
-    {
-      auto _all_force_values = _all_force.ReadPortal().Get(i);
-      outfile <<"id" << " "<< i << " " << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-              << std::endl;
-    }
-    outfile.close();
 
   }
   else if (_nearforce_type == "ORIGINAL")

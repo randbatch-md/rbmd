@@ -1789,48 +1789,67 @@ void ExecutionNPT::SetUp()
 
 void ExecutionNPT::ComputeTempTarget()
 {
-  auto currentstep = _app.GetExecutioner()->CurrentStep();
-  auto beginstep = 0;
-  auto endstep = _app.GetExecutioner()->NumStep();
+    if (t_stop == t_start) //Thermostatic simulation
+    {
+        t_target = t_stop= t_start;
+    }
+    else                    //anisothermal simulation
+    {
+        auto currentstep = _app.GetExecutioner()->CurrentStep();
+        auto beginstep = 0;
+        auto endstep = _app.GetExecutioner()->NumStep();
 
-  Real delta = currentstep - beginstep;
+        Real delta = currentstep - beginstep;
 
-  if (delta != 0.0)
-  {
-    delta = delta / static_cast<Real>(endstep - beginstep);
-  }
+        if (delta != 0.0)
+        {
+            delta = delta / static_cast<Real>(endstep - beginstep);
+        }
 
-  t_target = t_start + delta * (t_stop - t_start);
-  ke_target = tdof * _unit_factor._boltz * t_target;
+        t_target = t_start + delta * (t_stop - t_start);
+    }
+    //
+    ke_target = tdof * _unit_factor._boltz * t_target;
 }
+
 
 void ExecutionNPT::ComputePressTarget()
 {
-  auto currentstep = _app.GetExecutioner()->CurrentStep();
-  auto beginstep = 0;
-  auto endstep = _app.GetExecutioner()->NumStep();
+    p_hydro = 0.0;
+    for (Id i = 0; i < 3; i++)
+    {
+        if (p_stop[i] == p_start[i])
+        {
+            p_target[i] = p_stop[i] = p_start[i];
+        }
+        else
+        {
+            auto currentstep = _app.GetExecutioner()->CurrentStep();
+            auto beginstep = 0;
+            auto endstep = _app.GetExecutioner()->NumStep();
 
-  p_hydro = 0.0;
-  Real delta = currentstep - beginstep;
-  if (delta != 0.0)
-  {
-    delta = delta / static_cast<Real>(endstep - beginstep);
-  }
 
-  for (Id i = 0; i < 3; i++)
-  {
-    auto dt_over_period = _dt / p_period[i];
-    auto bulkmodulus_inv = 1.0 / _bulkmodulus;
-    p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
-    p_hydro += p_target[i];
-  }
-  if (pdim > 0)
-  {
-    p_hydro /= pdim;
-  }
+            Real delta = currentstep - beginstep;
+            if (delta != 0.0)
+            {
+                delta = delta / static_cast<Real>(endstep - beginstep);
+            }
+            for (Id i = 0; i < 3; i++)
+            {
+                p_target[i] = p_start[i] + delta * (p_stop[i] - p_start[i]);
+
+            }
+        }
+
+        //
+        p_hydro += p_target[i];
+        if (pdim > 0)
+        {
+            p_hydro /= pdim;
+        }
+    }
  //TRICLINIC TODO:
   // if deviatoric, recompute sigma each time p_target changes
-
 
 }
 
@@ -1851,8 +1870,8 @@ void ExecutionNPT::InitialIntegrate()
   if (_para.GetParameter<std::string>(PARA_PRESS_CTRL_TYPE) == "NOSE_HOOVE")
   {
     //Compute
-    ComputeTempe();
-    Compute_Pressure_Scalar();
+    //ComputeTempe();             //Tempe
+    Compute_Pressure_Scalar();  //Pressure
     Couple();
 
      //
@@ -1908,18 +1927,9 @@ void ExecutionNPT::FinalIntegrate()
 
 void ExecutionNPT::NHCTempIntegrate()
 {
-  auto n = _position.GetNumberOfValues();
-  auto extra_dof = 3; //dimension =3
-  auto tdof = 3 * n - extra_dof;
-  auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
-  if (shake == "true")
-  {
-    tdof = tdof - n;
-  }
-
-  //auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
+  auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
   Real expfac;
-  Real kecurrent = tdof * _unit_factor._boltz * _tempT;
+  Real kecurrent = tdof * _unit_factor._boltz * temperature;
 
   // Update masses, to preserve initial freq, if flag set
   if (eta_mass_flag)
@@ -1969,13 +1979,14 @@ void ExecutionNPT::NHCTempIntegrate()
     // rescale temperature due to velocity scaling
     // should not be necessary to explicitly recompute the temperature
 
-    _tempT *= factor_eta * factor_eta;
-    //temperature *= factor_eta * factor_eta;
-    //_para.SetParameter(PARA_TEMPT, temperature);
+    //_tempT *= factor_eta * factor_eta;
+     auto temperature_f = temperature * factor_eta * factor_eta;
+    _para.SetParameter(PARA_TEMPT, temperature_f);
 
 
     //
-    kecurrent = tdof * _unit_factor._boltz * _tempT;
+    auto temperature_n = _para.GetParameter<Real>(PARA_TEMPT);
+    kecurrent = tdof * _unit_factor._boltz * temperature_n;
 
     if (eta_mass[0] > 0.0)
       eta_dotdot[0] = (kecurrent - ke_target) / eta_mass[0];
@@ -2116,22 +2127,18 @@ void ExecutionNPT::ComputeScalar()
 void ExecutionNPT::NHOmegaDot()
 {
   auto n = _position.GetNumberOfValues();
-  auto extra_dof = 3; //dimension =3
-  auto tdof = 3 * n - extra_dof;
-  auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
-  if (shake == "true")
-  {
-    tdof = tdof - n;
-  }
 
   //
+  auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
+
   Real f_omega, volume;
   auto box = _para.GetParameter<Vec3f>(PARA_BOX); //
   volume = box[0] * box[1] * box[2];
+
   mtk_term1 = 0.0;
   if (mtk_flag)
   {
-    mtk_term1 = tdof * _unit_factor._boltz * _tempT;
+    mtk_term1 = tdof * _unit_factor._boltz * temperature;
     mtk_term1 /= pdim * n;
   }
   for (Id i = 0; i < 3; i++)

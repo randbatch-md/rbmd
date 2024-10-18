@@ -399,7 +399,7 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
   auto N = _position.GetNumberOfValues();
   
   const Id p_number = _psample.GetNumberOfValues();
-  
+
 
 
   RunWorklet::ComputePnumberChargeStructureFactor(_box,
@@ -411,7 +411,7 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
                                                      _psample,
                                                      _rhok_Re,
                                                      _rhok_Im);
- 
+
 
   vtkm::cont::ArrayHandle<Id> psamplekey_out;
   vtkm::cont::ArrayHandle<Real> rhok_Re_reduce;
@@ -420,7 +420,7 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
    
   vtkm::cont::Algorithm::ReduceByKey<Id, Real>(_psamplekey, _rhok_Re, psamplekey_out, rhok_Re_reduce, vtkm::Add());
   vtkm::cont::Algorithm::ReduceByKey<Id, Real>(_psamplekey, _rhok_Im, psamplekey_out, rhok_Im_reduce, vtkm::Add());
- 
+
 
 
   RunWorklet::ChangePnumberChargeStructureFactor(rhok_Re_reduce, rhok_Im_reduce, new_rhok);
