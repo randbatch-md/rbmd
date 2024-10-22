@@ -4,12 +4,14 @@
 #include <iostream>
 #include <array>
 #include <mace/maceload.h>
+#include <torch/jit.h>
 maceload macetest;
 
 maceload::maceload(){};
 void maceload::init(int nodes_, bool v_g, std::string path_, std::string device_name)
 {
-
+  torch::jit::getProfilingMode() = false;
+  torch::jit::getExecutorMode() = true;
   n_nodes = nodes_;
   std::cout << n_nodes<<" atoms " << std::endl;
   vflag_global = bool(v_g);
