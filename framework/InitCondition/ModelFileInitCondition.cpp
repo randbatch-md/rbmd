@@ -895,6 +895,23 @@ void ModelFileInitCondition::SetSpecialBonds()
 
   auto special_weights_array = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(special_weights), special_weights_array);
+  //for (int i=0;i< special_ids_array.GetNumberOfValues();++i)
+  //{
+  //    std::cout << i << " " <<
+  //        "special_ids_array: " << special_ids_array.ReadPortal().Get(i) << std::endl;
+  //}
+  //for (int i = 0; i < special_weights_array.GetNumberOfValues(); ++i)
+  //{
+  //    std::cout << i << " " <<
+  //        "special_weights_array: " << special_weights_array.ReadPortal().Get(i) << std::endl;
+  //}
+  //for (int i = 0; i < special_offsets_array.GetNumberOfValues(); ++i)
+  //{
+  //    std::cout << i << " " <<
+  //        "special_offsets_array: " << special_offsets_array.ReadPortal().Get(i) << std::endl;
+  //}
+
+
 
   //vtkm::Id offsetSize;
   //vtkm::cont::ArrayHandle<vtkm::Id> offsetsArray = vtkm::cont::ConvertNumComponentsToOffsets(

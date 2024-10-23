@@ -1448,10 +1448,11 @@ namespace RunWorklet
               auto charge_p_i = topology.GetCharge(atoms_id);
               auto atoms_coord_i = locator.GetPtsPosition(atoms_id);
               auto num_components = special_ids.GetNumberOfComponents();
-
+              //printf("atoms_id %i num_components %i\n", atoms_id, num_components);
               for (Id j = 0; j < num; ++j)
               {
                 auto id = group_vec[j];
+                //printf("atom_count %i  id2 %i\n", num, group_vec[j]);
                 if (atoms_id == id)
                   continue;
                 
@@ -1465,10 +1466,12 @@ namespace RunWorklet
 
                 Real weight = 1.0;
                 for (auto i = 0; i < num_components; ++i)
-                {
+                {  
+                   //printf("num_components %i special_ids %f\n", num_components, special_ids[i]);
                   if (special_ids[i] == id)
                   {
                     weight  = special_weights[i];
+                    //printf("weight %f\n", weight);
                   }
                 }
 

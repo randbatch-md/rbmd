@@ -108,6 +108,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     else
       forcebondij = 0.0;
     forcebondij = r_ij * forcebondij;
+    //printf("force_bond, %f %f %f\n", forcebondij[0], forcebondij[1], forcebondij[2]);
 
     bondEnergy = rk * dr;
   }
@@ -249,6 +250,11 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     force_anglei = a11 * r_ij + a12 * r_kj;
     force_anglek = a22 * r_kj + a12 * r_ij;
+    auto force_anglej = -(force_anglei+ force_anglek);
+    //printf("force_anglei, %f %f %f\n", force_anglei[0], force_anglei[1], force_anglei[2]);
+    //printf("force_anglej, %f %f %f\n", force_anglej[0], force_anglej[1], force_anglej[2]);
+    //printf("force_anglek, %f %f %f\n", force_anglek[0], force_anglek[1], force_anglek[2]);
+
   }
 
    Vec3f _box;
