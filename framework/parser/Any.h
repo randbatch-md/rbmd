@@ -1,3 +1,29 @@
+ï»¿//==================================================================================
+//  RBMD 2.1.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
 //
 // Implementation of N4562 std::experimental::any (merged into C++17) for C++11 compilers.
 //
@@ -8,7 +34,7 @@
 //   + https://cplusplus.github.io/LWG/lwg-active.html#2509
 //
 //
-// Copyright (c) 2016 Denilson das Merc¨ºs Amorim
+// Copyright (c) 2016 Denilson das MercÃªs Amorim
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -289,7 +315,7 @@ private: // Storage and Virtual Method Table
   struct requires_allocation
     : std::integral_constant<
         bool,
-        !(std::is_nothrow_move_constructible<T>::value // N4562 ¡ì6.3/3 [any.class]
+        !(std::is_nothrow_move_constructible<T>::value // N4562 Â§6.3/3 [any.class]
           && sizeof(T) <= sizeof(storage_union::stack) &&
           std::alignment_of<T>::value <= std::alignment_of<storage_union::stack_storage_t>::value)>
   {
