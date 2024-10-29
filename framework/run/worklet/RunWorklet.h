@@ -76,6 +76,20 @@ namespace RunWorklet
                          const CoordOffsetType& coord_offset_j,
                          vtkm::cont::ArrayHandle<Vec3f>& nearforce);
 
+   void NearForceVerletERFSpecialBonds(const Real& cut_off,
+       const Vec3f& box,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+       const ContPointLocator& locator,
+       const ContTopology& topology,
+       const ContForceFunction& force_function,
+       const ContStaticTable& static_table,
+       const GroupVecType& Group_j,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+       const CoordOffsetType& coord_offset_j,
+       const GroupIdIdType& group_ids,
+       const GroupRealIdType& group_weights,
+       vtkm::cont::ArrayHandle<Vec3f>& nearforce);
+
    void LJForceVerlet(const Real& cut_off,
                       const Vec3f& box,
                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

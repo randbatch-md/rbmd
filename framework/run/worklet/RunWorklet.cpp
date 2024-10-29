@@ -236,6 +236,94 @@ namespace RunWorklet
       Vec3f _box;
     };
 
+    struct ComputeNearForceVerletERFSpecialBondsWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputeNearForceVerletERFSpecialBondsWorklet(const Real& cut_off, const Vec3f& box)
+            : _cut_off(cut_off)
+            , _box(box)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            ExecObject locator,
+            ExecObject topology,
+            ExecObject force_function,
+            ExecObject static_table,
+            FieldIn group_j,
+            FieldIn num_j,
+            FieldIn coord_offset_j,
+            FieldIn special_ids,
+            FieldIn special_weights,
+            FieldOut nearforce);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8,_9, _10, _11);
+
+        template<typename NeighbourGroupVecType, 
+                typename CoordOffsetj,
+                typename idsType,
+                typename weightsType>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const ExecPointLocator& locator,
+            const ExecTopology& topology,
+            const ExecForceFunction& force_function,
+            const ExecStaticTable& static_table,
+            const NeighbourGroupVecType& group_j,
+            const Id& num_j,
+            const CoordOffsetj& coord_offset_j,
+            const idsType& special_ids,
+            const weightsType& special_weights,
+            Vec3f& nearforce) const
+        {
+            Vec3f LJ_force = { 0, 0, 0 };
+            Vec3f ele_force = { 0, 0, 0 };
+
+            nearforce = { 0, 0, 0 };
+            const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+            const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+            auto eps_i = topology.GetEpsilon(pts_type_i);
+            auto sigma_i = topology.GetSigma(pts_type_i);
+            auto charge_pi = topology.GetCharge(atoms_id);
+
+            auto num_components = special_ids.GetNumberOfComponents();
+            auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+            {
+                auto charge_pj = topology.GetCharge(pts_id_j);
+                auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+                auto pts_type_j = topology.GetAtomsType(pts_id_j);
+                auto eps_j = topology.GetEpsilon(pts_type_j);
+                auto sigma_j = topology.GetSigma(pts_type_j);
+                auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+                Real dispij = vtkm::Magnitude(r_ij);
+                IdComponent index_table_pij = static_table.Extract(dispij);
+                auto table_pij = static_table.TableGnearValue(dispij, index_table_pij);
+                ele_force += force_function.ComputeNearEnergyForceERF(p_i, p_j, charge_pi, charge_pj, table_pij);
+
+                Vec3f LJ_force_single = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+                auto weight = 1.0;
+                for (auto i = 0; i < num_components; ++i)
+                {
+                    if (special_ids[i] == pts_id_j)
+                    {
+                        weight = special_weights[i];
+                    }
+                }
+                LJ_force += weight * LJ_force_single;
+            };
+
+            auto p_i = locator.GetPtsPosition(atoms_id);
+
+            for (Id p = 0; p < num_j; p++)
+            {
+                auto idj = group_j[p];
+                auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+                function(p_i, p_j, idj);
+            }
+            nearforce = LJ_force + ele_force;
+        }
+        Real _cut_off;
+        Vec3f _box;
+    };
+
     struct ComputeLJForceVerletWorklet : vtkm::worklet::WorkletMapField
     {
       ComputeLJForceVerletWorklet(const Real& cut_off, const Vec3f& box)
@@ -1990,6 +2078,35 @@ namespace RunWorklet
                             coord_offset_j,
                             nearforce);
     }
+
+    void NearForceVerletERFSpecialBonds(const Real& cut_off,
+        const Vec3f& box,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const ContPointLocator& locator,
+        const ContTopology& topology,
+        const ContForceFunction& force_function,
+        const ContStaticTable& static_table,
+        const GroupVecType& Group_j,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+        const CoordOffsetType& coord_offset_j,
+        const GroupIdIdType& group_ids,
+        const GroupRealIdType& group_weights,
+        vtkm::cont::ArrayHandle<Vec3f>& nearforce)
+    {
+        vtkm::cont::Invoker{}(ComputeNearForceVerletERFSpecialBondsWorklet{ cut_off, box },
+            atoms_id,
+            locator,
+            topology,
+            force_function,
+            static_table,
+            Group_j,
+            num_j,
+            coord_offset_j,
+            group_ids,
+            group_weights,
+            nearforce);
+    }
+
     void LJForceVerlet(const Real& cut_off,
                        const Vec3f& box,
                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,

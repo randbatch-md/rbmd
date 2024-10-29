@@ -297,15 +297,10 @@ auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
       _near_ele_potential_energy_avr = near_ele_potential_energy_total / N;
       _near_ele_potential_energy_avr = _near_ele_potential_energy_avr * unit_factor._qqr2e;
 
-      std::cout << "coul_old: "  << _near_ele_potential_energy_avr << std::endl;
       _spec_far_ele_potential_energy_avr = 0.0;
       SpecialFarCoulEnergy();
       _near_ele_potential_energy_avr =
         _near_ele_potential_energy_avr - _spec_far_ele_potential_energy_avr;
-
-      std::cout << "special_coul: " << _spec_far_ele_potential_energy_avr
-          << "coul: " << _near_ele_potential_energy_avr << std::endl;
-
 
       //2:self_potential_energy_avr
       ArrayHandle<Real> _self_energy;

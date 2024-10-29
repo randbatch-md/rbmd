@@ -89,30 +89,30 @@ void ExecutionNVT::PreSolve()
 
 void ExecutionNVT::Solve()
 {
-  //// stage1:
-  //UpdateVelocity();
+  // stage1:
+  UpdateVelocity();
 
-  //// stage2:
-  //UpdatePosition();
+  // stage2:
+  UpdatePosition();
 
-  ////New added
-  //if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
-  //{
-  //  ConstraintA();
-  //}
+  //New added
+  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+  {
+    ConstraintA();
+  }
 
-  //// stage3:
-  //ComputeForce();
-  //UpdateVelocity();
+  // stage3:
+  ComputeForce();
+  UpdateVelocity();
 
-  ////New added
-  //if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
-  //{
-  //  ConstraintB();
-  //}
+  //New added
+  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+  {
+    ConstraintB();
+  }
 
-  //ComputeTempe();
-  //UpdateVelocityByTempConType();
+  ComputeTempe();
+  UpdateVelocityByTempConType();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -359,14 +359,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForce()
   {
     RunWorklet::SumFarNearForce(EleNearForce(), LJForce(), _nearforce);
   }
-  std::ofstream outfile3("force_near.txt");
-  for (vtkm::Id i = 0; i < _nearforce.GetNumberOfValues(); ++i)
-  {
-      auto _all_force_values = _nearforce.ReadPortal().Get(i);
-      outfile3 << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-          << std::endl;
-  }
-  outfile3.close();
   return _nearforce;
 }
 
@@ -475,14 +467,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
     vtkm::worklet::Keys<vtkm::Id> keys_bond(bondlist);
     Invoker{}(MolecularWorklet::ReduceForceWorklet{}, keys_bond, forcebond, reduce_force_bond);
   }
-  std::ofstream outfile3("force_bond.txt");
-  for (vtkm::Id i = 0; i < reduce_force_bond.GetNumberOfValues(); ++i)
-  {
-      auto _all_force_values = reduce_force_bond.ReadPortal().Get(i);
-      outfile3 << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-          << std::endl;
-  }
-  outfile3.close();
   return reduce_force_bond;
 }
 
@@ -555,14 +539,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
     vtkm::worklet::Keys<vtkm::Id> keys_angle(angle_list);
     Invoker{}(MolecularWorklet::ReduceForceWorklet{}, keys_angle, force_angle, reduce_force_angle);
   }
-  std::ofstream outfile3("force_angle.txt");
-  for (vtkm::Id i = 0; i < reduce_force_angle.GetNumberOfValues(); ++i)
-  {
-      auto _all_force_values = reduce_force_angle.ReadPortal().Get(i);
-      outfile3 << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-          << std::endl;
-  }
-  outfile3.close();
 
   return reduce_force_angle;
 }
@@ -634,7 +610,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
             keys_dihedrals,
             vtkm::cont::make_ArrayHandle(new_force_dihedrals),
             reduce_force_dihedrals);
-
   return reduce_force_dihedrals;
 }
 
@@ -669,14 +644,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
   {  
     RunWorklet::ComputeSpecialCoul(box, _atoms_id, groupVecArray, _force_function, _topology, _locator, _spec_coul_force);
   }
-  std::ofstream outfile3("force_spec_coul.txt");
-  for (vtkm::Id i = 0; i < _spec_coul_force.GetNumberOfValues(); ++i)
-  {
-      auto _all_force_values = _spec_coul_force.ReadPortal().Get(i);
-      outfile3 << i << " " << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-          << std::endl;
-  }
-  outfile3.close();
 
   return _spec_coul_force;
 }
@@ -696,14 +663,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::EleNewForce()
   }
 
   Invoker{}(MolecularWorklet::UnitRescaleWorklet{ _unit_factor._qqr2e }, _ele_new_force);
-  std::ofstream outfile3("force_ewald.txt");
-  for (vtkm::Id i = 0; i < _ele_new_force.GetNumberOfValues(); ++i)
-  {
-      auto _all_force_values = _ele_new_force.ReadPortal().Get(i);
-      outfile3 << _all_force_values[0] << " " << _all_force_values[1] << " " << _all_force_values[2]
-          << std::endl;
-  }
-  outfile3.close();
   return _ele_new_force;
 }
 
