@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.12...3.15 FATAL_ERROR)
 
 set(CMAKE_CXX_STANDARD 17)
-
+add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 set(project_name rbmd)
 project(${project_name} CXX)
 
