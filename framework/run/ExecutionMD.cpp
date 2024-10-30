@@ -370,7 +370,7 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   vtkm::cont::Timer timer;
-  timer.Start()
+  timer.Start();
   ArrayHandle<Vec2f> new_whole_rhok;
   ComputeNewChargeStructureFactorRBE(box, psample, new_whole_rhok);
   
@@ -591,7 +591,7 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
                                           offset_verletlist_group);
 
   vtkm::cont::Timer timer;
-  timer.Start()
+  timer.Start();
 
   RunWorklet::LJForceRBL(rs_num,
                          pice_num,
