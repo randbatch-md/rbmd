@@ -369,6 +369,8 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
+  vtkm::cont::Timer timer;
+  timer.Start()
   ArrayHandle<Vec2f> new_whole_rhok;
   ComputeNewChargeStructureFactorRBE(box, psample, new_whole_rhok);
   
@@ -379,7 +381,8 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                     _topology,
                                     _locator,
                                     RBE_ele_force);
- 
+
+  std::cout << "RBE: " << timer.GetElapsedTime() << std::endl;
 
 }
 
@@ -587,6 +590,9 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
                                           num_verletlist_group,
                                           offset_verletlist_group);
 
+  vtkm::cont::Timer timer;
+  timer.Start()
+
   RunWorklet::LJForceRBL(rs_num,
                          pice_num,
                          box,
@@ -602,6 +608,8 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
+
+  std::cout << "RBL: " << timer.GetElapsedTime() << std::endl;
 }
 
 void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
