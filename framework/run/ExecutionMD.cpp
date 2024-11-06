@@ -979,6 +979,7 @@ void ExecutionMD::ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce)
   //mace = std::make_shared<maceload>();
   //auto mace = _app.GetMace();
   //maceload& mace = *(_app.GetMace());
+  //auto start_time2 = std::chrono::high_resolution_clock::now();
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   // 加载盒子
@@ -1060,7 +1061,10 @@ void ExecutionMD::ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce)
     }
     
   }
-
+  //auto end_time2 = std::chrono::high_resolution_clock::now();
+  //auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(end_time2 - start_time2);
+  //std::cout << "listTime elapsed: " << duration2.count() << " milliseconds" << std::endl;
+  //auto start_time4 = std::chrono::high_resolution_clock::now();
   macetest.loadedges_index(edge0, edge1, unit_shifts, shifts);
 
   // 初始化结束  进行计算
@@ -1069,7 +1073,7 @@ void ExecutionMD::ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce)
   // 导出力
   auto all_force_temp = macetest.forcesout(mace_output);
   
-
+  //auto start_time5 = std::chrono::high_resolution_clock::now();
   vtkm::cont::ArrayCopy(vtkm::cont::make_ArrayHandle(all_force_temp),allforce);
   auto allforce_read = allforce.ReadPortal();
   //for (size_t i = 0; i < allforce.GetNumberOfValues(); i++)
@@ -1082,5 +1086,12 @@ void ExecutionMD::ComputeVerletlistNearForce_Mace(ArrayHandle<Vec3f>& allforce)
   Real energy = macetest.energyout(mace_output);
   _para.SetParameter(PARA_MACE_ENERGY, energy);
   //_energy_file << energy << std::endl;
+  /* auto end_time3 = std::chrono::high_resolution_clock::now();
+  auto duration3 = std::chrono::duration_cast<std::chrono::milliseconds>(end_time3 - start_time2);
+  auto duration4 = std::chrono::duration_cast<std::chrono::milliseconds>(end_time3 - start_time4);
+  auto duration5 = std::chrono::duration_cast<std::chrono::milliseconds>(end_time3 - start_time5);
+  std::cout << "hou-maceTime elapsed: " << duration5.count() << " milliseconds" << std::endl;
+  std::cout << "houTime elapsed: " << duration4.count() << " milliseconds" << std::endl;
+  std::cout << "allTime elapsed: " << duration3.count() << " milliseconds" << std::endl;*/
   
 }

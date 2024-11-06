@@ -7,7 +7,7 @@
 #include <vector>
 #include <vtkm/Types.h>
 #include"Types.h"
-
+#include <chrono>
 
 //#include "locator/ContPointLocator.h"
 
@@ -23,16 +23,20 @@ class maceload
         //void loadatoms();
         void loadatoms(std::vector<std::string>);
         void loadmass(std::vector<float>);
+        /*void loadedges_index(const std::vector<Id> edge0,
+                             const std::vector<Id> edge1,
+                             const std::vector<Vec3f> unit_shifts,
+                             const std::vector<Vec3f> shifts);*/
         void loadedges_index(std::vector<Id> edge0,
-                             std::vector<Id> edge1,
-                             std::vector<Vec3f> unit_shifts,
-                             std::vector<Vec3f> shifts);
+                                 std::vector<Id> edge1,
+                                 std::vector<Vec3f> unit_shifts,
+                                 std::vector<Vec3f> shifts);
         c10::impl::GenericDict forward();
         double energyout(c10::impl::GenericDict ouput);
         std::vector<Vec3f> forcesout(c10::impl::GenericDict ouput);
         torch::Tensor virialout(c10::impl::GenericDict ouput);
         torch::Tensor atomenergy(c10::impl::GenericDict ouput);
-        c10::ScalarType torch_float_dtype = torch::kF64;
+        c10::TensorOptions torch_float_dtype = torch::dtype(torch::kF64);
         double mace_r_max;
         torch::jit::script::Module model;
         int n_nodes, n_edges;
@@ -48,8 +52,12 @@ class maceload
         torch::Tensor weight = torch::empty({ 1 }, torch_float_dtype);
         torch::Tensor energy = torch::empty({ 1 }, torch_float_dtype);
         torch::Tensor positions;
-
-
+        double eng_vdwl;
+        torch::TensorOptions optsint32 = torch::TensorOptions().dtype(torch::kInt32);
+        torch::TensorOptions optsint64 = torch::TensorOptions().dtype(torch::kInt64);
+        torch::TensorOptions optsfloat32 = torch::TensorOptions().dtype(torch::kF32);
+        torch::TensorOptions optsfloat64 = torch::TensorOptions().dtype(torch::kF64);
+        //using DeviceType = Kokkos::Experimental::HIP;
         torch::Tensor batch;
         torch::Tensor forces;
         torch::Tensor ptr = torch::zeros({ 2 }, torch::dtype(torch::kInt64));

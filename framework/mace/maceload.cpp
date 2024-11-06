@@ -5,6 +5,8 @@
 #include <array>
 #include <mace/maceload.h>
 #include <torch/jit.h>
+#include <chrono>
+
 maceload macetest;
 
 maceload::maceload(){};
@@ -15,9 +17,11 @@ void maceload::init(int nodes_, bool v_g, std::string path_, std::string device_
   n_nodes = nodes_;
   std::cout << n_nodes<<" atoms " << std::endl;
   vflag_global = bool(v_g);
+  //Kokkos::initialize();
   if (device_name != "cuda" && device_name != "dcu")
   {
     device = c10::Device(torch::kCPU);
+  //  using DeviceType = Kokkos::DefaultHostExecutionSpace;
   }
       /*
     if (!torch::cuda::is_available()) {
@@ -35,7 +39,7 @@ void maceload::init(int nodes_, bool v_g, std::string path_, std::string device_
         std::cerr << "Error load mace model\n";
     }
     mace_r_max = model.attr("r_max").toTensor().item<double>();
-    double num_inter = model.attr("num_interactions").toTensor().item<double>();
+    //double num_inter = model.attr("num_interactions").toTensor().item<double>();
     //std::cout << num_inter <<std::endl;
     auto mace_atom_table = model.attr("atomic_numbers").toTensor();
     n_node_feats = mace_atom_table.numel();
@@ -50,20 +54,27 @@ void maceload::init(int nodes_, bool v_g, std::string path_, std::string device_
         mace_feats_table.push_back(transsymbol);
         //std::cout<< transsymbol << std::endl;
         //std::cout << transmass << std::endl;
-    }
-
-    //std::cout << mace_feats_mass_table << std::endl;
-    //std::cout << mace_feats_table << std::endl;
-    //std::cout << mace_r_max << std::endl;
-    //std::cout << n_node_feats <<std::endl;
+    }    
+    energy = energy.to(device);
+    //torch::Tensor positions;
+    //torch::Tensor batch;
+    //torch::Tensor forces;
+    //torch::Tensor node_attrs;
+    //torch::Tensor edge_index;
+    //torch::Tensor unit_shifts;
+    //torch::Tensor shifts;
+    //torch::Tensor mask;
 }
 void maceload::loadatoms(std::vector<std::string> symbollist) {
     /* no change between two timestep */
-    batch = torch::zeros({ n_nodes }, torch::dtype(torch::kInt64));
-    forces = torch::empty({ n_nodes,3 }, torch_float_dtype);
+    batch = torch::zeros({ n_nodes }, torch::dtype(torch::kInt64).device(device));
+    forces = torch::empty({ n_nodes, 3 }, torch_float_dtype.device(device));
+
     ptr[1] = n_nodes;
+    ptr = ptr.to(device);
     weight[0] = 1.0;
-    node_attrs = torch::zeros({ n_nodes,n_node_feats }, torch_float_dtype);
+    weight = weight.to(device);
+    node_attrs = torch::zeros({ n_nodes, n_node_feats }, torch_float_dtype.device(device));
 
     for (int n_a_i = 0; n_a_i < n_nodes; ++n_a_i) {
         //std::string as = symbollist[n_a_i];
@@ -77,19 +88,22 @@ void maceload::loadatoms(std::vector<std::string> symbollist) {
             std::cerr << "Unsupported element symbol!\n";
         }
     }
-    mask = torch::empty({ n_nodes }, torch::dtype(torch::kBool));
-    for (int i = 0; i < n_nodes; ++i) {
-        mask[i] = true;
-    }
+    mask = torch::ones({ n_nodes }, torch::dtype(torch::kBool));
+   // for (int i = 0; i < n_nodes; ++i) {
+   //     mask[i] = true;
+   // }
 }
 void maceload::loadmass(std::vector<float> masslist)
 {
   /* no change between two timestep */
-  batch = torch::zeros({ n_nodes }, torch::dtype(torch::kInt64));
-  forces = torch::empty({ n_nodes, 3 }, torch_float_dtype);
+  batch = torch::zeros({ n_nodes }, torch::dtype(torch::kInt64).device(device));
+  forces = torch::empty({ n_nodes, 3 }, torch_float_dtype.device(device));
+
   ptr[1] = n_nodes;
+  ptr = ptr.to(device);
   weight[0] = 1.0;
-  node_attrs = torch::zeros({ n_nodes, n_node_feats }, torch_float_dtype);
+  weight = weight.to(device);
+  node_attrs = torch::zeros({ n_nodes, n_node_feats }, torch_float_dtype.device(device));
   for (int n_a_i = 0; n_a_i < n_nodes; ++n_a_i)
   {
     float am = masslist[n_a_i];
@@ -111,11 +125,11 @@ void maceload::loadmass(std::vector<float> masslist)
                 << std::endl;
     }
   }
-  mask = torch::empty({ n_nodes }, torch::dtype(torch::kBool));
-  for (int i = 0; i < n_nodes; ++i)
-  {
-    mask[i] = true;
-  }
+  mask = torch::ones({ n_nodes }, torch::dtype(torch::kBool));
+  //for (int i = 0; i < n_nodes; ++i)
+  //{
+  //  mask[i] = true;
+  //}
   //std::cout << "masses" << std::endl;
 }
 void maceload::loadcell(const Vec3f& box)
@@ -123,8 +137,6 @@ void maceload::loadcell(const Vec3f& box)
     cell[0][0] = box[0];
     cell[1][1] = box[1];
     cell[2][2] = box[2];
-    //std::cout << "cell" << std::endl;
-    //std::cout << cell << std::endl;
     /*
     h[0] = xprd;
     h[1] = yprd;
@@ -135,16 +147,17 @@ void maceload::loadcell(const Vec3f& box)
     h[3] = yz;
     h[4] = xz;
     h[5] = xy;
-    cell[2][1] =  domain->h[3];
-    cell[2][0] = domain->h[4];
-    cell[1][0] = domain->h[5];
+    cell[2][1] = h[3];
+    cell[2][0] = h[4];
+    cell[1][0] = h[5];
     h_inv[3] = -h[3] / (h[1]*h[2]);
     h_inv[4] = (h[3]*h[5] - h[1]*h[4]) / (h[0]*h[1]*h[2]);
     h_inv[5] = -h[5] / (h[0]*h[1]);*/
+    cell = cell.to(device);
 }
 void maceload::loadpositions(const vtkm::cont::ArrayHandle<Vec3f>& position_rbmd)
 {
-    positions = torch::empty({ n_nodes,3 }, torch_float_dtype);
+  positions = torch::empty({ n_nodes, 3 }, torch_float_dtype);
     auto read_position = position_rbmd.ReadPortal();
     
     for (size_t i = 0; i < n_nodes; i++)
@@ -153,8 +166,50 @@ void maceload::loadpositions(const vtkm::cont::ArrayHandle<Vec3f>& position_rbmd
     positions[i][1] = read_position.Get(i)[1];
     positions[i][2] = read_position.Get(i)[2];
     }
+    //positions = positions.to(device);
     //std::cout << "positions" << std::endl;
 }
+
+/*void maceload::loadedges_index(const std::vector<Id> edge0,
+                               const std::vector<Id> edge1,
+                               const std::vector<Vec3f> _unit_shifts,
+                               const std::vector<Vec3f> _shifts)
+{
+    int64_t index = edge0.size();
+    
+    // 创建 Kokkos 视图
+    auto k_edge_index = Kokkos::View<int64_t**, Kokkos::LayoutRight, DeviceType>("k_edge_index", 2, index);
+    auto k_unit_shifts = Kokkos::View<double**, Kokkos::LayoutRight, DeviceType>("k_unit_shifts", index,3);
+    auto k_shifts = Kokkos::View<double**, Kokkos::LayoutRight, DeviceType>("k_shifts", index,3);
+
+    // 使用 Kokkos 并行处理
+    Kokkos::parallel_for("LoadEdgesIndex", index, KOKKOS_LAMBDA(int i) {
+        //k_edge_index(0, i) = edge0[i];
+        //k_edge_index(1, i) = edge1[i];
+        k_unit_shifts(i, 0) = _unit_shifts[i][0];
+        k_unit_shifts(i, 1) = _unit_shifts[i][1];
+        k_unit_shifts(i, 2) = _unit_shifts[i][2];
+        k_shifts(i, 0) = _shifts[i][0];
+        k_shifts(i, 1) = _shifts[i][1];
+        k_shifts(i, 2) = _shifts[i][2];
+    });
+
+    // 导入 PyTorch 张量
+    edge_index = torch::from_blob(
+        k_edge_index.data(),
+        {2, index},
+        torch::TensorOptions().dtype(torch::kInt64).device(device));
+    
+    unit_shifts = torch::from_blob(
+        k_unit_shifts.data(),
+        {index, 3},
+        torch::TensorOptions().dtype(torch::kF64).device(device));
+    
+    shifts = torch::from_blob(
+        k_shifts.data(),
+        {index, 3},
+        torch::TensorOptions().dtype(torch::kF64).device(device));
+}*/
 void maceload::loadedges_index(std::vector<Id> edge0,
                                std::vector<Id> edge1,
                                std::vector<Vec3f> _unit_shifts,
@@ -215,13 +270,39 @@ void maceload::loadedges_index(std::vector<Id> edge0,
         }
     }*/
     //std::cout << "edges_start" << std::endl;
-    torch::TensorOptions optsint64 = torch::TensorOptions().dtype(torch::kInt64);
-    torch::TensorOptions optsdouble = torch::TensorOptions().dtype(torch::kF64);
+    //auto start_time1 = std::chrono::high_resolution_clock::now();
     int64_t index = edge0.size();
-    edge_index = torch::empty({ 2, index }, torch::dtype(torch::kInt64));
-    //torch::Tensor edge_index = torch::cat({ torch::from_blob(edge0.data(), {1,index },optsint64).clone(), torch::from_blob(edge1.data(), { 1,index }, optsint64).clone() }, 0);
+    //std::cout << index << std::endl;
+    if (std::is_same<Id, vtkm::Int64>::value)
+    {
+      edge_index =
+        torch::cat({ torch::from_blob(edge0.data(), { 1, index }, optsint64),
+                     torch::from_blob(edge1.data(), { 1, index }, optsint64) },
+                   0);
+    }
+    else if (std::is_same<Id, vtkm::Int32>::value)
+    {
+      edge_index =
+        torch::cat({ torch::from_blob(edge0.data(), { 1, index }, optsint32).contiguous(),
+                     torch::from_blob(edge1.data(), { 1, index }, optsint32).contiguous() },
+                   0)
+          .to(torch::kInt64);
+    }
+    if (std::is_same<FloatDefault, vtkm::Float64>::value)
+    {
+      shifts = torch::from_blob(_shifts.data(), { index, 3 }, optsfloat64);
+      unit_shifts = torch::from_blob(_unit_shifts.data(), { index, 3 }, optsfloat64);
+    }
+    else if (std::is_same<FloatDefault, vtkm::Float32>::value)
+    {
+      shifts = torch::from_blob(_shifts.data(), { index, 3 }, optsfloat32).to(torch::kF64);
+      unit_shifts = torch::from_blob(_unit_shifts.data(), { index, 3 }, optsfloat32).to(torch::kF64);
+    }
+    //edge_index = torch::cat({ torch::from_blob(edge0.data(), {1,index },optsint32).clone(), torch::from_blob(edge1.data(), { 1,index }, optsint32).clone() }, 0).to(torch::kInt64);
+    /*edge_index = torch::empty({ 2, index }, torch::dtype(torch::kInt64));
     unit_shifts = torch::zeros({ index, 3 }, torch_float_dtype);
     shifts = torch::zeros({ index, 3 }, torch_float_dtype);
+
     for (size_t i = 0; i < index; i++)
     {
       edge_index[0][i] =edge0[i] ;
@@ -232,7 +313,10 @@ void maceload::loadedges_index(std::vector<Id> edge0,
       shifts[i][0] = _shifts[i][0];
       shifts[i][1] = _shifts[i][1];
       shifts[i][2] = _shifts[i][2];
-    }
+    }*/
+    //auto end_time1 = std::chrono::high_resolution_clock::now();
+    //auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end_time1 - start_time1);
+    //std::cout << "Time elapsed1: " << duration1.count() << " milliseconds" << std::endl;
     //std::cout << "edges_index" << std::endl;
     /*
     torch::TensorOptions opts = torch::TensorOptions().dtype(torch::kInt64);
@@ -287,8 +371,10 @@ void maceload::loadedges_index(std::vector<Id> edge0,
 
 double maceload::energyout(c10::impl::GenericDict ouput)
 {
-  torch::Tensor energy = ouput.at("total_energy_local").toTensor().cpu();
-  double eng_vdwl = energy.item<double>();
+  energy = ouput.at("total_energy_local").toTensor().cpu();
+  eng_vdwl = energy.item<double>();
+//  std::cout << node_energy_ptr<< std::endl;
+
   return eng_vdwl;
 }
 
@@ -302,21 +388,22 @@ c10::impl::GenericDict maceload::forward() {
     else {
         device = torch::Device(torch::DeviceType::CUDA);
     }*/
+    //std::cout << "forward_start"<< std::endl;
+    //auto start_time = std::chrono::high_resolution_clock::now();
     c10::Dict<std::string, torch::Tensor> input;
-    //std::cout << cell << std::endl;
     try
     {
-      batch = batch.to(device);
-      cell = cell.to(device);
+      //batch = batch.to(device);
+      //cell = cell.to(device);
       edge_index = edge_index.to(device);
-      energy = energy.to(device);
-      forces = forces.to(device);
-      node_attrs = node_attrs.to(device);
+      //energy = energy.to(device);
+      //forces = forces.to(device);
+      //node_attrs = node_attrs.to(device);
       positions = positions.to(device);
-      ptr = ptr.to(device);
+      //ptr = ptr.to(device);
       shifts = shifts.to(device);
       unit_shifts = unit_shifts.to(device);
-      weight = weight.to(device);
+      //weight = weight.to(device);
     }
     catch (const c10::Error& e)
     {
@@ -344,6 +431,7 @@ c10::impl::GenericDict maceload::forward() {
     std::cout << shifts.dtype() << std::endl; 
     std::cout << unit_shifts.dtype() << std::endl; 
     std::cout << weight.dtype() << std::endl; */
+    //std::cout << edge_index.sizes() << std::endl;
     input.insert("batch", batch);
     input.insert("cell", cell);
     input.insert("edge_index", edge_index);
@@ -356,15 +444,26 @@ c10::impl::GenericDict maceload::forward() {
     input.insert("unit_shifts", unit_shifts);
     input.insert("weight", weight);
     //std::cout << "数据载入完成" << std::endl;
+
     model.eval();
     c10::impl::GenericDict output = model.forward({ input, mask.to(device), bool(vflag_global) }).toGenericDict();
+    //auto end_time = std::chrono::high_resolution_clock::now();
+    //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    //std::cout << "Time elapsed: " << duration.count() << " milliseconds" << std::endl;
     //std::cout << "模型前向完成" << std::endl;
     return output;
 }
 
 std::vector<Vec3f> maceload::forcesout(c10::impl::GenericDict ouput)
 {
+    //auto start_timef = std::chrono::high_resolution_clock::now();
     forces = ouput.at("forces").toTensor().cpu();
+    /* if (!forces.is_contiguous())
+    {
+      std::cout << "s" << std::endl;
+      forces = forces.contiguous(); // 确保张量在内存中是连续的
+    }*/
+    //auto start_timef = std::chrono::high_resolution_clock::now();
     std::vector<Vec3f> _force(n_nodes);
     for (size_t i = 0; i < n_nodes; i++)
     {
@@ -372,7 +471,10 @@ std::vector<Vec3f> maceload::forcesout(c10::impl::GenericDict ouput)
       _force[i][1] = forces[i][1].item<float>();
       _force[i][2] = forces[i][2].item<float>();
     }
-    //std::cout << forces << std::endl;
+    //auto end_timef = std::chrono::high_resolution_clock::now();
+    //uto durationf = std::chrono::duration_cast<std::chrono::milliseconds>(end_timef - start_timef);
+    //std::cout << "force elapsed: " << durationf.count() << " milliseconds" << std::endl;
+  //  std::cout << forces << std::endl;
     return _force;
 }
 torch::Tensor maceload::virialout(c10::impl::GenericDict ouput) {
