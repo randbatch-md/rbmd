@@ -28,6 +28,7 @@
 
 #include <unordered_map>
 #include <string>
+#include <vector>
 class TableBase
 {
 public:
@@ -40,4 +41,5 @@ public:
 
 protected:
   std::unordered_map<std::string, std::string> _row_data;
+  std::vector<std::string> _keys;
 };

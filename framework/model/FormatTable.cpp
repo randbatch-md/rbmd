@@ -52,6 +52,7 @@ bool FormatTable::AddHeader(const std::string& name)
   }
 
   _row_data.insert(std::make_pair(name, ""));
+  _keys.push_back(name);
 
   return true;
 }
@@ -81,8 +82,8 @@ void FormatTable::Print()
 
 void FormatTable::PrintHeader() 
 {
-  auto begin = _row_data.begin();
-  auto end = _row_data.end();
+  auto begin = _keys.begin();
+  auto end = _keys.end();
   auto color = fmt::fg(fmt::color::yellow);
   for (auto iter = begin; iter != end; ++iter)
   {
@@ -97,11 +98,11 @@ void FormatTable::PrintHeader()
   for (auto iter = begin; iter != end; ++iter)
   {
     if (iter == begin)
-      fmt::print(color, "│{0: ^{1}}", iter->first, _column_width);
+      fmt::print(color, "│{0: ^{1}}", *iter, _column_width);
     else if (std::next(iter) == end)
-      fmt::print(color, "{0: ^{1}}│\n", iter->first, _column_width);
+      fmt::print(color, "{0: ^{1}}│\n", *iter, _column_width);
     else
-      fmt::print(color, "{0: ^{1}}", iter->first, _column_width);
+      fmt::print(color, "{0: ^{1}}", *iter, _column_width);
   }
 
   for (auto iter = begin; iter != end; ++iter)
@@ -117,18 +118,18 @@ void FormatTable::PrintHeader()
 
 void FormatTable::PrintRowData() 
 {
-  auto begin = _row_data.begin();
-  auto end = _row_data.end();
+  auto begin = _keys.begin();
+  auto end = _keys.end();
   auto color = fmt::fg(fmt::color::white);
 
   for (auto iter = begin; iter != end; ++iter)
   {
     if (iter == begin)
-      fmt::print(color, "│{0: ^{1}}", iter->second, _column_width);
+      fmt::print(color, "│{0: ^{1}}", _row_data[*iter], _column_width);
     else if (std::next(iter) == end)
-      fmt::print(color, "{0: ^{1}}│\n", iter->second, _column_width);
+      fmt::print(color, "{0: ^{1}}│\n", _row_data[*iter], _column_width);
     else
-      fmt::print(color, "{0: ^{1}}", iter->second, _column_width);
+      fmt::print(color, "{0: ^{1}}", _row_data[*iter], _column_width);
   }
 
   for (auto iter = begin; iter != end; ++iter)
