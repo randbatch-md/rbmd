@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <unordered_map>
+#include <vector>
 #include <string>
 class TableBase
 {
@@ -14,4 +15,5 @@ public:
 
 protected:
   std::unordered_map<std::string, std::string> _row_data;
+  std::vector<std::string> _keys;
 };
