@@ -156,7 +156,10 @@ void ExecutionNVT::ComputeAllForce()
   {
     RunWorklet::SumFarNearForce(EleNewForce(), NearForce(), _all_force);
 
-    Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
+    _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
+    if (_nearforce_type == "RBL") {
+       Invoker{}(MolecularWorklet::AddForceWorklet{}, SpecialCoulForce(), _all_force);
+    }
 
     //all force with bondforce
     Invoker{}(MolecularWorklet::AddForceWorklet{}, BondForce(), _all_force);
@@ -353,7 +356,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForce()
   }
   else if (_nearforce_type == "VERLETLIST")
   {
-    ComputeVerletlistNearForce(_nearforce);
+    ComputeVerletlistNearForce(_nearforce, _nearVirial_atom);
   }
   else if (_nearforce_type == "ORIGINAL")
   {
@@ -401,6 +404,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceEAM()
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
 {
   // original
+    auto N = _position.GetNumberOfValues();
   auto bondlist = _para.GetFieldAsArrayHandle<Id>(field::bond_atom_id);
   auto bond_type = _para.GetFieldAsArrayHandle<Id>(field::bond_type);
   vtkm::IdComponent bondlist_num = bondlist.GetNumberOfValues();
@@ -416,7 +420,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
   vtkm::cont::ArrayHandle<Vec3f> forcebond;
   vtkm::cont::ArrayHandle<Real> bond_energy;
   auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
-  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ _box },
+  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ N,_box },
             bond_type,
             bondlist_group,
             bond_coeffs_k,
@@ -424,6 +428,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
             _position,
             forcebond_group,
             bond_energy,
+            _bond_virial_atom_1,
             _locator);
 
   auto bond_energy_avr =
@@ -473,6 +478,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
 {
   //angle
+    auto N = _position.GetNumberOfValues();
   auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
   auto angle_type = _para.GetFieldAsArrayHandle<Id>(field::angle_type);
   vtkm::IdComponent anglelist_num = angle_list.GetNumberOfValues();
@@ -487,7 +493,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
   vtkm::cont::ArrayHandle<Vec3f> force_angle;
   vtkm::cont::ArrayHandle<Real> angle_energy;
   auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
-  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ _box },
+  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ N,_box },
             angle_type,
             anglelist_group,
             angle_coeffs_k,
@@ -495,6 +501,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
             _position,
             forceangle_group,
             angle_energy,
+            _angle_virial_atom_1,
             _locator);
 
   auto angle_energy_avr =
@@ -573,6 +580,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
             _position,
             forcedihedrals_group,
             dihedrals_energy,
+           _dihedral_virial_atom,
             _locator);
 
   auto dihedrals_energy_avr =
@@ -639,11 +647,8 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
                                              _locator,
                                              ids_group,
                                              weight_group,
-                                             _spec_coul_force);
-  }
-  else
-  {  
-    RunWorklet::ComputeSpecialCoul(box, _atoms_id, groupVecArray, _force_function, _topology, _locator, _spec_coul_force);
+                                             _spec_coul_force,
+                                             _spec_coul_virial_atom);
   }
   return _spec_coul_force;
 }
@@ -654,12 +659,12 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::EleNewForce()
   if (_farforce_type == "RBE")
   {
     // New RBE force part
-    ComputeRBEEleForce(_psample, _RBE_P, _ele_new_force);
+    ComputeRBEEleForce(_psample, _RBE_P, _ele_new_force, _ewald_long_virial_atom);
   }
   else if (_farforce_type == "EWALD")
   {
     // New Ewald far part
-    ComputeEwaldEleForce(_Kmax, _ele_new_force);
+    ComputeEwaldEleForce(_Kmax, _ele_new_force,_ewald_long_virial_atom);
   }
 
   Invoker{}(MolecularWorklet::UnitRescaleWorklet{ _unit_factor._qqr2e }, _ele_new_force);
@@ -782,6 +787,7 @@ void ExecutionNVT::TimeIntegration() {}
 
 void ExecutionNVT::ConstraintA()
 {
+  auto N = _position.GetNumberOfValues();
   auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
   auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
 
@@ -795,14 +801,15 @@ void ExecutionNVT::ConstraintA()
   auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
 
   Invoker{}(
-    MolecularWorklet::NewConstraintAWaterBondAngleWorklet{ _box, _dt, _unit_factor._fmt2v, range },
+    MolecularWorklet::NewConstraintAWaterBondAngleWorklet{ N,_box, _dt, _unit_factor._fmt2v, range },
     anglelist_group,
     _old_position,
     _old_velocity,
     _all_force,
     _mass,
     position_flag,
-    _locator);
+    _locator,
+    _shake_first_virial_atom);
 
   vtkm::cont::ArrayCopy(_old_position, _position);
   vtkm::cont::ArrayCopy(_old_velocity, _velocity);

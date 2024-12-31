@@ -147,4 +147,40 @@ private:
   std::vector<Id> numforce;
 
   std::vector<Id> map; // mapping from atom types to elements
+
+  //
+  ArrayHandle<Vec6f> _nearVirial_atom;
+  ArrayHandle<Vec6f> _lj_virial_atom;
+  ArrayHandle<Vec6f> _coul_virial_atom;
+  ArrayHandle<Vec6f> _ewald_long_virial_atom;
+  ArrayHandle<Vec6f> _bond_virial_atom;
+  ArrayHandle<Real> _bond_virial_atom_1;
+  ArrayHandle<Vec6f> _angle_virial_atom;
+  ArrayHandle<Real> _angle_virial_atom_1;
+  ArrayHandle<Vec6f> _dihedral_virial_atom;
+  ArrayHandle<Vec6f> _spec_coul_virial_atom;
+
+  ArrayHandle<Vec6f> _shake_first_virial_atom;
+
+  Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
+  Real _pressure_scalar; // computed global pressure scalar
+
+  Real _lj_potential_energy;
+
+  //
+  Vec3f p_start, p_stop;
+  Vec3f p_period, p_target;
+
+  Vec3f p_current, dilation;
+  Real bulkmodulus;
+
+  //
+  Vec6f h, h_inv; // shape matrix in Voigt ordering
+
+  // orthogonal box
+
+  Real xprd, yprd, zprd;                // global box dimensions
+  Real xprd_half, yprd_half, zprd_half; // half dimensions
+  Vec3f prd;                            // array form of dimensions
+  Vec3f prd_half;                       // array form of half dimensions
 };

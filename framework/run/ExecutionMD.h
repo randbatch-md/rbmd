@@ -52,12 +52,13 @@ protected:
   std::vector<Vec2f> ComputeChargeStructureFactorRBE(Real& _Vlength, ArrayHandle<Vec3f>& _psample);
   void ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                           IdComponent& RBE_P,
-                          ArrayHandle<Vec3f>& RBE_ele_force);
-  void ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force);
+                          ArrayHandle<Vec3f>& RBE_ele_force,
+                          ArrayHandle<Vec6f>& ewald_long_virial_atom);
+  void ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom);
 
   void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
   void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce);
-  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce);
+  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& nearVirial_atom);
   void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce);
@@ -80,6 +81,11 @@ protected:
                                           ArrayHandle<Vec2f>& new_rhok);
   void InitPointLocator();
 
+
+  //
+  void ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& lj_virial);
+  void ComputeCoulVirial(ArrayHandle<Vec6f>& Coul_virial);
+  void ComputeEwaldLongVirial(IdComponent& Kmax, ArrayHandle<Vec6f>& Ewald_long_virial);
 protected:
   ArrayHandle<Id> _molecule_id;
   ArrayHandle<Id> _atoms_id;

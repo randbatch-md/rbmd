@@ -149,7 +149,7 @@ void ExecutionMD::SetParameters()
   _para.SetParameter(PARA_TIMESTEP, Get<Real>("timestep"));
   _para.SetParameter(PARA_NUM_STEPS, Get<Real>("num_steps"));
   _para.SetParameter(PARA_TEMPERATURE, GetVectorValue<Real>("temperature"));
-  _para.SetParameter(PARA_PRESSURE, GetVectorValue<Real>("pressure"));
+  _para.SetParameter(PARA_PRESSURE_VECTOR, GetVectorValue<Real>("pressure"));
 }
 
 void ExecutionMD::InitialCondition()
@@ -218,6 +218,7 @@ void ExecutionMD::InitERF()
 void ExecutionMD::UpdateVerletList() 
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto N = _position.GetNumberOfValues();
   auto verletlist_num = N * N;
 
@@ -241,7 +242,7 @@ void ExecutionMD::UpdateVerletList()
     vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
 
   RunWorklet::ComputeNeighbours(
-    cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+    cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   _locator.SetVerletListInfo(num_verletlist, id_verletlist_group, offset_verletlist_group);
 }
@@ -330,24 +331,30 @@ void ExecutionMD::InitParameters()
   _unit = _para.GetParameter<std::string>(PARA_UNIT);
   if (_unit == "REAL")
   {
-    _unit_factor._kB = 1.9872067 * vtkm::Pow(10.0, -3);
-    _unit_factor._fmt2v = 4.186 * vtkm::Pow(10.0, -4);
-    _unit_factor._mvv2e = 1.0 / (4.186 * vtkm::Pow(10.0, -4));
-    _unit_factor._qqr2e = 332.06371;
+      _unit_factor._kB = 1.9872067 * vtkm::Pow(10.0, -3);
+      _unit_factor._fmt2v = 4.186 * vtkm::Pow(10.0, -4);
+      _unit_factor._mvv2e = 1.0 / (4.186 * vtkm::Pow(10.0, -4));
+      _unit_factor._qqr2e = 332.06371;
+      _unit_factor._boltz = 0.0019872067;
+      _unit_factor._nktv2p = 68568.415;
   }
   else if (_unit == "LJ")
   {
-    _unit_factor._kB = 1.0;
-    _unit_factor._fmt2v = 1.0;
-    _unit_factor._mvv2e = 1.0;
-    _unit_factor._qqr2e = 1.0;
+      _unit_factor._kB = 1.0;
+      _unit_factor._fmt2v = 1.0;
+      _unit_factor._mvv2e = 1.0;
+      _unit_factor._qqr2e = 1.0;
+      _unit_factor._boltz = 1.0;
+      _unit_factor._nktv2p = 1.0;
   }
   else if (_unit == "METAL")
   {
-    _unit_factor._kB = 8.617343e-5;
-    _unit_factor._fmt2v = 1.0 / 1.0364269e-4;
-    _unit_factor._mvv2e = 1.0364269e-4;
-    _unit_factor._qqr2e = 14.399645;
+      _unit_factor._kB = 8.617343e-5;
+      _unit_factor._fmt2v = 1.0 / 1.0364269e-4;
+      _unit_factor._mvv2e = 1.0364269e-4;
+      _unit_factor._qqr2e = 14.399645;
+      _unit_factor._boltz = 8.617343e-5;
+      _unit_factor._nktv2p = 1.6021765e6;
   }
   _para.SetParameter(PARA_UNIT_FACTOR, _unit_factor);
 }
@@ -388,7 +395,8 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
 
 void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                   IdComponent& RBE_P,
-                                  ArrayHandle<Vec3f>& RBE_ele_force)
+                                  ArrayHandle<Vec3f>& RBE_ele_force,
+                                  ArrayHandle<Vec6f>& ewald_long_virial_atom)
 {
  
 
@@ -398,13 +406,15 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
   ArrayHandle<Vec2f> new_whole_rhok;
   ComputeNewChargeStructureFactorRBE(box, psample, new_whole_rhok);
   
-  RunWorklet::ComputeNewRBEForce(RBE_P,
+  RunWorklet::ComputeNewRBEForce(RBE_P, box,
                                     _atoms_id,
                                     psample,
-                                    /*whole_rhok,*/ new_whole_rhok, _force_function,
+                                    new_whole_rhok,
+                                    _force_function,
                                     _topology,
                                     _locator,
-                                    RBE_ele_force);
+                                    RBE_ele_force,
+                                    ewald_long_virial_atom);
  
 
 }
@@ -447,14 +457,14 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
   
 }
 
-void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force)
+void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom)
 {
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto rhok = ComputeChargeStructureFactorEwald(box, Kmax);
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   RunWorklet::ComputeNewFarElectrostatics(
-    Kmax, _atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force);
+    Kmax, box,_atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force, ewald_long_virial_atom);
 }
 
 void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
@@ -517,8 +527,8 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
   auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
   auto weight_group =
     vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
-  
-  
+
+ 
   _EleNearPairtimer.Start();
 
   if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
@@ -630,7 +640,7 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   RunWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
 }
 
-void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
+void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,ArrayHandle<Vec6f>& nearVirial_atom)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
@@ -653,18 +663,48 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce)
   auto offset_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
   vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
 
-  RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+  RunWorklet::ComputeNeighbours( cut_off, box,_atoms_id, _locator, id_verletlist_group,
+      num_verletlist, offset_verletlist_group);
 
-  RunWorklet::NearForceVerlet(cut_off,
-                              box,
-                              _atoms_id,
-                              _locator,
-                              _topology,
-                              _force_function,
-                              id_verletlist_group,
-                              num_verletlist,
-                              offset_verletlist_group,
-                              nearforce);
+  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+  {
+      //
+      auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+      auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+      auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+      auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+      auto weight_group = vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+
+      RunWorklet::NearForceVerletWeightVirial(cut_off,
+          box,
+          _unit_factor._qqr2e,
+          _atoms_id,
+          _locator,
+          _topology,
+          _force_function,
+          id_verletlist_group,
+          num_verletlist,
+          offset_verletlist_group,
+          ids_group,
+          weight_group,
+          nearforce,
+          nearVirial_atom);
+  }
+  else
+  {
+      RunWorklet::NearForceVerletVirial(cut_off,
+          box,
+          _unit_factor._qqr2e,
+          _atoms_id,
+          _locator,
+          _topology,
+          _force_function,
+          id_verletlist_group,
+          num_verletlist,
+          offset_verletlist_group,
+          nearforce,
+          nearVirial_atom);
+  }
 }
 
 void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
@@ -690,7 +730,8 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
   auto id_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
   auto offset_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
 
-  RunWorklet::ComputeNeighbours( cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+  RunWorklet::ComputeNeighbours( cut_off, box, _atoms_id, _locator, id_verletlist_group, 
+      num_verletlist, offset_verletlist_group);
 
   RunWorklet::LJForceVerlet(cut_off,
                             box,
@@ -709,6 +750,142 @@ void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 
   RunWorklet::LJForceWithPeriodicBC(
     cut_off, _atoms_id, _locator, _topology, _force_function, ljforce);
+}
+
+void ExecutionMD::ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& lj_virial)
+{
+    auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+    auto N = _position.GetNumberOfValues();
+    auto rho_system = N / (box[0] * box[1] * box[2]);
+
+    auto max_j_num =
+        rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+    auto verletlist_num = N * max_j_num;
+
+    ArrayHandle<Id> id_verletlist;
+    ArrayHandle<Vec3f> offset_verletlist;
+    offset_verletlist.Allocate(verletlist_num);
+    id_verletlist.Allocate(verletlist_num);
+
+    std::vector<Id> temp_vec(N + 1);
+    Id inc = 0;
+    std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * max_j_num; });
+    vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+    vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+    auto id_verletlist_group =
+        vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+    auto offset_verletlist_group =
+        vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+
+    RunWorklet::ComputeNeighbours(cut_off,
+        box,
+        _atoms_id,
+        _locator,
+        id_verletlist_group,
+        num_verletlist,
+        offset_verletlist_group);
+
+    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+    {
+        //
+        auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+        auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+        auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+        auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+        auto weight_group =
+            vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+        //
+        RunWorklet::ComputeLJVirial(cut_off,
+            box,
+            _atoms_id,
+            _locator,
+            _topology,
+            _force_function,
+            id_verletlist_group,
+            num_verletlist,
+            offset_verletlist_group,
+            lj_virial);
+
+    }
+    else
+    {
+        RunWorklet::ComputeLJVirial(cut_off,
+            box,
+            _atoms_id,
+            _locator,
+            _topology,
+            _force_function,
+            id_verletlist_group,
+            num_verletlist,
+            offset_verletlist_group,
+            lj_virial);
+    }
+
+}
+
+void ExecutionMD::ComputeCoulVirial(ArrayHandle<Vec6f>& Coul_virial)
+{
+    auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+    auto N = _position.GetNumberOfValues();
+    auto rho_system = N / (box[0] * box[1] * box[2]);
+
+    auto max_j_num =
+        rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+    auto verletlist_num = N * N;
+
+    ArrayHandle<Id> id_verletlist;
+    ArrayHandle<Vec3f> offset_verletlist;
+    offset_verletlist.Allocate(verletlist_num);
+    id_verletlist.Allocate(verletlist_num);
+
+    std::vector<Id> temp_vec(N + 1);
+    Id inc = 0;
+    std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * N; });
+    vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+    auto id_verletlist_group =
+        vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+    auto offset_verletlist_group =
+        vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+    vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+
+    RunWorklet::ComputeNeighbours(cut_off,
+        box,
+        _atoms_id,
+        _locator,
+        id_verletlist_group,
+        num_verletlist,
+        offset_verletlist_group);
+
+    RunWorklet::ComputeCoulVirial(cut_off,
+        box,
+        _atoms_id,
+        _locator,
+        _topology,
+        _force_function,
+        id_verletlist_group,
+        num_verletlist,
+        offset_verletlist_group,
+        Coul_virial);
+}
+
+void ExecutionMD::ComputeEwaldLongVirial(IdComponent& Kmax,
+    ArrayHandle<Vec6f>& Ewald_long_virial)
+{
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+    auto rhok = ComputeChargeStructureFactorEwald(box, Kmax);
+    ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
+    RunWorklet::ComputeEwaldVirial(Kmax,
+        _unit_factor._qqr2e,
+        _atoms_id,
+        whole_rhok,
+        _force_function,
+        _topology,
+        _locator,
+        Ewald_long_virial);
 }
 
 void ExecutionMD::ComputeRBLEAMForce(ArrayHandle<Vec3f>& force)
@@ -832,7 +1009,7 @@ void ExecutionMD::ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force)
     vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
 
   RunWorklet::ComputeNeighbours(
-    cut_off, _atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
+    cut_off, box,_atoms_id, _locator, id_verletlist_group, num_verletlist, offset_verletlist_group);
 
   RunWorklet::EAMfpVerlet(cut_off,
                           box,
