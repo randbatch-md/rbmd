@@ -34,13 +34,270 @@
 #include "forceFunction/ContForceFunction.h"
 #include "topology/ContTopology.h"
 #include "math/Utiles.h"
+using Matrix3x3 = vtkm::Vec<vtkm::Vec3f, 3>; // 定义 3x3 矩阵
 
 namespace RunWorklet
 {
+    struct UnWarpPostionWorklet : vtkm::worklet::WorkletMapField
+    {
+        UnWarpPostionWorklet(const Vec3f& box)
+            : _box(box)
+        {
+        }
+
+        using ControlSignature = void(FieldIn position_flag,
+            FieldInOut unwarp_position);
+        using ExecutionSignature = void(_1, _2);
+
+        template<typename PositionFlagType>
+        VTKM_EXEC void operator()(const PositionFlagType& position_flag,
+            Vec3f& unwarp_position) const
+        {
+            Vec3f current_pts_temp;
+
+            current_pts_temp[0] = position_flag[0] * _box[0];
+            current_pts_temp[1] = position_flag[1] * _box[1];
+            current_pts_temp[2] = position_flag[2] * _box[2];
+
+            unwarp_position += current_pts_temp;
+
+        }
+
+        Vec3f _box;
+    };
+
+    struct ComputeCOMWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputeCOMWorklet()
+        {
+        }
+
+        using ControlSignature = void(FieldIn unwarp_position,
+            FieldIn mass,
+            FieldOut com);
+        using ExecutionSignature = void(_1, _2, _3);
+
+        template<typename UnWarpPositionType, typename MassType>
+        VTKM_EXEC void operator()(const UnWarpPositionType& unwarp_position,
+            const MassType& mass,
+            Vec3f& com) const
+        {
+            com[0] = unwarp_position[0] * mass;
+            com[1] = unwarp_position[1] * mass;
+            com[2] = unwarp_position[2] * mass;
+        }
+
+    };
+
+    struct ComputOmegaWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputOmegaWorklet(const Vec3f& com)
+            :_com(com)
+        {
+        }
+
+        using ControlSignature = void(FieldIn unwarp_position,
+            FieldIn velocity,
+            FieldIn mass,
+            ExecObject force_function,
+            FieldOut omega);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5);
+
+        template<typename UnWarpPositionTyp,
+            typename VelocityType,
+            typename MassType>
+        VTKM_EXEC void operator()(const UnWarpPositionTyp& unwarp_position,
+            const VelocityType& velocity,
+            const  MassType& mass,
+            const ExecForceFunction& force_function,
+            Vec3f& omega) const
+        {
+            Vec6f inertia{ 0,0,0,0,0,0 };
+            Vec3f angmom{ 0,0,0 };         // 角动量
+
+            // 计算质心与原子坐标的差值
+            Real dx = unwarp_position[0] - _com[0];
+            Real dy = unwarp_position[1] - _com[1];
+            Real dz = unwarp_position[2] - _com[2];
+
+            // 计算惯性张量
+            inertia[0] += mass * (dy * dy + dz * dz);
+            inertia[1] += mass * (dx * dx + dz * dz);
+            inertia[2] += mass * (dx * dx + dy * dy);
+            inertia[3] -= mass * dx * dy;
+            inertia[4] -= mass * dy * dz;
+            inertia[5] -= mass * dx * dz;
+
+            //// 计算角动量 L = r x p
+            angmom[0] += mass * (dy * velocity[2] - dz * velocity[1]);
+            angmom[1] += mass * (dz * velocity[0] - dx * velocity[2]);
+            angmom[2] += mass * (dx * velocity[1] - dy * velocity[0]);
+
+
+            //// 计算惯性张量的行列式
+            Real determinant, invdeterminant;
+            Vec3f idiag, ex, ey, ez, cross;
+            Matrix3x3  ione, inv_inertia, evectors;
+
+            determinant = inertia[0] * (inertia[1] * inertia[2] - inertia[4] * inertia[4]) +
+                inertia[3] * (inertia[4] * inertia[5] - inertia[3] * inertia[2]) +
+                inertia[5] * (inertia[3] * inertia[4] - inertia[1] * inertia[5]);
+
+            ione[0][0] = inertia[0];
+            ione[1][1] = inertia[1];
+            ione[2][2] = inertia[2];
+            ione[0][1] = ione[1][0] = inertia[3];
+            ione[1][2] = ione[2][1] = inertia[4];
+            ione[0][2] = ione[2][0] = inertia[5];
+
+
+            // 计算惯性张量的逆矩阵并计算 omega
+            Real EPSILON = 1.0e-6;
+            if (determinant > EPSILON)
+            {
+                // 惯性张量逆矩阵的计算
+
+                inv_inertia[0][0] = inertia[1] * inertia[2] - inertia[4] * inertia[4];
+                inv_inertia[0][1] = -(inertia[3] * inertia[2] - inertia[5] * inertia[4]);
+                inv_inertia[0][2] = inertia[3] * inertia[4] - inertia[5] * inertia[1];
+
+                inv_inertia[1][0] = -(inertia[0] * inertia[2] - inertia[5] * inertia[5]);
+                inv_inertia[1][1] = inertia[0] * inertia[2] - inertia[5] * inertia[3];
+                inv_inertia[1][2] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
+
+                inv_inertia[2][0] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
+                inv_inertia[2][1] = -(inertia[0] * inertia[4] - inertia[3] * inertia[5]);
+                inv_inertia[2][2] = inertia[0] * inertia[1] - inertia[3] * inertia[3];
+
+                // 乘以行列式的倒数
+                invdeterminant = 1.0 / determinant;
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        inv_inertia[i][j] *= invdeterminant;
+                    }
+                }
+
+                // 使用逆矩阵求解 omega = I^-1 * L
+                omega[0] = inv_inertia[0][0] * angmom[0] + inv_inertia[0][1] * angmom[1] + inv_inertia[0][2] * angmom[2];
+                omega[1] = inv_inertia[1][0] * angmom[0] + inv_inertia[1][1] * angmom[1] + inv_inertia[1][2] * angmom[2];
+                omega[2] = inv_inertia[2][0] * angmom[0] + inv_inertia[2][1] * angmom[1] + inv_inertia[2][2] * angmom[2];
+            }
+            else
+            {
+                //omega = Vec3f{ 0, 0, 0 };  
+                Id ierror = force_function.jacobi3(ione, idiag, evectors);
+                if (ierror)
+                {
+                    printf("Insufficient Jacobi rotations for omega");
+                }
+
+                ex[0] = evectors[0][0];
+                ex[1] = evectors[1][0];
+                ex[2] = evectors[2][0];
+                ey[0] = evectors[0][1];
+                ey[1] = evectors[1][1];
+                ey[2] = evectors[2][1];
+                ez[0] = evectors[0][2];
+                ez[1] = evectors[1][2];
+                ez[2] = evectors[2][2];
+                // 计算叉乘，使用 VTK-m 的 Cross 函数
+                vtkm::Vec3f cross = vtkm::Cross(ex, ey);
+
+                // 使用点积验证右手系, 如果 dot3 < 0 则反转 ez
+                if (vtkm::Dot(cross, ez) < 0.0)
+                {
+                    ez = -ez;  // 直接反转向量
+                }
+
+                // 如果任何惯性矩小于阈值 EPSILON * max，则设为0
+                Real max;
+                max = vtkm::Max(idiag[0], idiag[1]);
+                max = vtkm::Max(max, idiag[2]);
+
+                if (idiag[0] < EPSILON * max) idiag[0] = 0.0;
+                if (idiag[1] < EPSILON * max) idiag[1] = 0.0;
+                if (idiag[2] < EPSILON * max) idiag[2] = 0.0;
+                force_function.angmom_to_omega(angmom, ex, ey, ez, idiag, omega);
+
+            }
+        }
+        Vec3f _com;
+    };
+
+    struct FixMomentumWorklet : vtkm::worklet::WorkletMapField
+    {
+        FixMomentumWorklet(const Vec3f& pcom, const Vec3f& vcom, const Vec3f& omega)
+            :_pcom(pcom)
+            , _vcom(vcom)
+            , _omega(omega)
+        {
+        }
+
+        using ControlSignature = void(FieldIn unwarp_position,
+            FieldIn mass,
+            ExecObject force_function,
+            FieldInOut velocity);
+        using ExecutionSignature = void(_1, _2, _3, _4);
+
+        template<typename UnWarpPositionTyp,
+            typename MassType>
+        VTKM_EXEC void operator()(const UnWarpPositionTyp& unwarp_position,
+            const  MassType& mass,
+            const ExecForceFunction& force_function,
+            Vec3f& velocity) const
+        {
+            //Id linear = angular = rescale = 1;
+            //Id xflag = yflag = zflag = 1;
+            //Real  dx, dy, dz;
+
+            //Vec3f angmom;
+
+            //Real ke =0 .0;
+
+
+            ////
+            //ke = mass * (velocity[0] * velocity[0] + 
+            //              velocity[1] * velocity[1] + velocity[2] * velocity[2]);
+
+
+            //if (linear) 
+            //{
+            //    if (xflag) velocity[0] -= _vcom[0];
+            //    if (yflag) velocity[1] -= _vcom[1];
+            //    if (zflag) velocity[2] -= _vcom[2];
+
+            //}
+            ////angmom
+            //if (angular)
+            //{
+            //    dx = unwarp_position[0] - _pcom[0];
+            //    dy = unwarp_position[1] - _pcom[1];
+            //    dz = unwarp_position[2] - _pcom[2];
+
+            //    angmom[0] = mass * (dy * velocity[2] - dz * velocity[1]);
+            //    angmom[1] = mass * (dz * velocity[0] - dx * velocity[2]);
+            //    angmom[2] = mass * (dx * velocity[1] - dy * velocity[0]);
+            //}
+
+            //if (rescale)
+            //{
+
+            //}
+
+
+        }
+        Vec3f _pcom;
+        Vec3f _vcom;
+        Vec3f _omega;
+    };
+
     struct ComputeNeighboursWorklet : vtkm::worklet::WorkletMapField
     {
-      ComputeNeighboursWorklet(const Real& cut_off)
+      ComputeNeighboursWorklet(const Real& cut_off, const Vec3f& box)
         : _cut_off(cut_off)
+          , _box(box)
       {
       }
 
@@ -78,6 +335,7 @@ namespace RunWorklet
                 auto pts_id_j = locator.PtsInCell(ijk, p);
                 auto p_j = locator.GetPtsPosition(pts_id_j) - coord_offset;
                 auto r_ij = p_j - p_i;
+                //auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
                 const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
                 const Real _cut_off_2 = _cut_off * _cut_off;
                 if ( _cut_off_2 - dis_2 > 0.0001 && dis_2 > 0.0001)
@@ -93,6 +351,7 @@ namespace RunWorklet
         num_verletlist = index; 
        }
       Real _cut_off;
+      Vec3f _box;
     };
 
     struct ComputeNearForceVerletERFWorklet : vtkm::worklet::WorkletMapField
@@ -147,7 +406,7 @@ namespace RunWorklet
           IdComponent index_table_pij = static_table.Extract(dispij);
           auto table_pij = static_table.TableGnearValue(dispij, index_table_pij);
 
-          ele_force += force_function.ComputeNearEnergyForceERF(p_i, p_j, charge_pi, charge_pj, table_pij);
+          ele_force += force_function.ComputeNearEnergyForceERF(r_ij, charge_pi, charge_pj, table_pij);
 
           if (molecular_id_i == molecular_id_j)
             return;
@@ -251,8 +510,9 @@ namespace RunWorklet
                                     FieldIn group_j,
                                     FieldIn num_j,
                                     FieldIn coord_offset_j,
-                                    FieldOut LJforce);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+                                    FieldOut LJforce,
+                                    FieldOut LJvirial);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8,_9);
 
       template<typename NeighbourGroupVecType, typename CoordOffsetj>
       VTKM_EXEC void operator()(const Id atoms_id,
@@ -262,11 +522,12 @@ namespace RunWorklet
                                 const NeighbourGroupVecType& group_j,
                                 const Id& num_j,
                                 const CoordOffsetj& coord_offset_j,
-                                Vec3f& LJforce) const
+                                Vec3f& LJforce,
+                                Vec6f& LJvirial) const
       {
         Vec3f LJ_force = { 0, 0, 0 };
+        Vec6f virial_LJ = { 0, 0, 0, 0, 0, 0 };
 
-        LJforce = { 0, 0, 0 };
         const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
         const auto& pts_type_i = topology.GetAtomsType(atoms_id);
         auto eps_i = topology.GetEpsilon(pts_type_i);
@@ -282,10 +543,13 @@ namespace RunWorklet
           auto sigma_j = topology.GetSigma(pts_type_j);
           //auto r_ij = p_j - p_i;
           auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+          auto fpair = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
 
-          if (molecular_id_i == molecular_id_j)
-            return;
-          LJ_force += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+          //force_LJ
+          LJ_force += fpair;
+
+          //virial_LJ
+          virial_LJ += force_function.ComputePairVirial_fix(r_ij, fpair);
         };
 
         auto p_i = locator.GetPtsPosition(atoms_id);
@@ -297,6 +561,7 @@ namespace RunWorklet
           function(p_i, p_j, idj);
         }
         LJforce = LJ_force;
+        LJvirial = virial_LJ;
       }
       Real _cut_off;
       Vec3f _box;
@@ -771,7 +1036,7 @@ namespace RunWorklet
 
           if (flag == 1)
           {
-            rc_force_eleforce += force_function.ComputeNearEnergyForceERF(p_i, p_j, charge_pi, charge_pj, table_pij);
+            rc_force_eleforce += force_function.ComputeNearEnergyForceERF(r_ij, charge_pi, charge_pj, table_pij);
 
             if (molecular_id_i == molecular_id_j)
               return;
@@ -888,11 +1153,8 @@ namespace RunWorklet
           if (flag == 1)
           {
             rc_force_eleforce +=
-              force_function.ComputeNearEnergyForceERF(p_i, p_j, charge_pi, charge_pj, table_pij);
+              force_function.ComputeNearEnergyForceERF(r_ij, charge_pi, charge_pj, table_pij);
 
-            /*if (molecular_id_i == molecular_id_j)
-              return;
-            rc_force_lj += force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);*/
             Vec3f forceij = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
             auto weight = 1.0;
             for (auto i = 0; i < num_components; ++i)
@@ -907,12 +1169,8 @@ namespace RunWorklet
           }
           if (flag == 2)
           {
-            rcs_force_eleforce += _pice_num * force_function.ComputeNearEnergyForceRcsERF(p_i, p_j, charge_pi, charge_pj, table_pij, rs);
+            rcs_force_eleforce += _pice_num * force_function.ComputeNearEnergyForceRcsERF(r_ij, charge_pi, charge_pj, table_pij, rs);
 
-            /*if (molecular_id_i == molecular_id_j)
-              return;
-            rcs_force_lj += _pice_num *
-              force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);*/
             Vec3f forceij = _pice_num *
               force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
             auto weight = 1.0;
@@ -952,6 +1210,294 @@ namespace RunWorklet
       Id _pice_num;
       Real _qqr2e;
       Vec3f _box;
+    };
+
+    struct ComputeNearForceRBLERFSpecialBondsWorklet_fix : vtkm::worklet::WorkletMapField
+    {
+        ComputeNearForceRBLERFSpecialBondsWorklet_fix(const Id& rs_num,
+            const Id& pice_num,
+            const Real& qqr2e,
+            const Vec3f& box)
+            : _rs_num(rs_num)
+            , _pice_num(pice_num)
+            , _qqr2e(qqr2e)
+            , _box(box)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            ExecObject locator,
+            ExecObject topology,
+            ExecObject force_function,
+            ExecObject static_table,
+            FieldInOut id_verletlist_group,
+            FieldInOut num_verletlist,
+            FieldInOut offset_verletlist_group,
+            FieldIn special_ids,
+            FieldIn special_weights,
+            FieldOut corr_force);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11);
+
+        template<typename NeighbourGroupVecType,
+            typename numType,
+            typename CoordOffsetType,
+            typename idsType,
+            typename weightsType>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const ExecPointLocator& locator,
+            const ExecTopology& topology,
+            const ExecForceFunction& force_function,
+            const ExecStaticTable& static_table,
+            const NeighbourGroupVecType& id_verletlist,
+            const numType& num_verletlist,
+            const CoordOffsetType& offset_verletlist,
+            const idsType& special_ids,
+            const weightsType& special_weights,
+            Vec3f& corr_force) const
+        {
+            vtkm::Vec3f rc_force_lj = { 0, 0, 0 };
+            vtkm::Vec3f rcs_force_lj = { 0, 0, 0 };
+            vtkm::Vec3f rc_force_eleforce = { 0, 0, 0 };
+            vtkm::Vec3f rcs_force_eleforce = { 0, 0, 0 };
+
+            const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+            const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+            auto eps_i = topology.GetEpsilon(pts_type_i);
+            auto sigma_i = topology.GetSigma(pts_type_i);
+            auto rc = locator._cut_off;
+            auto rs = locator._rs;
+            auto charge_pi = topology.GetCharge(atoms_id);
+
+            auto num_components = special_ids.GetNumberOfComponents();
+
+            auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
+            {
+                auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+                auto pts_type_j = topology.GetAtomsType(pts_id_j);
+                auto eps_j = topology.GetEpsilon(pts_type_j);
+                auto sigma_j = topology.GetSigma(pts_type_j);
+                //auto r_ij = p_j - p_i;
+                auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+                auto charge_pj = topology.GetCharge(pts_id_j);
+                Real dispij = vtkm::Magnitude(r_ij);
+                IdComponent index_table_pij = static_table.Extract(dispij);
+                auto table_pij = static_table.TableGnearValue(dispij, index_table_pij);
+
+                if (flag == 1)
+                {
+                    auto weight = 1.0;
+                    for (auto i = 0; i < num_components; ++i)
+                    {
+                        if (special_ids[i] == pts_id_j)
+                        {
+                            weight = special_weights[i];
+                        }
+                    }
+
+                    Vec3f force_coul_factor, force_coul;
+                    force_function.ComputeNearEnergyForceRsERF_fix(r_ij, charge_pi, charge_pj, table_pij, rs,
+                        force_coul_factor, force_coul);
+
+                    Vec3f forceij = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc);
+
+
+                    rc_force_lj += weight * forceij;
+
+                    force_coul = force_coul - (1- weight)* force_coul_factor;
+                    rc_force_eleforce += force_coul;
+                }
+                if (flag == 2)
+                {
+                 
+                    auto weight = 1.0;
+                    for (auto i = 0; i < num_components; ++i)
+                    {
+                        if (special_ids[i] == pts_id_j)
+                        {
+                            weight = special_weights[i];
+                        }
+                    }
+
+                    Vec3f force_coul_factor, force_coul;
+                    force_function.ComputeNearEnergyForceRsERF_fix(r_ij, charge_pi, charge_pj, table_pij, rs,
+                        force_coul_factor, force_coul);
+
+                    Vec3f forceij = _pice_num *
+                        force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+
+
+                    rcs_force_lj += weight * forceij;
+                    force_coul = _pice_num *(force_coul - (1 - weight) * force_coul_factor);
+                    rcs_force_eleforce += force_coul;
+                }
+            };
+
+            auto p_i = locator.GetPtsPosition(atoms_id);
+            for (Id p = 0; p < num_verletlist[0]; p++)
+            {
+                Id id_rs = id_verletlist[p];
+                auto p_j = locator.GetPtsPosition(id_rs) - offset_verletlist[p];
+                function(p_i, p_j, id_rs, 1);
+            }
+
+            for (Id p = 0; p < num_verletlist[1]; p++)
+            {
+                Id id_random = id_verletlist[_rs_num + p];
+                auto p_j = locator.GetPtsPosition(id_random) - offset_verletlist[_rs_num + p];
+                function(p_i, p_j, id_random, 2);
+            }
+
+            // Individual output requirements can be used
+            auto LJforce = rc_force_lj + rcs_force_lj;
+            auto nearele_force = _qqr2e * (rc_force_eleforce + rcs_force_eleforce);
+            corr_force = LJforce + nearele_force;
+        }
+        Id _rs_num;
+        Id _pice_num;
+        Real _qqr2e;
+        Vec3f _box;
+    };
+
+    struct ComputeNearForceRBLERFSpecialBondsWorklet_fix2 : vtkm::worklet::WorkletMapField
+    {
+        ComputeNearForceRBLERFSpecialBondsWorklet_fix2(const Id& rs_num,
+            const Id& pice_num,
+            const Real& qqr2e,
+            const Vec3f& box)
+            : _rs_num(rs_num)
+            , _pice_num(pice_num)
+            , _qqr2e(qqr2e)
+            , _box(box)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            ExecObject locator,
+            ExecObject topology,
+            ExecObject force_function,
+            ExecObject static_table,
+            FieldInOut id_verletlist_group,
+            FieldInOut num_verletlist,
+            FieldInOut offset_verletlist_group,
+            FieldIn special_ids,
+            FieldIn special_weights,
+            FieldOut corr_force);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11);
+
+        template<typename NeighbourGroupVecType,
+            typename numType,
+            typename CoordOffsetType,
+            typename idsType,
+            typename weightsType>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const ExecPointLocator& locator,
+            const ExecTopology& topology,
+            const ExecForceFunction& force_function,
+            const ExecStaticTable& static_table,
+            const NeighbourGroupVecType& id_verletlist,
+            const numType& num_verletlist,
+            const CoordOffsetType& offset_verletlist,
+            const idsType& special_ids,
+            const weightsType& special_weights,
+            Vec3f& corr_force) const
+        {
+            vtkm::Vec3f rs_force_lj = { 0, 0, 0 };
+            vtkm::Vec3f rcs_force_lj = { 0, 0, 0 };
+            vtkm::Vec3f rs_force_eleforce = { 0, 0, 0 };
+            vtkm::Vec3f rcs_force_eleforce = { 0, 0, 0 };
+
+            const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+            auto eps_i = topology.GetEpsilon(pts_type_i);
+            auto sigma_i = topology.GetSigma(pts_type_i);
+            auto rc = locator._cut_off;
+            auto rs = locator._rs;
+            auto charge_pi = topology.GetCharge(atoms_id);
+
+            auto num_components = special_ids.GetNumberOfComponents();
+
+            auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j, const Id& flag)
+            {
+                auto pts_type_j = topology.GetAtomsType(pts_id_j);
+                auto eps_j = topology.GetEpsilon(pts_type_j);
+                auto sigma_j = topology.GetSigma(pts_type_j);
+                //auto r_ij = p_j - p_i;
+                auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+                auto charge_pj = topology.GetCharge(pts_id_j);
+                Real dispij = vtkm::Magnitude(r_ij);
+                IdComponent index_table_pij = static_table.Extract(dispij);
+                auto table_pij = static_table.TableGnearValue(dispij, index_table_pij);
+
+                if (flag == 1)
+                {
+                    Vec3f forceij = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, rs);
+                    auto weight = 1.0;
+                    for (auto i = 0; i < num_components; ++i)
+                    {
+                        if (special_ids[i] == pts_id_j)
+                        {
+                            weight = special_weights[i];
+                        }
+                    }
+
+                    rs_force_lj += weight * forceij;
+
+                    Vec3f force_coul_factor, force_coul;
+                    force_function.ComputeNearEnergyForceRsERF_fix(r_ij, charge_pi, charge_pj, table_pij, rs,
+                        force_coul_factor, force_coul);
+                    force_coul = force_coul - (1 - weight) * force_coul_factor;
+
+                    rs_force_eleforce +=  force_coul;
+                }
+                if (flag == 2)
+                {
+                    Vec3f forceij = _pice_num *
+                        force_function.ComputeLJForceRcs(r_ij, eps_i, eps_j, sigma_i, sigma_j, rc, rs);
+                    auto weight = 1.0;
+                    for (auto i = 0; i < num_components; ++i)
+                    {
+                        if (special_ids[i] == pts_id_j)
+                        {
+                            weight = special_weights[i];
+                        }
+                    }
+
+                    rcs_force_lj += weight * forceij;
+
+                    Vec3f force_coul_factor, force_coul;
+                    force_function.ComputeNearEnergyForceRcsERF_fix(r_ij, charge_pi, charge_pj, table_pij, rc, rs,
+                        force_coul_factor, force_coul);
+                    force_coul = force_coul - (1 - weight) * force_coul_factor;
+
+                    rcs_force_eleforce += _pice_num * force_coul;
+                }
+            };
+
+            auto p_i = locator.GetPtsPosition(atoms_id);
+            for (Id p = 0; p < num_verletlist[0]; p++)
+            {
+                Id id_rs = id_verletlist[p];
+                auto p_j = locator.GetPtsPosition(id_rs) - offset_verletlist[p];
+                function(p_i, p_j, id_rs, 1);
+            }
+
+            for (Id p = 0; p < num_verletlist[1]; p++)
+            {
+                Id id_random = id_verletlist[_rs_num + p];
+                auto p_j = locator.GetPtsPosition(id_random) - offset_verletlist[_rs_num + p];
+                function(p_i, p_j, id_random, 2);
+            }
+
+            // Individual output requirements can be used
+            auto LJforce = rs_force_lj + rcs_force_lj;
+            auto nearele_force = _qqr2e * (rs_force_eleforce + rcs_force_eleforce);
+            corr_force = LJforce + nearele_force;
+        }
+        Id _rs_num;
+        Id _pice_num;
+        Real _qqr2e;
+        Vec3f _box;
     };
 
     struct ComputeNearForceRBLWorklet : vtkm::worklet::WorkletMapField
@@ -1376,64 +1922,11 @@ namespace RunWorklet
               IdComponent index_table_pij = static_table.Extract(dispij);
               auto table_pij = static_table.TableGnearValue(dispij, index_table_pij);
               auto charge_pj = topology.GetCharge(pts_id_j);
-              //force += force_function.ComputeNearEnergyForce(p_i, p_j, charge_pi, charge_pj);
-              force += force_function.ComputeNearEnergyForceERF(p_i, p_j, charge_pi, charge_pj,table_pij);        
+
+              force += force_function.ComputeNearEnergyForceERF(r_ij, charge_pi, charge_pj,table_pij);
             };
             locator.ExecuteOnNeighbor(atoms_id, function);
           }
-       };
-
-    struct ComputeSpecialCoulWorklet : vtkm ::worklet::WorkletMapField
-       {
-          ComputeSpecialCoulWorklet(const Vec3f& box)
-            : _box(box)
-         {
-         }
-
-         using ControlSignature = void(FieldIn atoms_id,
-                                       FieldIn group_vec,
-                                       ExecObject force_function,
-                                       ExecObject topology,
-                                       ExecObject locator,
-                                       FieldOut force);
-         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
-         template<typename GroupVecType>
-
-         VTKM_EXEC void operator()(const Id& atoms_id,
-                                   const GroupVecType& group_vec,
-                                   ExecForceFunction& force_function,
-                                   const ExecTopology& topology,
-                                   const ExecPointLocator& locator,
-                                   Vec3f& force) const
-         {
-           auto num = group_vec.GetNumberOfComponents();
-           force = { 0, 0, 0 };
-           if (num < 3)
-           {
-             force = 0;
-           }
-           else
-           {
-             auto charge_p_i = topology.GetCharge(atoms_id);
-             auto atoms_coord_i = locator.GetPtsPosition(atoms_id);
-             for (Id j = 0; j < num; ++j)
-             {
-               auto id = group_vec[j];
-               if (atoms_id == id)
-                 continue;
-
-
-               auto atoms_charge_j = topology.GetCharge(id);
-               auto atoms_coord_j = locator.GetPtsPosition(id);
-               Vec3f rij = locator.MinDistanceVec(atoms_coord_i, atoms_coord_j, _box);
-               Real dis_ij = vtkm::Magnitude(rij);
-               Real dis_ij3 = vtkm::Pow(dis_ij, 3);
-               Real force_component = -332.06371 * charge_p_i * atoms_charge_j / dis_ij3;
-               force +=  force_component * rij;
-             }
-           }
-         }
-         Vec3f _box;
        };
 
     struct ComputeSpecialCoulGeneralWorklet : vtkm ::worklet::WorkletMapField
@@ -1450,8 +1943,9 @@ namespace RunWorklet
                                        ExecObject locator,
                                        FieldIn special_ids,
                                        FieldIn special_weights,
-                                       FieldOut force);
-         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6 ,_7,_8);
+                                       FieldOut force,
+                                        FieldOut SpecialCoulVirial);
+         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6 ,_7,_8, _9);
 
          template<typename GroupVecType, typename idsType, typename weightsType>
          VTKM_EXEC void operator()(const Id& atoms_id,
@@ -1461,7 +1955,8 @@ namespace RunWorklet
                                    const ExecPointLocator& locator,
                                    const idsType& special_ids,
                                    const weightsType& special_weights,
-                                   Vec3f& force) const
+                                   Vec3f& force,
+                                   Vec6f& SpecialCoulVirial) const
          { 
             auto num = group_vec.GetNumberOfComponents();           
             force = { 0, 0, 0 };
@@ -1497,8 +1992,19 @@ namespace RunWorklet
                     weight  = special_weights[i];
                   }
                 }
+                auto coulpair = (1.0 - weight) * force_component * rij;
+                force += coulpair;
 
-                force += (1.0 - weight) * force_component * rij;
+                //
+                SpecialCoulVirial += force_function.ComputePairVirial(rij, coulpair);
+
+                //auto f = -0.5 * coulpair;
+                //SpecialCoulVirial[0] += rij[0] * f[0];
+                //SpecialCoulVirial[1] += rij[1] * f[1];
+                //SpecialCoulVirial[2] += rij[2] * f[2];
+                //SpecialCoulVirial[3] += rij[0] * f[1];
+                //SpecialCoulVirial[4] += rij[0] * f[2];
+                //SpecialCoulVirial[5] += rij[1] * f[2];
               }
             } 
          }
@@ -1507,8 +2013,9 @@ namespace RunWorklet
 
     struct ComputeNewRBEForceWorklet : vtkm ::worklet::WorkletMapField
        {
-         ComputeNewRBEForceWorklet(const IdComponent& RBEP)
-           : _P(RBEP)
+         ComputeNewRBEForceWorklet(const IdComponent& RBEP,const Vec3f& box)
+           : _P(RBEP),
+             _box(box)
          {
          }
        
@@ -1518,8 +2025,9 @@ namespace RunWorklet
                                        ExecObject force_function,
                                        ExecObject topology,
                                        ExecObject locator,
-                                       FieldOut force);
-         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7);
+                                       FieldOut force,
+                                       FieldOut KspaceVirial);
+         using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7,_8);
        
          template<typename WholePType, typename WholeRhokType>
          VTKM_EXEC void operator()(const Id& atoms_id,
@@ -1528,9 +2036,12 @@ namespace RunWorklet
                                    ExecForceFunction& force_function,
                                    const ExecTopology& topology,
                                    ExecPointLocator& locator,
-                                   Vec3f& force) const
+                                   Vec3f& force,
+                                   Vec6f& KspaceVirial) const
          {
            force = { 0, 0, 0 };
+           KspaceVirial = { 0, 0, 0, 0, 0, 0 };
+
            const auto& current_pts = locator.GetPtsPosition(atoms_id);
            const auto& current_charge = topology.GetCharge(atoms_id);
        
@@ -1538,13 +2049,23 @@ namespace RunWorklet
            {
              Vec2f rhok_ri = whole_rhok.Get(i);
              Vec3f kl = psample.Get(i);
-       
-             force += force_function.ComputeRBEForceSum(kl, current_pts, current_charge, rhok_ri);
+
+             kl[0] = 2 * vtkm::Pi() * kl[0] / _box[0];
+             kl[1] = 2 * vtkm::Pi() * kl[1] / _box[1];
+             kl[2] = 2 * vtkm::Pi() * kl[2] / _box[2];
+             //force += force_function.ComputeRBEForceSum(kl, current_pts, current_charge, rhok_ri);
+             Real kspace_force_single = force_function.ComputeRBEForceSum_fix(kl, current_pts, current_charge, rhok_ri);
+             force += kspace_force_single * kl;
+
+             Vec6f kspace_virial_single = force_function.ComputeKspaceVirial(kl, current_pts, kspace_force_single);
+             KspaceVirial += kspace_virial_single;
            }
            force = force_function.ComputeRBEForce(_P, force);
+           KspaceVirial = force_function.ComputeRBEVirial_fix(_P, KspaceVirial);
          }
        
          Id _P;
+         Vec3f _box;
        };
 
     struct InitPositionWorklet : vtkm::worklet::WorkletVisitCellsWithPoints
@@ -1830,6 +2351,26 @@ namespace RunWorklet
       Real _coeff;
     };
     
+    struct UpdateVelocityRescalePressWorklet : vtkm::worklet::WorkletMapField
+    {
+        using ControlSignature = void(FieldInOut velocity);
+        using ExecutionSignature = void(_1);
+
+        UpdateVelocityRescalePressWorklet(const Vec3f& factor)
+            : _factor(factor)
+        {
+        }
+
+        VTKM_EXEC void operator()(Vec3f& velocity) const
+        {
+            velocity[0] = _factor[0] * velocity[0];
+            velocity[1] = _factor[1] * velocity[1];
+            velocity[2] = _factor[2] * velocity[2];
+        }
+
+        Vec3f _factor;
+    };
+
     struct UpdatePositionWorklet : vtkm::worklet::WorkletMapField
     {
       UpdatePositionWorklet(const Real& dt)
@@ -1846,7 +2387,7 @@ namespace RunWorklet
                                 CoordType& position) const
       {
         position += velocity * _dt;
-        locator.UpdateOverRangePoint(position);
+        //locator.UpdateOverRangePoint(position);
       }
       Real _dt;
     };
@@ -1871,15 +2412,16 @@ namespace RunWorklet
                                 Id3& position_flag) const
       {
         position += velocity * _dt;
-        locator.UpdateFlagOverRangePoint(position, position_flag);
+        //locator.UpdateFlagOverRangePoint(position, position_flag);
       }
       Real _dt;
     };
     
     struct ComputeNewFarElectrostaticsWorklet : vtkm ::worklet::WorkletMapField
     {
-      ComputeNewFarElectrostaticsWorklet(const IdComponent& Kmax)
-        : _Kmax(Kmax)
+      ComputeNewFarElectrostaticsWorklet(const IdComponent& Kmax, const Vec3f& box)
+        : _Kmax(Kmax),
+          _box(box)
       {
       }
 
@@ -1888,8 +2430,9 @@ namespace RunWorklet
                                     ExecObject force_function,
                                     ExecObject topology,
                                     ExecObject locator,
-                                    FieldOut force);
-      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+                                    FieldOut force,
+                                    FieldOut KspaceVirial);
+      using ExecutionSignature = void(_1, _2, _3, _4, _5, _6,_7);
 
       template<typename WholeRhokType>
       VTKM_EXEC void operator()(const Id atoms_id,
@@ -1897,35 +2440,343 @@ namespace RunWorklet
                                 ExecForceFunction& force_function,
                                 const ExecTopology& topology,
                                 const ExecPointLocator& locator,
-                                Vec3f& force) const
+                                Vec3f& force,
+                                Vec6f& KspaceVirial) const
       {
          force = { 0, 0, 0 };
+         KspaceVirial = { 0, 0, 0, 0, 0, 0 };
+
          const auto& charge_p_i = topology.GetCharge(atoms_id);
          const auto& p_i = locator.GetPtsPosition(atoms_id);
          auto function = [&](const vtkm::Vec3f& M, const vtkm::Id& indexEwald)
          {
+           Vec3f K;
+           K[0] = 2 * vtkm::Pi() * M[0] / _box[0];
+           K[1] = 2 * vtkm::Pi() * M[1] / _box[1];
+           K[2] = 2 * vtkm::Pi() * M[2] / _box[2];
+
            auto rhok_ri = whole_rhok.Get(indexEwald - 1);
-           force += force_function.ComputeFarEle(M, p_i, charge_p_i, rhok_ri);
+           Real kspace_force_single = force_function.Computekspace_fix(K, p_i, charge_p_i, rhok_ri);
+           force += kspace_force_single * K;
+
+           KspaceVirial += force_function.ComputeKspaceVirial(K, p_i, kspace_force_single);
          };
          locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
       }
       IdComponent _Kmax;
+      Vec3f _box;
     };   
 
-    void ComputeNeighbours(const Real& cut_off,
-                               const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                               const ContPointLocator& locator,
-                               GroupVecType& id_verletlist_group,
-                               vtkm::cont::ArrayHandle<vtkm::Id>& num_verletlist,
-                               CoordOffsetType& offset_verletlist_group)
+
+    struct ComputeLJVirialWorklet : vtkm::worklet::WorkletMapField
     {
-      vtkm::cont::Invoker{}(ComputeNeighboursWorklet{ cut_off },
-                            atoms_id,
-                            locator,
-                            id_verletlist_group,
-                            num_verletlist,
-                            offset_verletlist_group);
-    }
+        ComputeLJVirialWorklet(const Real& cut_off, const Vec3f& box)
+            : _cut_off(cut_off)
+            , _box(box)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            ExecObject locator,
+            ExecObject topology,
+            ExecObject force_function,
+            FieldIn group_j,
+            FieldIn num_j,
+            FieldIn coord_offset_j,
+            FieldOut LJVirial);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+
+        template<typename NeighbourGroupVecType, typename CoordOffsetj>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const ExecPointLocator& locator,
+            const ExecTopology& topology,
+            const ExecForceFunction& force_function,
+            const NeighbourGroupVecType& group_j,
+            const Id& num_j,
+            const CoordOffsetj& coord_offset_j,
+            Vec6f& LJVirial) const
+        {
+            Vec6f lj_v = { 0, 0, 0, 0, 0, 0 };
+
+            const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+            const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+            auto eps_i = topology.GetEpsilon(pts_type_i);
+            auto sigma_i = topology.GetSigma(pts_type_i);
+
+            auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+            {
+                auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+                auto pts_type_j = topology.GetAtomsType(pts_id_j);
+                auto eps_j = topology.GetEpsilon(pts_type_j);
+                auto sigma_j = topology.GetSigma(pts_type_j);
+                //auto r_ij = p_j - p_i;
+                auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+                lj_v += force_function.ComputeLJVirial(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+            };
+
+            auto p_i = locator.GetPtsPosition(atoms_id);
+
+            for (Id p = 0; p < num_j; p++)
+            {
+                auto idj = group_j[p];
+                auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+                function(p_i, p_j, idj);
+            }
+
+            LJVirial = lj_v;
+        }
+        Real _cut_off;
+        Vec3f _box;
+    };
+
+    struct ComputeCoulVirialWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputeCoulVirialWorklet(const Real& cut_off, const Vec3f& box)
+            : _cut_off(cut_off)
+            , _box(box)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            ExecObject locator,
+            ExecObject topology,
+            ExecObject force_function,
+            FieldIn group_j,
+            FieldIn num_j,
+            FieldIn coord_offset_j,
+            FieldOut CoulVirial);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+
+        template<typename NeighbourGroupVecType, typename CoordOffsetj>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const ExecPointLocator& locator,
+            const ExecTopology& topology,
+            const ExecForceFunction& force_function,
+            const NeighbourGroupVecType& group_j,
+            const Id& num_j,
+            const CoordOffsetj& coord_offset_j,
+            Vec6f& CoulVirial) const
+        {
+            Vec6f coul_v = { 0, 0, 0, 0, 0, 0 };
+
+            auto charge_pi = topology.GetCharge(atoms_id);
+            auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+            {
+                auto charge_pj = topology.GetCharge(pts_id_j);
+
+                //auto r_ij = p_j - p_i;
+                auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+                coul_v += force_function.ComputeCoulVirial(r_ij, charge_pi, charge_pj, _cut_off);
+
+            };
+
+            auto p_i = locator.GetPtsPosition(atoms_id);
+
+            for (Id p = 0; p < num_j; p++)
+            {
+                auto idj = group_j[p];
+                auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+                function(p_i, p_j, idj);
+            }
+            CoulVirial = coul_v;
+        }
+        Real _cut_off;
+        Vec3f _box;
+    };
+
+    struct ComputeEwaldVirialWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputeEwaldVirialWorklet(const IdComponent& Kmax, const Real& unit_factor)
+            : _Kmax(Kmax)
+            , _unit_factor(unit_factor)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            WholeArrayIn whole_rhok,
+            ExecObject force_function,
+            ExecObject topology,
+            ExecObject locator,
+            FieldOut EwaldVirial);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+
+        template<typename WholeRhokType>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const WholeRhokType& whole_rhok,
+            ExecForceFunction& force_function,
+            const ExecTopology& topology,
+            const ExecPointLocator& locator,
+            Vec6f& EwaldVirial) const
+        {
+            Vec6f  Ewald_v = { 0, 0, 0, 0, 0, 0 };
+            const auto& charge_p_i = topology.GetCharge(atoms_id);
+            const auto& p_i = locator.GetPtsPosition(atoms_id);
+            auto function = [&](const vtkm::Vec3f& M, const vtkm::Id& indexEwald)
+            {
+                auto rhok_ri = whole_rhok.Get(indexEwald - 1);
+                Ewald_v += force_function.ComputeLongVirial(M, p_i, charge_p_i, rhok_ri);
+            };
+
+            locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
+            EwaldVirial = Ewald_v;
+        }
+        IdComponent _Kmax;
+        Real _unit_factor;
+    };
+
+    struct fix_press_berendsenWorklet : vtkm::worklet::WorkletMapField
+    {
+        fix_press_berendsenWorklet(const Real& scale_factor)
+            : _scale_factor(scale_factor)
+        {
+        }
+
+        using ControlSignature = void(FieldInOut position, ExecObject locator);
+        using ExecutionSignature = void(_1, _2);
+
+        VTKM_EXEC void operator()(Vec3f& position, const ExecPointLocator locator) const
+        {
+            position = _scale_factor * position;
+            //locator.UpdateOverRangePoint(position);
+        }
+        Real _scale_factor;
+    };
+
+    struct ApplyPbcWorklet : vtkm::worklet::WorkletMapField
+    {
+        ApplyPbcWorklet(const Vec3f& box, const Vec<Vec2f, 3>& range)
+            : _box(box)
+            , _range(range)
+        {
+        }
+
+        using ControlSignature = void(FieldInOut position, ExecObject locator);
+        using ExecutionSignature = void(_1, _2);
+
+        template<typename CoordType>
+        VTKM_EXEC void operator()(CoordType& position,
+            const ExecPointLocator locator) const
+        {
+            for (vtkm::Id i = 0; i < 3; ++i)
+            {
+                if (position[i] < _range[i][0])
+                {
+                    position[i] += _box[i];
+                }
+                else if (position[i] >= _range[i][1])
+                {
+                    position[i] -= _box[i];
+                }
+            }
+        }
+        Vec3f _box;
+        Vec<Vec2f, 3> _range;
+    };
+
+    struct ApplyPbcFlagWorklet : vtkm::worklet::WorkletMapField
+    {
+        ApplyPbcFlagWorklet(const Vec3f& box, const Vec<Vec2f, 3>& range)
+            : _box(box)
+            , _range(range)
+        {
+        }
+
+        using ControlSignature = void(FieldInOut position,
+            ExecObject locator,
+            FieldInOut position_flag);
+        using ExecutionSignature = void(_1, _2, _3);
+
+        template<typename CoordType>
+        VTKM_EXEC void operator()(CoordType& position,
+            const ExecPointLocator locator,
+            Id3& position_flag) const
+        {
+            for (vtkm::Id i = 0; i < 3; ++i)
+            {
+                if (position[i] < _range[i][0])
+                {
+                    position[i] += _box[i];
+                    position_flag[i] -= 1;
+                }
+                else if (position[i] >= _range[i][1])
+                {
+                    position[i] -= _box[i];
+                    position_flag[i] += 1;
+                }
+            }
+        }
+        Vec3f _box;
+        Vec<Vec2f, 3> _range;
+    };
+
+    struct X2LamdaWorklet : vtkm::worklet::WorkletMapField
+    {
+        X2LamdaWorklet(const Vec6f& h_inv,
+            const vtkm::Vec<vtkm::Range, 3>& range)
+            : _h_inv(h_inv)
+            , _range(range)
+        {
+        }
+
+        using ControlSignature = void(FieldInOut position);
+        using ExecutionSignature = void(_1);
+
+        template<typename CoordType>
+        VTKM_EXEC void operator()(CoordType& position) const
+        {
+            Vec3f delta;
+            delta[0] = position[0] - _range[0].Min;
+            delta[1] = position[1] - _range[1].Min;
+            delta[2] = position[2] - _range[2].Min;
+
+            // 计算 lamda 坐标
+            Vec3f lamda_position;
+            lamda_position[0] = _h_inv[0] * delta[0] + _h_inv[5] * delta[1] + _h_inv[4] * delta[2];
+            lamda_position[1] = _h_inv[1] * delta[1] + _h_inv[3] * delta[2];
+            lamda_position[2] = _h_inv[2] * delta[2];
+
+            // 更新位置
+            position = lamda_position;
+        }
+        Vec6f _h_inv;
+        vtkm::Vec<vtkm::Range, 3> _range;
+    };
+
+    struct Lamda2XWorklet : vtkm::worklet::WorkletMapField
+    {
+        Lamda2XWorklet(const Vec6f& h, const vtkm::Vec<vtkm::Range, 3>& range)
+            : _h(h)
+            , _range(range)
+        {
+        }
+        using ControlSignature = void(FieldInOut position);
+        using ExecutionSignature = void(_1);
+
+        template<typename CoordType>
+        VTKM_EXEC void operator()(CoordType& position) const
+        {
+            Vec3f position_base;
+            position_base[0] = position[0];
+            position_base[1] = position[1];
+            position_base[2] = position[2];
+
+            // compute  real position
+            Vec3f x_position;
+            x_position[0] = _h[0] * position_base[0] + _h[5] * position_base[1] +
+                _h[4] * position_base[2] + static_cast<vtkm::FloatDefault>(_range[0].Min);
+
+            x_position[1] = _h[1] * position_base[1] + _h[3] * position_base[2] +
+                static_cast<vtkm::FloatDefault>(_range[1].Min);
+
+            x_position[2] = _h[2] * position_base[2] + static_cast<vtkm::FloatDefault>(_range[2].Min);
+
+            position = x_position;
+        }
+        Vec6f _h;
+        vtkm::Vec<vtkm::Range, 3> _range;
+    };
 
     void ComputeRBLNeighboursOnce(const Id& rs_num,
                                   const Id& pice_num,
@@ -1987,6 +2838,195 @@ namespace RunWorklet
                             coord_offset_j,
                             nearforce);
     }
+
+
+    struct ComputeNearForceVerletWeightVirialWorklet1 : vtkm::worklet::WorkletMapField
+    {
+        ComputeNearForceVerletWeightVirialWorklet1(const Real& cut_off,
+            const Vec3f& box,
+            const Real& qqr2e)
+            : _cut_off(cut_off)
+            , _box(box)
+            , _qqr2e(qqr2e)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            ExecObject locator,
+            ExecObject topology,
+            ExecObject force_function,
+            FieldIn group_j,
+            FieldIn num_j,
+            FieldIn coord_offset_j,
+            FieldIn special_ids,
+            FieldIn special_weights,
+            FieldOut nearforce,
+            FieldOut nearVirial);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11);
+
+        template<typename NeighbourGroupVecType,
+            typename CoordOffsetj,
+            typename idsType,
+            typename weightsType>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const ExecPointLocator& locator,
+            const ExecTopology& topology,
+            const ExecForceFunction& force_function,
+            const NeighbourGroupVecType& group_j,
+            const Id& num_j,
+            const CoordOffsetj& coord_offset_j,
+            const idsType& special_ids,
+            const weightsType& special_weights,
+            Vec3f& nearforce,
+            Vec6f& nearVirial) const
+        {
+            Vec3f force_ij = { 0, 0, 0 };
+            Vec6f virial_ij = { 0, 0, 0, 0, 0, 0 };
+
+            nearforce = { 0, 0, 0 };
+            nearVirial = { 0, 0, 0, 0, 0, 0 };
+
+            const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+            const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+            auto eps_i = topology.GetEpsilon(pts_type_i);
+            auto sigma_i = topology.GetSigma(pts_type_i);
+            auto charge_pi = topology.GetCharge(atoms_id);
+            auto num_components = special_ids.GetNumberOfComponents();
+
+            auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+            {
+                auto charge_pj = topology.GetCharge(pts_id_j);
+                auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+                auto pts_type_j = topology.GetAtomsType(pts_id_j);
+                auto eps_j = topology.GetEpsilon(pts_type_j);
+                auto sigma_j = topology.GetSigma(pts_type_j);
+
+                auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+                //weight
+                Vec3f LJ_force = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+                auto weight = 1.0;
+                for (auto i = 0; i < num_components; ++i)
+                {
+                    if (special_ids[i] == pts_id_j)
+                    {
+                        weight = special_weights[i];
+                    }
+                }
+
+                Vec3f force_coul, force_coul_factor;
+                force_function.ComputeNearEnergyForce_fix(r_ij, charge_pi, charge_pj, _cut_off,
+                    force_coul_factor, force_coul);
+
+                Vec3f ele_force = force_coul - (1 - weight) * force_coul_factor;
+                auto fpair = _qqr2e * ele_force + weight * LJ_force;
+
+                //force_ij
+                force_ij += fpair;
+
+                //virial_ij
+                virial_ij += force_function.ComputePairVirial_fix(r_ij, fpair);
+            };
+
+            auto p_i = locator.GetPtsPosition(atoms_id);
+
+            for (Id p = 0; p < num_j; p++)
+            {
+                auto idj = group_j[p];
+                auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+                function(p_i, p_j, idj);
+            }
+
+            nearforce = force_ij;
+            nearVirial = virial_ij;
+        }
+        Real _cut_off;
+        Vec3f _box;
+        Real _qqr2e;
+    };
+
+    struct ComputeNearForceVerletVirialWorklet : vtkm::worklet::WorkletMapField
+    {
+        ComputeNearForceVerletVirialWorklet(const Real& cut_off, const Vec3f& box, const Real& qqr2e)
+            : _cut_off(cut_off)
+            , _box(box)
+            , _qqr2e(qqr2e)
+        {
+        }
+
+        using ControlSignature = void(FieldIn atoms_id,
+            ExecObject locator,
+            ExecObject topology,
+            ExecObject force_function,
+            FieldIn group_j,
+            FieldIn num_j,
+            FieldIn coord_offset_j,
+            FieldOut nearforce,
+            FieldOut nearVirial);
+        using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
+
+        template<typename NeighbourGroupVecType,
+            typename CoordOffsetj>
+        VTKM_EXEC void operator()(const Id atoms_id,
+            const ExecPointLocator& locator,
+            const ExecTopology& topology,
+            const ExecForceFunction& force_function,
+            const NeighbourGroupVecType& group_j,
+            const Id& num_j,
+            const CoordOffsetj& coord_offset_j,
+            Vec3f& nearforce,
+            Vec6f& nearVirial) const
+        {
+            Vec3f force_ij = { 0, 0, 0 };
+            Vec6f virial_ij = { 0, 0, 0, 0, 0, 0 };
+
+            nearforce = { 0, 0, 0 };
+            nearVirial = { 0, 0, 0, 0, 0, 0 };
+
+            const auto& molecular_id_i = topology.GetMolecularId(atoms_id);
+            const auto& pts_type_i = topology.GetAtomsType(atoms_id);
+            auto eps_i = topology.GetEpsilon(pts_type_i);
+            auto sigma_i = topology.GetSigma(pts_type_i);
+            auto charge_pi = topology.GetCharge(atoms_id);
+
+            auto function = [&](const Vec3f& p_i, const Vec3f& p_j, const Id& pts_id_j)
+            {
+                auto charge_pj = topology.GetCharge(pts_id_j);
+                auto molecular_id_j = topology.GetMolecularId(pts_id_j);
+                auto pts_type_j = topology.GetAtomsType(pts_id_j);
+                auto eps_j = topology.GetEpsilon(pts_type_j);
+                auto sigma_j = topology.GetSigma(pts_type_j);
+                auto r_ij = locator.MinDistanceVec(p_j, p_i, _box);
+
+                Vec3f ele_force = _qqr2e * force_function.ComputeNearEnergyForce1(r_ij, charge_pi, charge_pj, _cut_off);
+
+                Vec3f LJ_force = force_function.ComputeLJForce(r_ij, eps_i, eps_j, sigma_i, sigma_j, _cut_off);
+                auto fpair = ele_force + LJ_force;
+
+                //force_ij
+                force_ij += fpair;
+
+                //virial_ij
+                virial_ij += force_function.ComputePairVirial_fix(r_ij, fpair);
+            };
+
+            auto p_i = locator.GetPtsPosition(atoms_id);
+
+            for (Id p = 0; p < num_j; p++)
+            {
+                auto idj = group_j[p];
+                auto p_j = locator.GetPtsPosition(idj) - coord_offset_j[p];
+                function(p_i, p_j, idj);
+            }
+            nearforce = force_ij;
+            nearVirial = virial_ij;
+
+        }
+        Real _cut_off;
+        Vec3f _box;
+        Real _qqr2e;
+    };
+
     void LJForceVerlet(const Real& cut_off,
                        const Vec3f& box,
                        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -1996,7 +3036,8 @@ namespace RunWorklet
                        const GroupVecType& Group_j,
                        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                        const CoordOffsetType& coord_offset_j,
-                       vtkm::cont::ArrayHandle<Vec3f>& LJforce)
+                       vtkm::cont::ArrayHandle<Vec3f>& LJforce, 
+                       vtkm::cont::ArrayHandle<Vec6f>& LJvirial)
     {
       vtkm::cont::Invoker{}(ComputeLJForceVerletWorklet{ cut_off, box },
                             atoms_id,
@@ -2006,8 +3047,65 @@ namespace RunWorklet
                             Group_j,
                             num_j,
                             coord_offset_j,
-                            LJforce);
+                            LJforce,
+                            LJvirial);
     }
+
+    void NearForceVerletWeightVirial(const Real& cut_off,
+        const Vec3f& box,
+        const Real& qqr2e,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const ContPointLocator& locator,
+        const ContTopology& topology,
+        const ContForceFunction& force_function,
+        const GroupVecType& Group_j,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+        const CoordOffsetType& coord_offset_j,
+        const GroupIdIdType& group_ids,
+        const GroupRealIdType& group_weights,
+        vtkm::cont::ArrayHandle<Vec3f>& nearforce,
+        vtkm::cont::ArrayHandle<Vec6f>& nearvirial)
+    {
+        vtkm::cont::Invoker{}(ComputeNearForceVerletWeightVirialWorklet1{ cut_off, box, qqr2e },
+            atoms_id,
+            locator,
+            topology,
+            force_function,
+            Group_j,
+            num_j,
+            coord_offset_j,
+            group_ids,
+            group_weights,
+            nearforce,
+            nearvirial);
+    }
+
+    void NearForceVerletVirial(const Real& cut_off,
+        const Vec3f& box,
+        const Real& qqr2e,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const ContPointLocator& locator,
+        const ContTopology& topology,
+        const ContForceFunction& force_function,
+        const GroupVecType& Group_j,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+        const CoordOffsetType& coord_offset_j,
+        vtkm::cont::ArrayHandle<Vec3f>& nearforce,
+        vtkm::cont::ArrayHandle<Vec6f>& nearvirial)
+    {
+        vtkm::cont::Invoker{}(ComputeNearForceVerletVirialWorklet{ cut_off, box, qqr2e },
+            atoms_id,
+            locator,
+            topology,
+            force_function,
+            Group_j,
+            num_j,
+            coord_offset_j,
+            nearforce,
+            nearvirial);
+    }
+
+
 
     void EAMfpVerlet(const Real& cut_off,
                      const Vec3f& box,
@@ -2174,6 +3272,37 @@ namespace RunWorklet
         group_weights,
         corr_force);
     }
+
+      void NearForceRBLERFSpecialBonds_fix(const Id& rs_num,
+          const Id& pice_num,
+          const Real& qqr2e,
+          const Vec3f& box,
+          const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+          const ContPointLocator& locator,
+          const ContTopology& topology,
+          const ContForceFunction& force_function,
+          const ContStaticTable& static_table,
+          const GroupVecType& id_verletlist_group,
+          const GroupNumType& num_verletlist,
+          const CoordOffsetType& offset_verletlist_group,
+          const GroupIdIdType& group_ids,
+          const GroupRealIdType& group_weights,
+          vtkm::cont::ArrayHandle<Vec3f>& corr_force)
+      {
+          vtkm::cont::Invoker{}(
+              ComputeNearForceRBLERFSpecialBondsWorklet_fix{ rs_num, pice_num, qqr2e, box },
+              atoms_id,
+              locator,
+              topology,
+              force_function,
+              static_table,
+              id_verletlist_group,
+              num_verletlist,
+              offset_verletlist_group,
+              group_ids,
+              group_weights,
+              corr_force);
+      }
 
      void NearForceRBL(const Id& rs_num,
                        const Id& pice_num,
@@ -2348,23 +3477,6 @@ namespace RunWorklet
                             eleNearforce);
     }
 
-    void ComputeSpecialCoul(const Vec3f& box,
-                            const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                            const GroupVecType& group_vec,
-                            const ContForceFunction& force_function,
-                            const ContTopology& topology,
-                            const ContPointLocator& locator,
-                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce)
-    {
-      vtkm::cont::Invoker{}(ComputeSpecialCoulWorklet{ box },
-                            atoms_id,
-                            group_vec,
-                            force_function,
-                            topology,
-                            locator,
-                            SpecCoulforce);
-    }
-
     void ComputeSpecialCoulGeneral(const Vec3f& box,
                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                             const GroupVecType& group_vec,
@@ -2373,7 +3485,8 @@ namespace RunWorklet
                             const ContPointLocator& locator,
                             const GroupIdIdType& group_ids,
                             const GroupRealIdType& group_weights,
-                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce)
+                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& SpecCoulforce,
+                             vtkm::cont::ArrayHandle<Vec6f>& SpecCoulVirial)
     {
       vtkm::cont::Invoker{}(ComputeSpecialCoulGeneralWorklet{ box },
                             atoms_id,
@@ -2383,26 +3496,30 @@ namespace RunWorklet
                             locator,
                             group_ids,
                             group_weights,
-                            SpecCoulforce);
+                            SpecCoulforce,
+                            SpecCoulVirial);
     }
 
     void ComputeNewRBEForce(const IdComponent& rbeP,
+                            const Vec3f& box,
                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                             const vtkm::cont::ArrayHandle<vtkm::Vec3f>& psample,
                             const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhokRBE,
                             const ContForceFunction& force_function,
                             const ContTopology& topology,
                             const ContPointLocator& locator,
-                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleRBENewforce)
+                            vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleRBENewforce,
+                            vtkm::cont::ArrayHandle<Vec6f>& KspaceVirial)
     {
-      vtkm::cont::Invoker{}(ComputeNewRBEForceWorklet{ rbeP },
+      vtkm::cont::Invoker{}(ComputeNewRBEForceWorklet{ rbeP,box },
                             atoms_id,
                             psample,
                             whole_rhokRBE,
                             force_function,
                             topology,
                             locator,
-                            eleRBENewforce);
+                            eleRBENewforce,
+                             KspaceVirial);
     }
 
     void InitPosition(const vtkm::cont::UnknownCellSet& cellset,
@@ -2468,6 +3585,12 @@ namespace RunWorklet
 {
       vtkm::cont::Invoker{}(UpdateVelocityRescaleWorklet{ coeff_Berendsen }, velocity);
 } 
+    void UpdateVelocityRescale_press(const Vec3f& factor,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity)
+    {
+        vtkm::cont::Invoker{}(UpdateVelocityRescalePressWorklet{ factor }, velocity);
+    }
+
 
     void UpdateVelocityNoseHoover(const Real& dt,
                                   const Real& unit_factor,
@@ -2545,19 +3668,183 @@ namespace RunWorklet
     
 
     void ComputeNewFarElectrostatics(const IdComponent& Kmax,
+                                      const Vec3f& box,
                                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                              const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
                                              const ContForceFunction& force_function,
                                              const ContTopology& topology,
                                              const ContPointLocator& locator,
-                                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce)
+                                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce,
+                                             vtkm::cont::ArrayHandle<Vec6f>& KspaceVirial)
     {
-         vtkm::cont::Invoker{}(ComputeNewFarElectrostaticsWorklet{ Kmax },
+         vtkm::cont::Invoker{}(ComputeNewFarElectrostaticsWorklet{ Kmax ,box },
                                atoms_id,
                                whole_rhok,
                                force_function,
                                topology,
                                locator,
-                               eleFarNewforce);
+                               eleFarNewforce,
+                               KspaceVirial);
     }
+
+    void ComputeLJVirial(const Real& cut_off,
+        const Vec3f& box,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const ContPointLocator& locator,
+        const ContTopology& topology,
+        const ContForceFunction& force_function,
+        const GroupVecType& Group_j,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+        const CoordOffsetType& coord_offset_j,
+        vtkm::cont::ArrayHandle<Vec6f>& LJVirial)
+    {
+        vtkm::cont::Invoker{}(ComputeLJVirialWorklet{ cut_off, box },
+            atoms_id,
+            locator,
+            topology,
+            force_function,
+            Group_j,
+            num_j,
+            coord_offset_j,
+            LJVirial);
+    }
+
+
+    void ComputeCoulVirial(const Real& cut_off,
+        const Vec3f& box,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const ContPointLocator& locator,
+        const ContTopology& topology,
+        const ContForceFunction& force_function,
+        const GroupVecType& Group_j,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+        const CoordOffsetType& coord_offset_j,
+        vtkm::cont::ArrayHandle<Vec6f>& CoulVirial)
+    {
+        vtkm::cont::Invoker{}(ComputeCoulVirialWorklet{ cut_off, box },
+            atoms_id,
+            locator,
+            topology,
+            force_function,
+            Group_j,
+            num_j,
+            coord_offset_j,
+            CoulVirial);
+    }
+
+
+    void ComputeEwaldVirial(const IdComponent& Kmax,
+        const Real& unit_factor,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
+        const ContForceFunction& force_function,
+        const ContTopology& topology,
+        const ContPointLocator& locator,
+        vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial)
+    {
+        vtkm::cont::Invoker{}(ComputeEwaldVirialWorklet{ Kmax, unit_factor },
+            atoms_id,
+            whole_rhok,
+            force_function,
+            topology,
+            locator,
+            EwaldVirial);
+    }
+
+    void fix_press_berendsen(const Real& scale_factor,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+        const ContPointLocator& locator)
+    {
+        vtkm::cont::Invoker{}(fix_press_berendsenWorklet{ scale_factor }, position, locator);
+    }
+
+    void ApplyPbcFlag(const Vec3f& box,
+        const Vec<Vec2f, 3>& range,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+        const ContPointLocator& locator,
+        vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag)
+    {
+        vtkm::cont::Invoker{}(ApplyPbcFlagWorklet{ box, range }, position, locator, position_flag);
+    }
+
+    void ApplyPbc(const Vec3f& box,
+        const Vec<Vec2f, 3>& range,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
+        const ContPointLocator& locator)
+    {
+        vtkm::cont::Invoker{}(ApplyPbcWorklet{ box, range }, position, locator);
+    }
+
+    void X2Lamda(const Vec6f& h_inv,
+        const vtkm::Vec<vtkm::Range, 3>& range,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& position)
+    {
+        vtkm::cont::Invoker{}(X2LamdaWorklet{ h_inv, range }, position);
+    }
+
+    void Lamda2X(const Vec6f& h,
+        const vtkm::Vec<vtkm::Range, 3>& range,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& position)
+    {
+        vtkm::cont::Invoker{}(Lamda2XWorklet{ h, range }, position);
+    }
+
+    void UnWarpPostion(const Vec3f& _box,
+        const vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position)
+    {
+        vtkm::cont::Invoker{}(UnWarpPostionWorklet{ _box }, position_flag, unwarp_position);
+    }
+
+    void ComputeCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+        const vtkm::cont::ArrayHandle<Real>& mass,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& com)
+    {
+        vtkm::cont::Invoker{}(ComputeCOMWorklet{}, unwarp_position, mass, com);
+    }
+
+    void ComputeVCOM(const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
+        const vtkm::cont::ArrayHandle<Real>& mass,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& vcom)
+    {
+        vtkm::cont::Invoker{}(ComputeCOMWorklet{}, velocity, mass, vcom);
+    }
+
+    void ComputeOmega(const vtkm::Vec3f& com,
+        const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+        const vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity,
+        const vtkm::cont::ArrayHandle<Real>& mass,
+        const ContForceFunction& force_function,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& omega)
+    {
+        vtkm::cont::Invoker{}(ComputOmegaWorklet{ com }, unwarp_position, velocity, mass, force_function, omega);
+    }
+
+    void FixMomentum(const vtkm::Vec3f& pcom,
+        const vtkm::Vec3f& vcom,
+        const vtkm::Vec3f& omega,
+        const vtkm::cont::ArrayHandle<vtkm::Vec3f>& unwarp_position,
+        const vtkm::cont::ArrayHandle<Real>& mass,
+        const ContForceFunction& force_function,
+        vtkm::cont::ArrayHandle<vtkm::Vec3f>& velocity)
+    {
+        vtkm::cont::Invoker{}(FixMomentumWorklet{ pcom,vcom ,omega }, unwarp_position, mass, force_function, velocity);
+    }
+
+   void ComputeNeighbours(const Real& cut_off,
+        const Vec3f& box,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const ContPointLocator& locator,
+        GroupVecType& id_verletlist_group,
+        vtkm::cont::ArrayHandle<vtkm::Id>& num_verletlist,
+        CoordOffsetType& offset_verletlist_group)
+    {
+        vtkm::cont::Invoker{}(ComputeNeighboursWorklet{ cut_off, box },
+            atoms_id,
+            locator,
+            id_verletlist_group,
+            num_verletlist,
+            offset_verletlist_group);
+    }
+
 }

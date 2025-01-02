@@ -42,4 +42,11 @@ void ForceField::Execute()
     _para.SetParameter(PARA_POTENTIAL_FILE, Get<std::string>("potential_file"));
     _para.SetParameter(PARA_FILE_TYPE, (std::string) "EAM");
   }
+  else if ("CVFF" == Get<std::string>("type"))
+  {
+    _para.SetParameter(PARA_BOND_TYPE, Get<std::string>("bond_type"));
+    _para.SetParameter(PARA_ANGLE_TYPE, Get<std::string>("angle_type"));
+    _para.SetParameter(PARA_DIHEDRAL_TYPE, GetJudge<std::string>("dihedral_type"));
+    _para.SetParameter(PARA_IMPROPER_TYPE, GetJudge<std::string>("improper_type"));
+  }
 }

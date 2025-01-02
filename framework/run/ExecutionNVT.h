@@ -79,6 +79,18 @@ private:
   void SetEAM();
   void InitStyle();
 
+  //
+  void Computedof();
+  void SetUp();
+  void NoseHooverChain();
+  void ComputeTempTarget();
+  void InitialIntegrate();
+  void FinalIntegrate();
+
+  void NHCTempIntegrate();
+  void NVE_v();
+  void NVE_x();
+
 private:
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
@@ -147,4 +159,23 @@ private:
   std::vector<Id> numforce;
 
   std::vector<Id> map; // mapping from atom types to elements
+
+    //temp
+  Real t_start, t_stop, t_period, t_target, ke_target;
+  Real t_freq;
+  Real tdof;
+
+  std::vector<Real> eta, eta_dot; // chain thermostat for particles
+  std::vector<Real> eta_dotdot;
+  std::vector<Real> eta_mass;
+  Id mtchain;              // length of chain
+  Id mtchain_default_flag; // 1 = mtchain is default
+
+  Real dtv, dtf, dthalf, dt4, dt8, dto;
+  Id eta_mass_flag;
+  Real drag, tdrag_factor; // drag factor on particle thermostat
+
+  Id nc_tchain;
+  Real factor_eta;
+
 };
