@@ -2,7 +2,7 @@
   "init_configuration": {
 
     "read_data": {
-      "file": "rbmd1.data",
+      "file": "H2O_212121_v.data",
       "unit": "REAL", //LJ ,REAL
       "atom_style": "full", //支持atomic，charge,full
       "velocity_type": "GAUSS"
@@ -20,36 +20,40 @@
 
   "hyper_parameters": {
     "force_field": {
-      "type": "CVFF"//,  OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file)
+      "type": "CVFF", // OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file)
       //"potential_file": "/path/to/"
+	  "bond_type" :"Harmonic",
+	  "angle_type":"Harmonic",
+	  //"dihedral_type":" Harmonic",
+	  //"improper_type":" Harmonic"
     },
 
     "neighbor": {
-      "type": "RBL", //RBL,VERLET-LIST
-      "cut_off": 12,
+      "type": "VERLETLIST", //RBL,VERLETLIST
+      "cut_off": 10,
       "r_core": 5,
       "neighbor_sample_num": 100
     },
 
     "coulomb": {
-      "type": "RBE", //  RBE,EWALD
+      "type": "EWALD", //  RBE,EWALD
       "coulomb_sample_num": 100,
-      "alpha": 0.1,
-      "kmax": 2
+      "alpha": 0.0361,
+      "kmax": 3
     },
 
     "extend": {
-      "fix_shake": true,
+      //"fix_shake": true,
       "special_bonds": [ 0, 0, 0 ]
     }
   },
 
   "execution": {
     "ensemble": "NVT", // "NVE","NVT" ,"NPT"
-    "temperature":[ 298.0, 298.0, 1],  // 5= 20*dt;
-	"pressure" :[1.0,1.0,1000],
-    "temp_ctrl_type": "BERENDSEN", //BERENDSEN ，NOSE_HOOVER                                      
-    "press_ctrl_type": "Parrinello-Rahman", //Berendsen ,stochastic cell rescaling ,Parrinello-Rahman    
+    "temperature":[ 298.0, 298.0, 50],  // 5= 20*dt;
+	"pressure" :[1.0,1.0,500,100],
+    "temp_ctrl_type": "NOSE_HOOVER", //BERENDSEN ，NOSE_HOOVER                                      
+    "press_ctrl_type": "NOSE_HOOV", //Berendsen ,stochastic cell rescaling ,Parrinello-Rahman    
     "timestep": 0.5,
     "num_steps": 10000 //run 
   },
@@ -64,18 +68,18 @@
       "interval": 10,
       "radius": 10,
       "dr": 0.1,
-      "statistics_rdf_steps": 1000,
-      "atoms_pair": [[ 0, 0 ],[ 1, 1 ]]
+      "statistics_rdf_steps": 100,
+      "atoms_pair": [[ 0, 0 ]]
     },
     
     "msd_out": {
-      "interval": 1,
+      "interval": 100,
       "start_step": 0,
       "end_step": 10000
     },
     
     "vacf_out": {
-      "interval": 1,
+      "interval": 100,
       "start_step": 0,
       "end_step": 10000
     },
