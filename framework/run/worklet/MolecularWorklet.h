@@ -70,7 +70,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 WholeArrayIn _position,
                                 FieldOut forcebond,
                                 FieldOut bondEnergy,
-                                WholeArrayOut  bondVirial,
+                                FieldOut  bondVirial,
                                 ExecObject locator);
   using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
 
@@ -95,7 +95,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     vtkm::IdComponent bondj = bondlist[1];
     vtkm::IdComponent bondtype = bond_type;
     Vec3f forcebondij;
-    //Real virialbondij;
+    Vec6f virialbondij;
 
     ComputeijBondEnergyForce(bondi,
                              bondj,
@@ -105,7 +105,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                              _position,
                              forcebondij,
                              bondEnergy,
-                             bondVirial,
+                             virialbondij,
                               locator);
 
     //_forcebond.Get(bondi) = _forcebond.Get(bondi) + forcebondij;
@@ -113,9 +113,9 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     forcebond[0] = forcebondij;
     forcebond[1] = -forcebondij;
-    //bondVirial = virialbondij;
+    bondVirial = virialbondij;
   }
-  template<typename PositionType, typename BondVirialyType1>
+  template<typename PositionType>
   VTKM_EXEC void ComputeijBondEnergyForce(const vtkm::IdComponent& bondi,
                                           const vtkm::IdComponent& bondj,
                                           const vtkm::IdComponent& bondtype,
@@ -124,7 +124,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                                           const PositionType& _position,
                                           Vec3f& forcebondij,
                                           Real& bondEnergy,
-                                         BondVirialyType1& bondVirial,
+                                          Vec6f& virialbondij,
                                           const ExecPointLocator& locator) const
   {
     Vec3f p_i = _position.Get(bondi);
@@ -148,40 +148,35 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     bondEnergy = rk * dr;
 
    //newton_bond
-    //auto bondij = forcebondij;
-    //virialbondij[0] = r_ij[0] * bondij[0];
-    //virialbondij[1] = r_ij[1] * bondij[1];
-    //virialbondij[2] = r_ij[2] * bondij[2];
-    //virialbondij[3] = r_ij[0] * bondij[1];
-    //virialbondij[4] = r_ij[0] * bondij[2];
-    //virialbondij[5] = r_ij[1] * bondij[2];
+    bool newton_bond = true;
+    //Vec6f local_virial;
+    if (newton_bond)
+    {
+        virialbondij[0] = r_ij[0] * forcebondij[0];
+        virialbondij[1] = r_ij[1] * forcebondij[1];
+        virialbondij[2] = r_ij[2] * forcebondij[2];
+        virialbondij[3] = r_ij[0] * forcebondij[1];
+        virialbondij[4] = r_ij[0] * forcebondij[2];
+        virialbondij[5] = r_ij[1] * forcebondij[2];
+    }
 
-    Vec6f local_virial;
-    local_virial[0] = 0.5 * r_ij[0] * forcebondij[0];
-    local_virial[1] = 0.5 * r_ij[1] * forcebondij[1];
-    local_virial[2] = 0.5 * r_ij[2] * forcebondij[2];
-    local_virial[3] = 0.5 * r_ij[0] * forcebondij[1];
-    local_virial[4] = 0.5 * r_ij[0] * forcebondij[2];
-    local_virial[5] = 0.5 * r_ij[1] * forcebondij[2];
+    //// Wrap bondVirial as AtomicArrayExecutionObject
+    //vtkm::exec::AtomicArrayExecutionObject<Real> atomicBondVirial(bondVirial);
 
+    //// Perform atomic updates
+    //atomicBondVirial.Add(0 * _N + bondi, local_virial[0]);
+    //atomicBondVirial.Add(1 * _N + bondi, local_virial[1]);
+    //atomicBondVirial.Add(2 * _N + bondi, local_virial[2]);
+    //atomicBondVirial.Add(3 * _N + bondi, local_virial[3]);
+    //atomicBondVirial.Add(4 * _N + bondi, local_virial[4]);
+    //atomicBondVirial.Add(5 * _N + bondi, local_virial[5]);
 
-    // Wrap bondVirial as AtomicArrayExecutionObject
-    vtkm::exec::AtomicArrayExecutionObject<Real> atomicBondVirial(bondVirial);
-
-    // Perform atomic updates
-    atomicBondVirial.Add(0 * _N + bondi, local_virial[0]);
-    atomicBondVirial.Add(1 * _N + bondi, local_virial[1]);
-    atomicBondVirial.Add(2 * _N + bondi, local_virial[2]);
-    atomicBondVirial.Add(3 * _N + bondi, local_virial[3]);
-    atomicBondVirial.Add(4 * _N + bondi, local_virial[4]);
-    atomicBondVirial.Add(5 * _N + bondi, local_virial[5]);
-
-    atomicBondVirial.Add(0 * _N + bondj, local_virial[0]);
-    atomicBondVirial.Add(1 * _N + bondj, local_virial[1]);
-    atomicBondVirial.Add(2 * _N + bondj, local_virial[2]);
-    atomicBondVirial.Add(3 * _N + bondj, local_virial[3]);
-    atomicBondVirial.Add(4 * _N + bondj, local_virial[4]);
-    atomicBondVirial.Add(5 * _N + bondj, local_virial[5]);
+    //atomicBondVirial.Add(0 * _N + bondj, local_virial[0]);
+    //atomicBondVirial.Add(1 * _N + bondj, local_virial[1]);
+    //atomicBondVirial.Add(2 * _N + bondj, local_virial[2]);
+    //atomicBondVirial.Add(3 * _N + bondj, local_virial[3]);
+    //atomicBondVirial.Add(4 * _N + bondj, local_virial[4]);
+    //atomicBondVirial.Add(5 * _N + bondj, local_virial[5]);
 
 
     //portal.Set(0 * _N + bondi, local_virial[0]);
@@ -248,7 +243,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 const WholeArrayIn whole_pts,
                                 FieldOut forceangle,
                                 FieldOut angleEnergy,
-                                 WholeArrayOut angleVirial,
+                                FieldOut angleVirial,
                                 ExecObject locator);
   using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
 
@@ -275,7 +270,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     vtkm::IdComponent angletype = angle_type;
     Vec3f force_anglei;
     Vec3f force_anglek;
-    //Real angleVirial_pair;
+    Vec6f angleVirial_pair;
 
     ComputeijAngleEnergyForce(anglei,
                               anglej,
@@ -287,15 +282,15 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                               force_anglei,
                               force_anglek,
                               angleEnergy,
-                              angleVirial,
+                              angleVirial_pair,
                               locator);
     forceangle[0] = force_anglei;
     forceangle[1] = -force_anglei - force_anglek;
     forceangle[2] = force_anglek;
 
-    //angleVirial = angleVirial_pair;
+    angleVirial = angleVirial_pair;
   }
-  template<typename WholePtsType, typename AngleVirialType1>
+  template<typename WholePtsType>
   VTKM_EXEC void ComputeijAngleEnergyForce(const vtkm::IdComponent& anglei,
                                            const vtkm::IdComponent& anglej,
                                            const vtkm::IdComponent& anglek,
@@ -306,7 +301,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                            Vec3f& force_anglei,
                                            Vec3f& force_anglek,
                                            Real& angleEnergy,
-                                            AngleVirialType1& angleVirial,
+                                           Vec6f& angleVirial_pair,
                                            const ExecPointLocator& locator) const
   {
 
@@ -349,75 +344,50 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     force_anglek = a22 * r_kj + a12 * r_ij;
     auto  force_anglej = -(force_anglei + force_anglek);
 
-    //fix
-    //angleVirial_pair[0] = -THIRD * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
-    //angleVirial_pair[1] = -THIRD * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
-    //angleVirial_pair[2] = -THIRD * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
-    //angleVirial_pair[3] = -THIRD * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
-    //angleVirial_pair[4] = -THIRD * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
-    //angleVirial_pair[5] = -THIRD * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
-   
     //newton_bond
-    //angleVirial_pair[0] = (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
-    //angleVirial_pair[1] = (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
-    //angleVirial_pair[2] = (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
-    //angleVirial_pair[3] = (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
-    //angleVirial_pair[4] = (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
-    //angleVirial_pair[5] = (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
-
-    Vec6f local_virial;
-    local_virial[0] = 0.3333333333 * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
-    local_virial[1] = 0.3333333333 * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
-    local_virial[2] = 0.3333333333 * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
-    local_virial[3] = 0.3333333333 * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
-    local_virial[4] = 0.3333333333 * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
-    local_virial[5] = 0.3333333333 * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
-
-    //auto portal = angleVirial.WritePortal();
-    auto portal = angleVirial;
-
-    portal.Set(0 * _N + anglei, local_virial[0]);
-    portal.Set(1 * _N + anglei, local_virial[1]);
-    portal.Set(2 * _N + anglei, local_virial[2]);
-    portal.Set(3 * _N + anglei, local_virial[3]);
-    portal.Set(4 * _N + anglei, local_virial[4]);
-    portal.Set(5 * _N + anglei, local_virial[5]);
-
-    portal.Set(0 * _N + anglej, local_virial[0]);
-    portal.Set(1 * _N + anglej, local_virial[1]);
-    portal.Set(2 * _N + anglej, local_virial[2]);
-    portal.Set(3 * _N + anglej, local_virial[3]);
-    portal.Set(4 * _N + anglej, local_virial[4]);
-    portal.Set(5 * _N + anglej, local_virial[5]);
-
-    portal.Set(0 * _N + anglek, local_virial[0]);
-    portal.Set(1 * _N + anglek, local_virial[1]);
-    portal.Set(2 * _N + anglek, local_virial[2]);
-    portal.Set(3 * _N + anglek, local_virial[3]);
-    portal.Set(4 * _N + anglek, local_virial[4]);
-    portal.Set(5 * _N + anglek, local_virial[5]);
+    bool newton_bond = true;
+    //Vec6f local_virial;
+    if (newton_bond)
+    {
+        angleVirial_pair[0] = (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+        angleVirial_pair[1] = (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+        angleVirial_pair[2] = (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+        angleVirial_pair[3] = (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+        angleVirial_pair[4] = (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+        angleVirial_pair[5] = (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
+    }
+    else
+    {
+        angleVirial_pair[0] = 0.3333333333 * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+        angleVirial_pair[1] = 0.3333333333 * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+        angleVirial_pair[2] = 0.3333333333 * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+        angleVirial_pair[3] = 0.3333333333 * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+        angleVirial_pair[4] = 0.3333333333 * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+        angleVirial_pair[5] = 0.3333333333 * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
+    }
 
 
-    //angleVirial[0 * _N + anglei] = local_virial[0];
-    //angleVirial[1 * _N + anglei] = local_virial[1];
-    //angleVirial[2 * _N + anglei] = local_virial[2];
-    //angleVirial[3 * _N + anglei] = local_virial[3];
-    //angleVirial[4 * _N + anglei] = local_virial[4];
-    //angleVirial[5 * _N + anglei] = local_virial[5];
+    //auto portal = angleVirial;
+    //portal.Set(0 * _N + anglei, local_virial[0]);
+    //portal.Set(1 * _N + anglei, local_virial[1]);
+    //portal.Set(2 * _N + anglei, local_virial[2]);
+    //portal.Set(3 * _N + anglei, local_virial[3]);
+    //portal.Set(4 * _N + anglei, local_virial[4]);
+    //portal.Set(5 * _N + anglei, local_virial[5]);
 
-    //angleVirial[0 * _N + anglej] = local_virial[0];
-    //angleVirial[1 * _N + anglej] = local_virial[1];
-    //angleVirial[2 * _N + anglej] = local_virial[2];
-    //angleVirial[3 * _N + anglej] = local_virial[3];
-    //angleVirial[4 * _N + anglej] = local_virial[4];
-    //angleVirial[5 * _N + anglej] = local_virial[5];
+    //portal.Set(0 * _N + anglej, local_virial[0]);
+    //portal.Set(1 * _N + anglej, local_virial[1]);
+    //portal.Set(2 * _N + anglej, local_virial[2]);
+    //portal.Set(3 * _N + anglej, local_virial[3]);
+    //portal.Set(4 * _N + anglej, local_virial[4]);
+    //portal.Set(5 * _N + anglej, local_virial[5]);
 
-    //angleVirial[0 * _N + anglek] = local_virial[0];
-    //angleVirial[1 * _N + anglek] = local_virial[1];
-    //angleVirial[2 * _N + anglek] = local_virial[2];
-    //angleVirial[3 * _N + anglek] = local_virial[3];
-    //angleVirial[4 * _N + anglek] = local_virial[4];
-    //angleVirial[5 * _N + anglek] = local_virial[5];
+    //portal.Set(0 * _N + anglek, local_virial[0]);
+    //portal.Set(1 * _N + anglek, local_virial[1]);
+    //portal.Set(2 * _N + anglek, local_virial[2]);
+    //portal.Set(3 * _N + anglek, local_virial[3]);
+    //portal.Set(4 * _N + anglek, local_virial[4]);
+    //portal.Set(5 * _N + anglek, local_virial[5]);
   }
 
    Vec3f _box;

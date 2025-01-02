@@ -79,6 +79,18 @@ private:
   void SetEAM();
   void InitStyle();
 
+  //
+  void Computedof();
+  void SetUp();
+  void NoseHooverChain();
+  void ComputeTempTarget();
+  void InitialIntegrate();
+  void FinalIntegrate();
+
+  void NHCTempIntegrate();
+  void NVE_v();
+  void NVE_x();
+
 private:
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
@@ -148,39 +160,22 @@ private:
 
   std::vector<Id> map; // mapping from atom types to elements
 
-  //
-  ArrayHandle<Vec6f> _nearVirial_atom;
-  ArrayHandle<Vec6f> _lj_virial_atom;
-  ArrayHandle<Vec6f> _coul_virial_atom;
-  ArrayHandle<Vec6f> _ewald_long_virial_atom;
-  ArrayHandle<Vec6f> _bond_virial_atom;
-  ArrayHandle<Real> _bond_virial_atom_1;
-  ArrayHandle<Vec6f> _angle_virial_atom;
-  ArrayHandle<Real> _angle_virial_atom_1;
-  ArrayHandle<Vec6f> _dihedral_virial_atom;
-  ArrayHandle<Vec6f> _spec_coul_virial_atom;
+    //temp
+  Real t_start, t_stop, t_period, t_target, ke_target;
+  Real t_freq;
+  Real tdof;
 
-  ArrayHandle<Vec6f> _shake_first_virial_atom;
+  std::vector<Real> eta, eta_dot; // chain thermostat for particles
+  std::vector<Real> eta_dotdot;
+  std::vector<Real> eta_mass;
+  Id mtchain;              // length of chain
+  Id mtchain_default_flag; // 1 = mtchain is default
 
-  Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
-  Real _pressure_scalar; // computed global pressure scalar
+  Real dtv, dtf, dthalf, dt4, dt8, dto;
+  Id eta_mass_flag;
+  Real drag, tdrag_factor; // drag factor on particle thermostat
 
-  Real _lj_potential_energy;
+  Id nc_tchain;
+  Real factor_eta;
 
-  //
-  Vec3f p_start, p_stop;
-  Vec3f p_period, p_target;
-
-  Vec3f p_current, dilation;
-  Real bulkmodulus;
-
-  //
-  Vec6f h, h_inv; // shape matrix in Voigt ordering
-
-  // orthogonal box
-
-  Real xprd, yprd, zprd;                // global box dimensions
-  Real xprd_half, yprd_half, zprd_half; // half dimensions
-  Vec3f prd;                            // array form of dimensions
-  Vec3f prd_half;                       // array form of half dimensions
 };

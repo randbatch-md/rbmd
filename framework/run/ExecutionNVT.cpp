@@ -89,30 +89,48 @@ void ExecutionNVT::PreSolve()
 
 void ExecutionNVT::Solve()
 {
-  // stage1:
-  UpdateVelocity();
-
-  // stage2:
-  UpdatePosition();
-
-  //New added
-  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+  auto temp_ctrl_type = _para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE);
+  if (temp_ctrl_type == "BERENDSEN" || temp_ctrl_type == "TEMP_RESCALE")
   {
-    ConstraintA();
+        // stage1:
+        UpdateVelocity();
+
+        // stage2:
+        UpdatePosition();
+
+        //New added
+        if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+        {
+            ConstraintA();
+        }
+
+        // stage3:
+        ComputeForce();
+        UpdateVelocity();
+
+        //New added
+        if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+        {
+            ConstraintB();
+        }
+
+        ComputeTempe();
+        UpdateVelocityByTempConType();
   }
-
-  // stage3:
-  ComputeForce();
-  UpdateVelocity();
-
-  //New added
-  if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+  else if (temp_ctrl_type == "NOSE_HOOVER")
   {
-    ConstraintB();
+      InitialIntegrate();
+      if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+      {
+          ConstraintA();
+      }
+      ComputeForce();
+      FinalIntegrate();
+      if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+      {
+          ConstraintB();
+      }
   }
-
-  ComputeTempe();
-  UpdateVelocityByTempConType();
 }
 
 void ExecutionNVT::PostSolve() {}
@@ -131,6 +149,40 @@ void ExecutionNVT::InitialCondition()
     PreForce();
   }
   _nosehooverxi = 0.0;
+
+  //tdof
+  Computedof();
+  t_freq = 1 / t_period;
+
+  //defult values
+  eta_mass_flag = 1;
+  nc_tchain  = 1;
+  mtchain  = 3;  //defult=3
+
+  // set timesteps and frequencies
+  auto _dt = _executioner->Dt();
+  dtf = _dt * _unit_factor._fmt2v;
+  dthalf = 0.5 * _dt;
+  dt4 = 0.25 * _dt;
+  dt8 = 0.125 * _dt;
+  dto = dthalf;
+
+  drag = 0.0;
+  tdrag_factor = 1.0 - (_dt * t_freq * drag / nc_tchain);
+
+  // Nose-Hoover temp init
+  eta.resize(mtchain);
+  eta_dot.resize(mtchain + 1);
+  eta_dot[mtchain] = 0;
+  eta_dotdot.resize(mtchain);
+  eta_mass.resize(mtchain);
+
+  for (int ich = 0; ich < mtchain; ich++)
+  {
+      eta[ich] = eta_dot[ich] = eta_dotdot[ich] = 0.0;
+  }
+  //
+  SetUp();
 }
 
 void ExecutionNVT::ComputeForce()
@@ -170,8 +222,8 @@ void ExecutionNVT::ComputeAllForce()
     if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
         _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
     {
-      //all force with dihedral+force
-      Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
+        //all force with dihedral+force
+        Invoker{}(MolecularWorklet::AddForceWorklet{}, DihedralsForce(), _all_force);
     }
   }
 
@@ -208,28 +260,16 @@ void ExecutionNVT::UpdatePosition()
   {
     RunWorklet::UpdatePosition(_dt, _velocity, _locator, _position);
   }
-
+  //pbc
+  ApplyPbc();
   _locator.SetPosition(_position);
   SetCenterTargetPositions();
 }
 
 void ExecutionNVT::UpdateVelocityByTempConType()
 {
-    // ！注意：tauT 和 dt_divide_taut 与 temperature[3] 相关 目前暂定统一为一个常量
   _temp_con_type = _para.GetParameter<std::string>(PARA_TEMP_CTRL_TYPE);
-  if (_temp_con_type == "NOSE_HOOVER")
-  {
-    //Nose Hoover
-    //Maybe tauT = 20.0 * dt is a good choice for dt = 2e-3 from the test.
-    //Because the temperature curve is the smoothest of all test simulations.
-    //In fact, 5.0 and 10.0 are also optional.
-    //As long as the coefficent is not too large, such as larger than 100 * dt.
-    RunWorklet::UpdateVelocityNoseHoover(
-      _dt, _unit_factor._fmt2v, _nosehooverxi, _all_force, _mass, _velocity);
-    Real tauT = vtkm::Pow(10.0, -1) * _dt;
-    _nosehooverxi += 0.5 * _dt * (_tempT / _kbT - 1.0) / tauT;
-  }
-  else if (_temp_con_type == "TEMP_RESCALE")
+  if (_temp_con_type == "TEMP_RESCALE")
   {
     Real coeff_rescale = vtkm::Sqrt(_kbT / _tempT);
     RunWorklet::UpdateVelocityRescale(coeff_rescale, _velocity);
@@ -321,11 +361,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::LJForce()
   }
   if (_nearforce_type == "VERLETLIST")
   {
-    ComputeVerletlistLJForce(_LJforce);
-  }
-  else if (_nearforce_type == "ORIGINAL")
-  {
-    ComputeSpecialBondsLJForce(_LJforce);
+    ComputeVerletlistLJForce(_LJforce, _nearVirial_atom);
   }
   return _LJforce;
 }
@@ -358,10 +394,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForce()
   {
     ComputeVerletlistNearForce(_nearforce, _nearVirial_atom);
   }
-  else if (_nearforce_type == "ORIGINAL")
-  {
-    RunWorklet::SumFarNearForce(EleNearForce(), LJForce(), _nearforce);
-  }
   return _nearforce;
 }
 
@@ -374,11 +406,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   }
   else if (_nearforce_type == "VERLETLIST")
   {
-    ComputeVerletlistLJForce(_all_force);
-  }
-  else if (_nearforce_type == "ORIGINAL")
-  {
-    ComputeOriginalLJForce(_all_force);
+    ComputeVerletlistLJForce(_all_force,_nearVirial_atom);
   }
   return _all_force;
 }
@@ -394,33 +422,32 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceEAM()
   {
     ComputeVerletlistEAMForce(_all_force);
   }
-  else if (_nearforce_type == "ORIGINAL")
-  {
-    ComputeOriginalEAMForce(_all_force);
-  }
   return _all_force;
 }
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
 {
-  // original
-    auto N = _position.GetNumberOfValues();
-  auto bondlist = _para.GetFieldAsArrayHandle<Id>(field::bond_atom_id);
-  auto bond_type = _para.GetFieldAsArrayHandle<Id>(field::bond_type);
-  vtkm::IdComponent bondlist_num = bondlist.GetNumberOfValues();
-  auto&& bondlist_group = vtkm::cont::make_ArrayHandleGroupVec<2>(bondlist);
-  auto bond_num = bondlist_group.GetNumberOfValues();
+    auto bond_type = _para.GetParameter<std::string>(PARA_BOND_TYPE);
+    if ("Harmonic" == bond_type)
+    {
+        // original
+        auto N = _position.GetNumberOfValues();
+        auto bondlist = _para.GetFieldAsArrayHandle<Id>(field::bond_atom_id);
+        auto bond_type = _para.GetFieldAsArrayHandle<Id>(field::bond_type);
+        vtkm::IdComponent bondlist_num = bondlist.GetNumberOfValues();
+        auto&& bondlist_group = vtkm::cont::make_ArrayHandleGroupVec<2>(bondlist);
+        auto bond_num = bondlist_group.GetNumberOfValues();
 
 
-  // bond_coeffs_k   bond_coeffs_equilibrium
-  auto bond_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k);
-  auto bond_coeffs_equilibrium = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_equilibrium);
+        // bond_coeffs_k   bond_coeffs_equilibrium
+        auto bond_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_k);
+        auto bond_coeffs_equilibrium = _para.GetFieldAsArrayHandle<Real>(field::bond_coeffs_equilibrium);
 
-  // forcebond
-  vtkm::cont::ArrayHandle<Vec3f> forcebond;
-  vtkm::cont::ArrayHandle<Real> bond_energy;
-  auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
-  Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ N,_box },
+        // forcebond
+        vtkm::cont::ArrayHandle<Vec3f> forcebond;
+        vtkm::cont::ArrayHandle<Real> bond_energy;
+        auto&& forcebond_group = vtkm::cont::make_ArrayHandleGroupVec<2>(forcebond);
+        Invoker{}(MolecularWorklet::ComputeBondHarmonicWorklet{ N,_box },
             bond_type,
             bondlist_group,
             bond_coeffs_k,
@@ -428,72 +455,76 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::BondForce()
             _position,
             forcebond_group,
             bond_energy,
-            _bond_virial_atom_1,
+            _bond_virial_atom,
             _locator);
 
-  auto bond_energy_avr =
-    vtkm::cont::Algorithm::Reduce(bond_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
-    bond_num;
-  _para.SetParameter(PARA_BOND_ENERGY, bond_energy_avr);
+        auto bond_energy_avr =
+            vtkm::cont::Algorithm::Reduce(bond_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
+            bond_num;
+        _para.SetParameter(PARA_BOND_ENERGY, bond_energy_avr);
 
-  vtkm::cont::ArrayHandle<Vec3f> reduce_force_bond;
-  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
-  {
-    //reduce bond force
-    auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
-    auto atom_id_number = atom_id.GetNumberOfValues();
-    auto original_number = bondlist.GetNumberOfValues();
+        vtkm::cont::ArrayHandle<Vec3f> reduce_force_bond;
+        if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+        {
+            //reduce bond force
+            auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+            auto atom_id_number = atom_id.GetNumberOfValues();
+            auto original_number = bondlist.GetNumberOfValues();
 
-    std::vector<Id> new_bondlist(original_number);
-    memcpy(&new_bondlist[0], bondlist.ReadPortal().GetArray(), original_number * sizeof(vtkm::Id));
+            std::vector<Id> new_bondlist(original_number);
+            memcpy(&new_bondlist[0], bondlist.ReadPortal().GetArray(), original_number * sizeof(vtkm::Id));
 
-    std::vector<vtkm::Id> append_list(atom_id_number);
-    memcpy(&append_list[0], atom_id.ReadPortal().GetArray(), atom_id_number * sizeof(vtkm::Id));
+            std::vector<vtkm::Id> append_list(atom_id_number);
+            memcpy(&append_list[0], atom_id.ReadPortal().GetArray(), atom_id_number * sizeof(vtkm::Id));
 
-    //append key
-    new_bondlist.insert(new_bondlist.end(), append_list.begin(), append_list.end());
+            //append key
+            new_bondlist.insert(new_bondlist.end(), append_list.begin(), append_list.end());
 
-    //append force bond
-    std::vector<vtkm::Vec3f> new_forcebond(original_number);
-    memcpy(
-      &new_forcebond[0], forcebond.ReadPortal().GetArray(), original_number * sizeof(vtkm::Vec3f));
+            //append force bond
+            std::vector<vtkm::Vec3f> new_forcebond(original_number);
+            memcpy(
+                &new_forcebond[0], forcebond.ReadPortal().GetArray(), original_number * sizeof(vtkm::Vec3f));
 
-    std::vector<Vec3f> value(atom_id_number, vtkm::Vec3f{ 0.0, 0.0, 0.0 });
-    new_forcebond.insert(new_forcebond.end(), value.begin(), value.end());
+            std::vector<Vec3f> value(atom_id_number, vtkm::Vec3f{ 0.0, 0.0, 0.0 });
+            new_forcebond.insert(new_forcebond.end(), value.begin(), value.end());
 
-    vtkm::worklet::Keys<vtkm::Id> keys_bond(vtkm::cont::make_ArrayHandle(new_bondlist));
-    Invoker{}(MolecularWorklet::ReduceForceWorklet{},
-              keys_bond,
-              vtkm::cont::make_ArrayHandle(new_forcebond),
-              reduce_force_bond);
-  }
-  else
-  {
-    vtkm::worklet::Keys<vtkm::Id> keys_bond(bondlist);
-    Invoker{}(MolecularWorklet::ReduceForceWorklet{}, keys_bond, forcebond, reduce_force_bond);
-  }
-  return reduce_force_bond;
+            vtkm::worklet::Keys<vtkm::Id> keys_bond(vtkm::cont::make_ArrayHandle(new_bondlist));
+            Invoker{}(MolecularWorklet::ReduceForceWorklet{},
+                keys_bond,
+                vtkm::cont::make_ArrayHandle(new_forcebond),
+                reduce_force_bond);
+        }
+        else
+        {
+            vtkm::worklet::Keys<vtkm::Id> keys_bond(bondlist);
+            Invoker{}(MolecularWorklet::ReduceForceWorklet{}, keys_bond, forcebond, reduce_force_bond);
+        }
+        return reduce_force_bond;
+    }
 }
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
 {
-  //angle
-    auto N = _position.GetNumberOfValues();
-  auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
-  auto angle_type = _para.GetFieldAsArrayHandle<Id>(field::angle_type);
-  vtkm::IdComponent anglelist_num = angle_list.GetNumberOfValues();
-  auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
-  auto angle_num = anglelist_group.GetNumberOfValues();
+    auto angle_type = _para.GetParameter<std::string>(PARA_ANGLE_TYPE);
+    if ("Harmonic" == angle_type)
+    {
+        //angle
+        auto N = _position.GetNumberOfValues();
+        auto angle_list = _para.GetFieldAsArrayHandle<Id>(field::angle_atom_id);
+        auto angle_type = _para.GetFieldAsArrayHandle<Id>(field::angle_type);
+        vtkm::IdComponent anglelist_num = angle_list.GetNumberOfValues();
+        auto&& anglelist_group = vtkm::cont::make_ArrayHandleGroupVec<3>(angle_list);
+        auto angle_num = anglelist_group.GetNumberOfValues();
 
-  // angle_coeffs_k   angle_coeffs_equilibrium
-  auto angle_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);
-  auto angle_coeffs_equilibrium = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_equilibrium);
+        // angle_coeffs_k   angle_coeffs_equilibrium
+        auto angle_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_k);
+        auto angle_coeffs_equilibrium = _para.GetFieldAsArrayHandle<Real>(field::angle_coeffs_equilibrium);
 
-  // force_angle
-  vtkm::cont::ArrayHandle<Vec3f> force_angle;
-  vtkm::cont::ArrayHandle<Real> angle_energy;
-  auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
-  Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ N,_box },
+        // force_angle
+        vtkm::cont::ArrayHandle<Vec3f> force_angle;
+        vtkm::cont::ArrayHandle<Real> angle_energy;
+        auto&& forceangle_group = vtkm::cont::make_ArrayHandleGroupVec<3>(force_angle);
+        Invoker{}(MolecularWorklet::ComputeAngleHarmonicWorklet{ N,_box },
             angle_type,
             anglelist_group,
             angle_coeffs_k,
@@ -501,77 +532,80 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::AngleForce()
             _position,
             forceangle_group,
             angle_energy,
-            _angle_virial_atom_1,
+            _angle_virial_atom,
             _locator);
 
-  auto angle_energy_avr =
-    vtkm::cont::Algorithm::Reduce(angle_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
-    angle_num;
-  _para.SetParameter(PARA_ANGLE_ENERGY, angle_energy_avr);
+        auto angle_energy_avr =
+            vtkm::cont::Algorithm::Reduce(angle_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
+            angle_num;
+        _para.SetParameter(PARA_ANGLE_ENERGY, angle_energy_avr);
 
-  vtkm::cont::ArrayHandle<Vec3f> reduce_force_angle;
-  if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
-  {
-    //reduce angle force
-    auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
-    auto atom_id_number = atom_id.GetNumberOfValues();
-    auto original_number = angle_list.GetNumberOfValues();
+        vtkm::cont::ArrayHandle<Vec3f> reduce_force_angle;
+        if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
+        {
+            //reduce angle force
+            auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+            auto atom_id_number = atom_id.GetNumberOfValues();
+            auto original_number = angle_list.GetNumberOfValues();
 
-    std::vector<Id> new_anglelist(original_number);
-    memcpy(
-      &new_anglelist[0], angle_list.ReadPortal().GetArray(), original_number * sizeof(vtkm::Id));
+            std::vector<Id> new_anglelist(original_number);
+            memcpy(
+                &new_anglelist[0], angle_list.ReadPortal().GetArray(), original_number * sizeof(vtkm::Id));
 
-    std::vector<vtkm::Id> append_list(atom_id_number);
-    memcpy(&append_list[0], atom_id.ReadPortal().GetArray(), atom_id_number * sizeof(vtkm::Id));
+            std::vector<vtkm::Id> append_list(atom_id_number);
+            memcpy(&append_list[0], atom_id.ReadPortal().GetArray(), atom_id_number * sizeof(vtkm::Id));
 
-    //append key
-    new_anglelist.insert(new_anglelist.end(), append_list.begin(), append_list.end());
+            //append key
+            new_anglelist.insert(new_anglelist.end(), append_list.begin(), append_list.end());
 
-    //append force bond
-    std::vector<vtkm::Vec3f> new_force_angle(original_number);
-    memcpy(&new_force_angle[0],
-           force_angle.ReadPortal().GetArray(),
-           original_number * sizeof(vtkm::Vec3f));
-    std::vector<Vec3f> value(atom_id_number, vtkm::Vec3f{ 0.0, 0.0, 0.0 });
-    new_force_angle.insert(new_force_angle.end(), value.begin(), value.end());
+            //append force bond
+            std::vector<vtkm::Vec3f> new_force_angle(original_number);
+            memcpy(&new_force_angle[0],
+                force_angle.ReadPortal().GetArray(),
+                original_number * sizeof(vtkm::Vec3f));
+            std::vector<Vec3f> value(atom_id_number, vtkm::Vec3f{ 0.0, 0.0, 0.0 });
+            new_force_angle.insert(new_force_angle.end(), value.begin(), value.end());
 
-    vtkm::worklet::Keys<vtkm::Id> keys_angle(vtkm::cont::make_ArrayHandle(new_anglelist));
-    Invoker{}(MolecularWorklet::ReduceForceWorklet{},
-              keys_angle,
-              vtkm::cont::make_ArrayHandle(new_force_angle),
-              reduce_force_angle);
-  }
-  else
-  {
-    vtkm::worklet::Keys<vtkm::Id> keys_angle(angle_list);
-    Invoker{}(MolecularWorklet::ReduceForceWorklet{}, keys_angle, force_angle, reduce_force_angle);
-  }
+            vtkm::worklet::Keys<vtkm::Id> keys_angle(vtkm::cont::make_ArrayHandle(new_anglelist));
+            Invoker{}(MolecularWorklet::ReduceForceWorklet{},
+                keys_angle,
+                vtkm::cont::make_ArrayHandle(new_force_angle),
+                reduce_force_angle);
+        }
+        else
+        {
+            vtkm::worklet::Keys<vtkm::Id> keys_angle(angle_list);
+            Invoker{}(MolecularWorklet::ReduceForceWorklet{}, keys_angle, force_angle, reduce_force_angle);
+        }
 
-  return reduce_force_angle;
+        return reduce_force_angle;
+    }
 }
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
 {
-  //dihedrals
-  auto dihedrals_list = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
-  auto dihedrals_type = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
-  vtkm::IdComponent dihedralslist_num = dihedrals_list.GetNumberOfValues();
-  auto&& dihedralslist_group = vtkm::cont::make_ArrayHandleGroupVec<4>(dihedrals_list);
-  auto dihedrals_num = dihedralslist_group.GetNumberOfValues();
+    auto dihedral_type = _para.GetParameter<std::string>(PARA_DIHEDRAL_TYPE);
+    if ("Harmonic" == dihedral_type) {
+        //dihedrals
+        auto dihedrals_list = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_atom_id);
+        auto dihedrals_type = _para.GetFieldAsArrayHandle<Id>(field::dihedrals_type);
+        vtkm::IdComponent dihedralslist_num = dihedrals_list.GetNumberOfValues();
+        auto&& dihedralslist_group = vtkm::cont::make_ArrayHandleGroupVec<4>(dihedrals_list);
+        auto dihedrals_num = dihedralslist_group.GetNumberOfValues();
 
-  // dihedrals_coeffs_k   dihedrals_coeffs_sign     dihedrals_coeffs_multiplicity
-  auto dihedrals_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::dihedrals_coeffs_k);
-  auto dihedrals_coeffs_sign =
-    _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_sign);
-  auto dihedrals_coeffs_multiplicity =
-    _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
+        // dihedrals_coeffs_k   dihedrals_coeffs_sign     dihedrals_coeffs_multiplicity
+        auto dihedrals_coeffs_k = _para.GetFieldAsArrayHandle<Real>(field::dihedrals_coeffs_k);
+        auto dihedrals_coeffs_sign =
+            _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_sign);
+        auto dihedrals_coeffs_multiplicity =
+            _para.GetFieldAsArrayHandle<vtkm::IdComponent>(field::dihedrals_coeffs_multiplicity);
 
-  // force_dihedrals
-  vtkm::cont::ArrayHandle<Vec3f> force_dihedrals;
-  vtkm::cont::ArrayHandle<Real> dihedrals_energy;
-  auto&& forcedihedrals_group = vtkm::cont::make_ArrayHandleGroupVec<4>(force_dihedrals);
+        // force_dihedrals
+        vtkm::cont::ArrayHandle<Vec3f> force_dihedrals;
+        vtkm::cont::ArrayHandle<Real> dihedrals_energy;
+        auto&& forcedihedrals_group = vtkm::cont::make_ArrayHandleGroupVec<4>(force_dihedrals);
 
-  Invoker{}(MolecularWorklet::ComputeDihedralHarmonicWorklet{ _box },
+        Invoker{}(MolecularWorklet::ComputeDihedralHarmonicWorklet{ _box },
             dihedrals_type,
             dihedralslist_group,
             dihedrals_coeffs_k,
@@ -580,46 +614,47 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
             _position,
             forcedihedrals_group,
             dihedrals_energy,
-           _dihedral_virial_atom,
+            _dihedral_virial_atom,
             _locator);
 
-  auto dihedrals_energy_avr =
-    vtkm::cont::Algorithm::Reduce(dihedrals_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
-    dihedrals_num;
-  _para.SetParameter(PARA_DIHEDRAL_ENERGY, dihedrals_energy_avr);
+        auto dihedrals_energy_avr =
+            vtkm::cont::Algorithm::Reduce(dihedrals_energy, vtkm::TypeTraits<Real>::ZeroInitialization()) /
+            dihedrals_num;
+        _para.SetParameter(PARA_DIHEDRAL_ENERGY, dihedrals_energy_avr);
 
-  vtkm::cont::ArrayHandle<Vec3f> reduce_force_dihedrals;
-  //reduce dihedrals force
-  auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
-  auto atom_id_number = atom_id.GetNumberOfValues();
-  auto original_number = dihedrals_list.GetNumberOfValues();
+        vtkm::cont::ArrayHandle<Vec3f> reduce_force_dihedrals;
+        //reduce dihedrals force
+        auto atom_id = _para.GetFieldAsArrayHandle<Id>(field::atom_id);
+        auto atom_id_number = atom_id.GetNumberOfValues();
+        auto original_number = dihedrals_list.GetNumberOfValues();
 
-  std::vector<Id> new_dihedralslist(original_number);
-  memcpy(&new_dihedralslist[0],
-         dihedrals_list.ReadPortal().GetArray(),
-         original_number * sizeof(vtkm::Id));
+        std::vector<Id> new_dihedralslist(original_number);
+        memcpy(&new_dihedralslist[0],
+            dihedrals_list.ReadPortal().GetArray(),
+            original_number * sizeof(vtkm::Id));
 
-  std::vector<vtkm::Id> append_list(atom_id_number);
-  memcpy(&append_list[0], atom_id.ReadPortal().GetArray(), atom_id_number * sizeof(vtkm::Id));
+        std::vector<vtkm::Id> append_list(atom_id_number);
+        memcpy(&append_list[0], atom_id.ReadPortal().GetArray(), atom_id_number * sizeof(vtkm::Id));
 
-  //append key
-  new_dihedralslist.insert(new_dihedralslist.end(), append_list.begin(), append_list.end());
+        //append key
+        new_dihedralslist.insert(new_dihedralslist.end(), append_list.begin(), append_list.end());
 
-  //append force bond
-  std::vector<vtkm::Vec3f> new_force_dihedrals(original_number);
-  memcpy(&new_force_dihedrals[0],
-         force_dihedrals.ReadPortal().GetArray(),
-         original_number * sizeof(vtkm::Vec3f));
-  std::vector<Vec3f> value(atom_id_number, vtkm::Vec3f{ 0.0, 0.0, 0.0 });
-  new_force_dihedrals.insert(new_force_dihedrals.end(), value.begin(), value.end());
+        //append force bond
+        std::vector<vtkm::Vec3f> new_force_dihedrals(original_number);
+        memcpy(&new_force_dihedrals[0],
+            force_dihedrals.ReadPortal().GetArray(),
+            original_number * sizeof(vtkm::Vec3f));
+        std::vector<Vec3f> value(atom_id_number, vtkm::Vec3f{ 0.0, 0.0, 0.0 });
+        new_force_dihedrals.insert(new_force_dihedrals.end(), value.begin(), value.end());
 
-  vtkm::worklet::Keys<vtkm::Id> keys_dihedrals(vtkm::cont::make_ArrayHandle(new_dihedralslist));
-  Invoker{}(MolecularWorklet::ReduceForceWorklet{},
+        vtkm::worklet::Keys<vtkm::Id> keys_dihedrals(vtkm::cont::make_ArrayHandle(new_dihedralslist));
+        Invoker{}(MolecularWorklet::ReduceForceWorklet{},
             keys_dihedrals,
             vtkm::cont::make_ArrayHandle(new_force_dihedrals),
             reduce_force_dihedrals);
 
-  return reduce_force_dihedrals;
+        return reduce_force_dihedrals;
+    }
 }
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::SpecialCoulForce()
@@ -777,7 +812,11 @@ void ExecutionNVT::InitParameters()
     _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX); 
   }
   _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
+  t_start = _kbT;
+  t_stop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[1];
   _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
+  t_period = _Tdamp;
+
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
@@ -1046,4 +1085,168 @@ void ExecutionNVT::InitStyle()
   file2array();
   array2spline();
   SetEAM();
+}
+
+void ExecutionNVT::SetUp()
+{
+    ComputeTempe();       //t_current
+    ComputeTempTarget();  //t_target
+
+    // masses and initial forces on thermostat variables
+    eta_mass[0] = tdof * _unit_factor._boltz * t_target / (t_freq * t_freq);
+    for (Id ich = 1; ich < mtchain; ich++)
+    {
+        eta_mass[ich] = _unit_factor._boltz * t_target / (t_freq * t_freq);
+    }
+
+    for (Id ich = 1; ich < mtchain; ich++)
+    {
+        eta_dotdot[ich] = (eta_mass[ich - 1] * eta_dot[ich - 1] * eta_dot[ich - 1] - _unit_factor._boltz * t_target) / eta_mass[ich];
+    }
+}
+
+void ExecutionNVT::ComputeTempTarget()
+{
+    if (t_stop == t_start) //Thermostatic simulation
+    {
+        t_target = t_stop = t_start;
+    }
+    else                    //anisothermal simulation
+    {
+        auto currentstep = _app.GetExecutioner()->CurrentStep();
+        auto beginstep = 0;
+        auto endstep = _app.GetExecutioner()->NumStep();
+
+        Real delta = currentstep - beginstep;
+
+        if (delta != 0.0)
+        {
+            delta = delta / static_cast<Real>(endstep - beginstep);
+        }
+
+        t_target = t_start + delta * (t_stop - t_start);
+    }
+    //
+    ke_target = tdof * _unit_factor._boltz * t_target;
+}
+
+void ExecutionNVT::InitialIntegrate()
+{
+    // update eta_dot
+    ComputeTempTarget();
+    NHCTempIntegrate();  //perform half-step update of chain thermostat variables
+
+    UpdateVelocity();  //NVE_v();
+
+    UpdatePosition(); // NVE_x();
+}
+
+void ExecutionNVT::FinalIntegrate()
+{
+    UpdateVelocity();   //NVE_v();
+
+    // compute new T,P after velocities rescaled by nh_v_press()
+    // compute appropriately coupled elements of mvv_current
+    ComputeTempe(); //t_current
+    // update eta_dot
+
+    NHCTempIntegrate();
+}
+
+void ExecutionNVT::NHCTempIntegrate()
+{
+    auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
+    Real expfac;
+    Real kecurrent = tdof * _unit_factor._boltz * temperature;
+
+    // Update masses, to preserve initial freq, if flag set
+    if (eta_mass_flag)
+    {
+        eta_mass[0] = tdof * _unit_factor._boltz * t_target / (t_freq * t_freq);
+        for (Id ich = 1; ich < mtchain; ich++)
+        {
+            eta_mass[ich] = _unit_factor._boltz * t_target / (t_freq * t_freq);
+        }
+    }
+
+    if (eta_mass[0] > 0.0)
+    {
+        eta_dotdot[0] = (kecurrent - ke_target) / eta_mass[0]; //链的加速度
+    }
+    else
+    {
+        eta_dotdot[0] = 0.0;
+    }
+
+
+    //
+    Real ncfac = 1.0 / nc_tchain;
+    for (Id iloop = 0; iloop < nc_tchain; iloop++)
+    {
+        for (Id ich = mtchain - 1; ich > 0; ich--) // 反向传播,为了正确传播影响，必须从最后一个链节开始，逐步向前传播至第一个链节。
+            //这样可以确保上游链节（更靠近粒子的链节）的更新能准确反映下游链节的影响。
+
+        {
+            expfac = vtkm::Exp(-ncfac * dt8 * eta_dot[ich + 1]);  // 使用 exp(-dt/8) 对速度进行指数更新, 第 ich 链节会受到后续链节 𝜂(ich + 1)的影响.
+            eta_dot[ich] *= expfac;
+            eta_dot[ich] += eta_dotdot[ich] * ncfac * dt4;  // 基于当前链节的加速度 eta_dotdot 更新链的速度，时间步长为 dt/4
+            eta_dot[ich] *= tdrag_factor;                  // 乘以阻尼因子
+            eta_dot[ich] *= expfac;                        // 再次使用 exp(-dt/8) 进行指数更新,完成另一个半步更新,这一步确保动量的完整更新，使其演化符合时间反演对称性。
+        }                                                //两次应用指数缩放因子是为了模拟 Nose-Hoover 链系统的哈密顿力学方程。
+
+        expfac = vtkm::Exp(-ncfac * dt8 * eta_dot[1]);
+        eta_dot[0] *= expfac;
+        eta_dot[0] += eta_dotdot[0] * ncfac * dt4;
+        eta_dot[0] *= tdrag_factor;
+        eta_dot[0] *= expfac;
+
+        factor_eta = vtkm::Exp(-ncfac * dthalf * eta_dot[0]);
+        RunWorklet::UpdateVelocityRescale(factor_eta, _velocity);     //nh_v_temp();  dt/2的更新
+
+
+        // rescale temperature due to velocity scaling
+        // should not be necessary to explicitly recompute the temperature
+
+        //_tempT *= factor_eta * factor_eta;
+        auto temperature_f = temperature * factor_eta * factor_eta;
+        _para.SetParameter(PARA_TEMPT, temperature_f);
+
+
+        //
+        auto temperature_n = _para.GetParameter<Real>(PARA_TEMPT);
+        kecurrent = tdof * _unit_factor._boltz * temperature_n;
+
+        if (eta_mass[0] > 0.0)
+            eta_dotdot[0] = (kecurrent - ke_target) / eta_mass[0];
+        else
+            eta_dotdot[0] = 0.0;
+
+        for (Id ich = 0; ich < mtchain; ich++)
+            eta[ich] += ncfac * dthalf * eta_dot[ich];   //链的位置
+
+        eta_dot[0] *= expfac;
+        eta_dot[0] += eta_dotdot[0] * ncfac * dt4;
+        eta_dot[0] *= expfac;
+
+        for (Id ich = 1; ich < mtchain; ich++) //正向循环（从头到尾）：用于更新加速度
+        {
+            expfac = vtkm::Exp(-ncfac * dt8 * eta_dot[ich + 1]);
+            eta_dot[ich] *= expfac;
+            eta_dotdot[ich] = (eta_mass[ich - 1] * eta_dot[ich - 1] * eta_dot[ich - 1] - _unit_factor._boltz * t_target) / eta_mass[ich];
+            eta_dot[ich] += eta_dotdot[ich] * ncfac * dt4;
+            eta_dot[ich] *= expfac;
+        }
+    }
+}
+
+void ExecutionNVT::Computedof()
+{
+    auto n = _position.GetNumberOfValues();
+    auto extra_dof = 3; //dimension =3
+    tdof = 3 * n - extra_dof;
+    auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+    if (shake == "true")
+    {
+        tdof = tdof - n;
+    }
 }

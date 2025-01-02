@@ -707,7 +707,7 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,Array
   }
 }
 
-void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
+void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHandle<Vec6f>& nearVirial_atom)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
@@ -742,8 +742,10 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce)
                             id_verletlist_group,
                             num_verletlist,
                             offset_verletlist_group,
-                            ljforce);
+                            ljforce,
+                            nearVirial_atom);
 }
+
 void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
 {
   auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
@@ -1112,4 +1114,16 @@ void ExecutionMD::InitPointLocator()
   _locator.SetRs(_para.GetParameter<Real>(PARA_R_CORE));
 
   _locator.SetPosition(_position);
+}
+
+void ExecutionMD::ApplyPbc()
+{
+    //pbc
+    auto&& position_flag = _para.GetFieldAsArrayHandle<Id3>(field::position_flag);
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX); //
+    auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+    Vec<Vec2f, 3> data_range{ { static_cast<Real>(range[0].Min), static_cast<Real>(range[0].Max) },
+                              { static_cast<Real>(range[1].Min), static_cast<Real>(range[1].Max) },
+                              { static_cast<Real>(range[2].Min), static_cast<Real>(range[2].Max) } };
+    RunWorklet::ApplyPbcFlag(box, data_range, _position, _locator, position_flag);
 }

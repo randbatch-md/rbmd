@@ -399,8 +399,6 @@ public:
       const Real& KspaceForce)
   {
       Vec6f KspaceVirial{ 0, 0, 0, 0, 0, 0 };
-
-      //compute LongVirial
       KspaceVirial[0] =  (r_i[0] * K[0] + r_i[0] * K[0]) * KspaceForce; //_xx
       KspaceVirial[1] =  (r_i[1] * K[1] + r_i[1] * K[1]) * KspaceForce; // yy
       KspaceVirial[2] =  (r_i[2] * K[2] + r_i[2] * K[2]) * KspaceForce; // zz
@@ -423,8 +421,8 @@ public:
     const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
     const Real cut_off_2 = cut_off * cut_off;
 
-    //if (dis_2 < cut_off_2 && dis_2 > small_value)
-    if (dis_2 < cut_off_2)
+    if (dis_2 < cut_off_2 && dis_2 > small_value)
+    //if (dis_2 < cut_off_2)
     {
       Real sigma_ij = (sigma_i + sigma_j) / 2;
 

@@ -59,7 +59,7 @@ protected:
   void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
   void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce);
   void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& nearVirial_atom);
-  void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce);
+  void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHandle<Vec6f>& nearVirial_atom);
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeRBLEAMForce(ArrayHandle<Vec3f>& force);
@@ -86,6 +86,8 @@ protected:
   void ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& lj_virial);
   void ComputeCoulVirial(ArrayHandle<Vec6f>& Coul_virial);
   void ComputeEwaldLongVirial(IdComponent& Kmax, ArrayHandle<Vec6f>& Ewald_long_virial);
+
+  void ApplyPbc();
 protected:
   ArrayHandle<Id> _molecule_id;
   ArrayHandle<Id> _atoms_id;
@@ -112,4 +114,18 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
+
+  ArrayHandle<Vec6f> _nearVirial_atom;
+  ArrayHandle<Vec6f> _lj_virial_atom;
+  ArrayHandle<Vec6f> _coul_virial_atom;
+  ArrayHandle<Vec6f> _ewald_long_virial_atom;
+  ArrayHandle<Vec6f> _ewald_long_virial_atom_1;
+  ArrayHandle<Vec6f> _bond_virial_atom;
+  ArrayHandle<Real> _bond_virial_atom_1;
+  ArrayHandle<Vec6f> _angle_virial_atom;
+  ArrayHandle<Real> _angle_virial_atom_1;
+  ArrayHandle<Vec6f> _dihedral_virial_atom;
+  ArrayHandle<Vec6f> _spec_coul_virial_atom;
+
+  ArrayHandle<Vec6f> _shake_first_virial_atom;
 };

@@ -94,7 +94,6 @@ private:
     void lamda2x(Id n);
     void set_global_box();
     void remap();
-    void ApplyPbc();
 
     //
     void Computedof();
@@ -199,24 +198,10 @@ private:
 
     std::vector<Id> map; // mapping from atom types to elements
 
+
     //
-    ArrayHandle<Vec6f> _nearVirial_atom;
-    ArrayHandle<Vec6f> _lj_virial_atom;
-    ArrayHandle<Vec6f> _coul_virial_atom;
-    ArrayHandle<Vec6f> _ewald_long_virial_atom;
-    ArrayHandle<Vec6f> _bond_virial_atom;
-    ArrayHandle<Real> _bond_virial_atom_1;
-    ArrayHandle<Vec6f> _angle_virial_atom;
-    ArrayHandle<Real> _angle_virial_atom_1;
-    ArrayHandle<Vec6f> _dihedral_virial_atom;
-    ArrayHandle<Vec6f> _spec_coul_virial_atom;
-
-    ArrayHandle<Vec6f> _shake_first_virial_atom;
-
     Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
     Real _pressure_scalar; // computed global pressure scalar
-
-    Real _lj_potential_energy;
 
     //pressure
     Real _Pstart, _Pstop, _Pperiod, _bulkmodulus; //read

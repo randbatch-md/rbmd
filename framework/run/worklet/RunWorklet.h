@@ -114,7 +114,8 @@ namespace RunWorklet
                       const GroupVecType& Group_j,
                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                       const CoordOffsetType& coord_offset_j,
-                      vtkm::cont::ArrayHandle<Vec3f>& LJforce);
+                      vtkm::cont::ArrayHandle<Vec3f>& LJforce,
+                      vtkm::cont::ArrayHandle<Vec6f>& LJvirial);
 
    void EAMfpVerlet(const Real& cut_off,
                     const Vec3f& box,
