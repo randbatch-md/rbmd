@@ -56,7 +56,6 @@ private:
 
   void PostData();
   void PostExecute();
-  void SpecialFarCoulEnergy();
 
 private:
   std::ofstream _file;

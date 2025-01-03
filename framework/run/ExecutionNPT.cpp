@@ -403,7 +403,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::LJForce()
     _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
     if (_nearforce_type == "RBL")
     {
-        ComputeRBLLJForce(_LJforce);
+        ComputeRBLLJForce(_LJforce, _nearVirial_atom);
     }
     if (_nearforce_type == "VERLETLIST")
     {
@@ -434,7 +434,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::NearForce()
 
     if (_nearforce_type == "RBL")
     {
-        ComputeRBLNearForce(_nearforce);
+        ComputeRBLNearForce(_nearforce, _nearVirial_atom);
     }
     else if (_nearforce_type == "VERLETLIST")
     {
@@ -448,7 +448,7 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::NearForceLJ()
     _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
     if (_nearforce_type == "RBL")
     {
-        ComputeRBLLJForce(_all_force);
+        ComputeRBLLJForce(_all_force, _nearVirial_atom);
     }
     else if (_nearforce_type == "VERLETLIST")
     {

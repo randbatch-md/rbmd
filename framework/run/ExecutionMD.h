@@ -48,17 +48,24 @@ public:
   virtual void InitParameters();
 
 protected:
-  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Vec3f& _box, IdComponent& Kmax);
+  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Vec3f& _box, IdComponent& Kmax, Real& alpha,Real& ewald_energy_total);
   std::vector<Vec2f> ComputeChargeStructureFactorRBE(Real& _Vlength, ArrayHandle<Vec3f>& _psample);
   void ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                           IdComponent& RBE_P,
                           ArrayHandle<Vec3f>& RBE_ele_force,
                           ArrayHandle<Vec6f>& ewald_long_virial_atom);
   void ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom);
+  void ComputeLJCoulEnergy(ArrayHandle<Vec6f>& nearVirial_atom);
 
-  void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
-  void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce);
+  void ComputeLJEnergy(ArrayHandle<Vec6f>& nearVirial_atom);
+
+  void ComputeSelfEnergy(Real& self_potential_energy_avr);
+  void ComputeEwaldEnergy(Vec3f& _box, IdComponent& Kmax, Real& alpha, Real& ewald_energy_total);
+
+  void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& nearVirial_atom);
+  void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce, ArrayHandle<Vec6f>& nearVirial_atom);
   void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& nearVirial_atom);
+
   void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHandle<Vec6f>& nearVirial_atom);
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce);
@@ -128,4 +135,6 @@ protected:
   ArrayHandle<Vec6f> _spec_coul_virial_atom;
 
   ArrayHandle<Vec6f> _shake_first_virial_atom;
+
+  ArrayHandle<Real> _energy_lj, _energy_coul;
 };

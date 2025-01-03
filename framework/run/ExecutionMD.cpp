@@ -360,7 +360,9 @@ void ExecutionMD::InitParameters()
 }
 
 std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
-                                                                      IdComponent& Kmax)
+                                                                  IdComponent& Kmax,
+                                                                  Real&  alpha,
+                                                                  Real& ewald_energy_total)
 {
   std::vector<Vec2f> rhok;
   ArrayHandle<Real> density_real;
@@ -378,6 +380,8 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
           K = { Real(2 * vtkm::Pi() * K[0] / box[0]),
                 Real(2 * vtkm::Pi() * K[1] / box[1]),
                 Real(2 * vtkm::Pi() * K[2] / box[2]) };
+          Real Range_K = vtkm::Magnitude(K);
+
           RunWorklet::ComputeChargeStructureFactorComponent(
             K, _position, _charge, density_real, density_image);
           Real value_Re = vtkm::cont::Algorithm::Reduce(
@@ -385,6 +389,12 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
           Real value_Im = vtkm::cont::Algorithm::Reduce(
             density_image, vtkm::TypeTraits<Real>::ZeroInitialization());
 
+          Real Range_density2 = vtkm::Pow(value_Re, 2) + vtkm::Pow(value_Im, 2);
+
+          ewald_energy_total +=
+              vtkm::Exp(-Range_K * Range_K / (4 * alpha)) * Range_density2 / (Range_K * Range_K);
+
+          //std::cout << "Updated ewald_energy_total: " << ewald_energy_total << std::endl;
           rhok.push_back({ value_Re, value_Im });
         }
       }
@@ -392,6 +402,47 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
   }
   return rhok;
 }
+
+void  ExecutionMD::ComputeEwaldEnergy(Vec3f& box,
+    IdComponent& Kmax,
+    Real& alpha,
+    Real& ewald_energy_total)
+{
+    std::vector<Vec2f> rhok;
+    ArrayHandle<Real> density_real;
+    ArrayHandle<Real> density_image;
+    for (Id i = -Kmax; i <= Kmax; i++)
+    {
+        for (Id j = -Kmax; j <= Kmax; j++)
+        {
+            for (Id k = -Kmax; k <= Kmax; k++)
+            {
+                if (!(i == 0 && j == 0 && k == 0))
+                {
+                    Vec3f K = { Real(i), Real(j), Real(k) };
+                    //
+                    K = { Real(2 * vtkm::Pi() * K[0] / box[0]),
+                          Real(2 * vtkm::Pi() * K[1] / box[1]),
+                          Real(2 * vtkm::Pi() * K[2] / box[2]) };
+                    Real Range_K = vtkm::Magnitude(K);
+
+                    RunWorklet::ComputeChargeStructureFactorComponent(
+                        K, _position, _charge, density_real, density_image);
+                    Real value_Re = vtkm::cont::Algorithm::Reduce(
+                        density_real, vtkm::TypeTraits<Real>::ZeroInitialization());
+                    Real value_Im = vtkm::cont::Algorithm::Reduce(
+                        density_image, vtkm::TypeTraits<Real>::ZeroInitialization());
+
+                    Real Range_density2 = vtkm::Pow(value_Re, 2) + vtkm::Pow(value_Im, 2);
+
+                    ewald_energy_total +=
+                        vtkm::Exp(-Range_K * Range_K / (4 * alpha)) * Range_density2 / (Range_K * Range_K);
+                }
+            }
+        }
+    }
+}
+
 
 void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                   IdComponent& RBE_P,
@@ -454,20 +505,61 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
   RunWorklet::ChangePnumberChargeStructureFactor(rhok_Re_reduce, rhok_Im_reduce, new_rhok);
  
 
-  
+  //energy
+  Real self_potential_energy_ave;
+  ComputeSelfEnergy(self_potential_energy_ave);
+
+  auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
+  auto kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+  auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+  auto volume = box[0] * box[1] * box[2];
+  Real ewald_energy_total = 0.0;
+  ComputeEwaldEnergy(box, kmax, alpha, ewald_energy_total);
+  Real ewald_energy_ave = _unit_factor._qqr2e * ewald_energy_total * ((2 * vtkm::Pi() / volume)) / N;
+  ewald_energy_ave = ewald_energy_ave + self_potential_energy_ave;
+
+  _para.SetParameter(PARA_EWALD_LONG_ENERGY, ewald_energy_ave);
 }
 
 void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom)
 {
+  auto N = _position.GetNumberOfValues();
+  auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-  auto rhok = ComputeChargeStructureFactorEwald(box, Kmax);
+  auto volume = box[0] * box[1] * box[2];
+  Real ewald_energy_total =0.0;
+  auto rhok = ComputeChargeStructureFactorEwald(box, Kmax, alpha, ewald_energy_total);
+  Real ewald_energy_ave = _unit_factor._qqr2e * ewald_energy_total * ((2 * vtkm::Pi() / volume)) /N;
+
   ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
   RunWorklet::ComputeNewFarElectrostatics(
     Kmax, box,_atoms_id, whole_rhok, _force_function, _topology, _locator, Ewald_ele_force, ewald_long_virial_atom);
+
+  Real  self_potential_energy_ave;
+  ComputeSelfEnergy(self_potential_energy_ave);
+
+  ewald_energy_ave = ewald_energy_ave + self_potential_energy_ave;
+  _para.SetParameter(PARA_EWALD_LONG_ENERGY, ewald_energy_ave);
+} 
+
+void ExecutionMD::ComputeSelfEnergy(Real& self_potential_energy_ave)
+{
+    auto N = _position.GetNumberOfValues();
+    auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
+    auto charge = _para.GetFieldAsArrayHandle<Real>(field::charge);
+
+    ArrayHandle<Real> _self_energy;
+    RunWorklet::ComputeSqCharge(charge, _self_energy);
+    auto self_potential_energy_total = -vtkm::Sqrt(alpha / vtkm::Pi()) *
+        vtkm::cont::Algorithm::Reduce(_self_energy, vtkm::TypeTraits<Real>::ZeroInitialization());
+    self_potential_energy_ave = self_potential_energy_total / N;
+    self_potential_energy_ave = self_potential_energy_ave * _unit_factor._qqr2e;
+
+    _para.SetParameter(PARA_SELF_ENERGY, self_potential_energy_ave);
 }
 
-void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
+void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& nearVirial_atom)
 {
   auto N = _position.GetNumberOfValues();
   vtkm::cont::ArrayHandle<Vec3f> corr_force;
@@ -568,9 +660,93 @@ void ExecutionMD::ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce)
 
   Vec3f corr_value = vtkm::cont::Algorithm::Reduce(corr_force, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrForce(corr_value, corr_force, nearforce);
+
+  //energy
+  ComputeLJCoulEnergy(nearVirial_atom);
+
 }
 
-void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
+void ExecutionMD::ComputeLJCoulEnergy(ArrayHandle<Vec6f>& nearVirial_atom) 
+{
+    auto cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+    auto N = _position.GetNumberOfValues();
+    auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+    auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * cut_off * cut_off * cut_off) + 1;
+    auto verletlist_num = N * N;
+
+    ArrayHandle<Id> id_verletlist;
+    ArrayHandle<Vec3f> offset_verletlist;
+    offset_verletlist.Allocate(verletlist_num);
+    id_verletlist.Allocate(verletlist_num);
+
+    std::vector<Id> temp_vec(N + 1);
+    Id inc = 0;
+    std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * N; });
+    vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+    auto id_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+    auto offset_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+    vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+
+    RunWorklet::ComputeNeighbours(cut_off, box, _atoms_id, _locator, id_verletlist_group,
+        num_verletlist, offset_verletlist_group);
+
+    //energy
+    ArrayHandle<Real> energy_lj;
+    ArrayHandle<Real>energy_coul;
+    if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE)) 
+    {
+        auto special_offsets = _para.GetFieldAsArrayHandle<Id>(field::special_offsets);
+        auto special_weights = _para.GetFieldAsArrayHandle<Real>(field::special_weights);
+        auto specoal_ids = _para.GetFieldAsArrayHandle<Id>(field::special_ids);
+        auto ids_group = vtkm::cont::make_ArrayHandleGroupVecVariable(specoal_ids, special_offsets);
+        auto weight_group =
+            vtkm::cont::make_ArrayHandleGroupVecVariable(special_weights, special_offsets);
+
+        RunWorklet::SpecialLJCoulEnergyVerletWeightVirial(cut_off,
+            box,
+            _unit_factor._qqr2e,
+            _atoms_id,
+            _locator,
+            _topology,
+            _force_function,
+            id_verletlist_group,
+            num_verletlist,
+            offset_verletlist_group,
+            ids_group,
+            weight_group,
+            nearVirial_atom,
+            energy_lj, energy_coul);
+    }
+    else {
+        RunWorklet::LJCoulEnergyVerletVirial(cut_off,
+            box,
+            _unit_factor._qqr2e,
+            _atoms_id,
+            _locator,
+            _topology,
+            _force_function,
+            id_verletlist_group,
+            num_verletlist,
+            offset_verletlist_group,
+            nearVirial_atom,
+            energy_lj, energy_coul);
+    }
+
+    auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+        energy_lj, vtkm::TypeTraits<Real>::ZeroInitialization());
+    auto lj_potential_energy_avr = lj_potential_energy_total / N;
+
+    auto coul_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+        energy_coul, vtkm::TypeTraits<Real>::ZeroInitialization());
+    auto coul_potential_energy_avr = coul_potential_energy_total / N;
+
+    _para.SetParameter(PARA_LJ_ENERGY, lj_potential_energy_avr);
+    _para.SetParameter(PARA_COUL_ENERGY, coul_potential_energy_avr);
+}
+
+void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce, ArrayHandle<Vec6f>& nearVirial_atom)
 {
   auto N = _position.GetNumberOfValues();
   vtkm::cont::ArrayHandle<Vec3f> corr_ljforce;
@@ -638,6 +814,56 @@ void ExecutionMD::ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce)
   Vec3f corr_value =
     vtkm::cont::Algorithm::Reduce(corr_ljforce, vtkm::TypeTraits<Vec3f>::ZeroInitialization()) / N;
   RunWorklet::SumRBLCorrForce(corr_value, corr_ljforce, LJforce);
+
+
+  //energy
+  ComputeLJEnergy(nearVirial_atom);
+}
+
+void ExecutionMD::ComputeLJEnergy(ArrayHandle<Vec6f>& nearVirial_atom)
+{
+    auto rc = _para.GetParameter<Real>(PARA_CUTOFF);
+    auto box = _para.GetParameter<Vec3f>(PARA_BOX);
+    auto N = _position.GetNumberOfValues();
+    auto rho_system = _para.GetParameter<Real>(PARA_RHO);
+    auto max_j_num = rho_system * vtkm::Ceil(4.0 / 3.0 * vtkm::Pif() * rc * rc * rc) + 1;
+    auto verletlist_num = N * max_j_num;
+
+    ArrayHandle<Id> id_verletlist;
+    ArrayHandle<Vec3f> offset_verletlist;
+    offset_verletlist.Allocate(verletlist_num);
+    id_verletlist.Allocate(verletlist_num);
+
+    std::vector<Id> temp_vec(N + 1);
+    Id inc = 0;
+    std::generate(temp_vec.begin(), temp_vec.end(), [&](void) -> Id { return (inc++) * max_j_num; });
+    vtkm::cont::ArrayHandle<vtkm::Id> temp_offset = vtkm::cont::make_ArrayHandle(temp_vec);
+
+    vtkm::cont::ArrayHandle<vtkm::Id> num_verletlist;
+    auto id_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(id_verletlist, temp_offset);
+    auto offset_verletlist_group = vtkm::cont::make_ArrayHandleGroupVecVariable(offset_verletlist, temp_offset);
+
+    RunWorklet::ComputeNeighbours(rc, box, _atoms_id, _locator, id_verletlist_group,
+        num_verletlist, offset_verletlist_group);
+
+
+    //
+    ArrayHandle<Real> energy_lj;
+    RunWorklet::LJEnergyVerlet(rc,
+        box,
+        _atoms_id,
+        _locator,
+        _topology,
+        _force_function,
+        id_verletlist_group,
+        num_verletlist,
+        offset_verletlist_group,
+        energy_lj);
+
+    auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+        energy_lj, vtkm::TypeTraits<Real>::ZeroInitialization());
+    auto lj_potential_energy_avr = lj_potential_energy_total / N;
+    _para.SetParameter(PARA_LJ_ENERGY, lj_potential_energy_avr);
 }
 
 void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,ArrayHandle<Vec6f>& nearVirial_atom)
@@ -666,6 +892,7 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,Array
   RunWorklet::ComputeNeighbours( cut_off, box,_atoms_id, _locator, id_verletlist_group,
       num_verletlist, offset_verletlist_group);
 
+  ArrayHandle<Real> energy_lj, energy_coul;
   if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE))
   {
       //
@@ -688,7 +915,8 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,Array
           ids_group,
           weight_group,
           nearforce,
-          nearVirial_atom);
+          nearVirial_atom,
+          energy_lj, energy_coul);
   }
   else
   {
@@ -703,8 +931,20 @@ void ExecutionMD::ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce,Array
           num_verletlist,
           offset_verletlist_group,
           nearforce,
-          nearVirial_atom);
+          nearVirial_atom,
+          energy_lj, energy_coul);
   }
+
+  auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+      energy_lj, vtkm::TypeTraits<Real>::ZeroInitialization());
+  auto lj_potential_energy_avr = lj_potential_energy_total / N;
+
+  auto coul_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+      energy_coul, vtkm::TypeTraits<Real>::ZeroInitialization());
+  auto coul_potential_energy_avr = coul_potential_energy_total / N;
+  
+  _para.SetParameter(PARA_LJ_ENERGY, lj_potential_energy_avr);
+  _para.SetParameter(PARA_COUL_ENERGY, coul_potential_energy_avr);
 }
 
 void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHandle<Vec6f>& nearVirial_atom)
@@ -733,6 +973,7 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHan
   RunWorklet::ComputeNeighbours( cut_off, box, _atoms_id, _locator, id_verletlist_group, 
       num_verletlist, offset_verletlist_group);
 
+  ArrayHandle<Real> energy_lj;
   RunWorklet::LJForceVerlet(cut_off,
                             box,
                             _atoms_id,
@@ -743,7 +984,13 @@ void ExecutionMD::ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHan
                             num_verletlist,
                             offset_verletlist_group,
                             ljforce,
-                            nearVirial_atom);
+                            nearVirial_atom,
+                            energy_lj);
+  auto lj_potential_energy_total = vtkm::cont::Algorithm::Reduce(
+      energy_lj, vtkm::TypeTraits<Real>::ZeroInitialization());
+  auto lj_potential_energy_avr = lj_potential_energy_total / N;
+
+  _para.SetParameter(PARA_LJ_ENERGY, lj_potential_energy_avr);
 }
 
 void ExecutionMD::ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce)
@@ -877,8 +1124,10 @@ void ExecutionMD::ComputeCoulVirial(ArrayHandle<Vec6f>& Coul_virial)
 void ExecutionMD::ComputeEwaldLongVirial(IdComponent& Kmax,
     ArrayHandle<Vec6f>& Ewald_long_virial)
 {
+    auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
     auto box = _para.GetParameter<Vec3f>(PARA_BOX);
-    auto rhok = ComputeChargeStructureFactorEwald(box, Kmax);
+    Real ewald_energy_total;
+    auto rhok = ComputeChargeStructureFactorEwald(box, Kmax, alpha, ewald_energy_total);
     ArrayHandle<Vec2f> whole_rhok = vtkm::cont::make_ArrayHandle(rhok);
     RunWorklet::ComputeEwaldVirial(Kmax,
         _unit_factor._qqr2e,

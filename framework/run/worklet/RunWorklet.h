@@ -90,7 +90,9 @@ namespace RunWorklet
        const GroupIdIdType& group_ids,
        const GroupRealIdType& group_weights,
        vtkm::cont::ArrayHandle<Vec3f>& nearforce,
-       vtkm::cont::ArrayHandle<Vec6f>& nearvirial);
+       vtkm::cont::ArrayHandle<Vec6f>& nearvirial,
+       vtkm::cont::ArrayHandle<Real>& energy_lj,
+       vtkm::cont::ArrayHandle<Real>& Energy_coul);
 
    void NearForceVerletVirial(const Real& cut_off,
        const Vec3f& box,
@@ -103,7 +105,9 @@ namespace RunWorklet
        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
        const CoordOffsetType& coord_offset_j,
        vtkm::cont::ArrayHandle<Vec3f>& nearforce,
-       vtkm::cont::ArrayHandle<Vec6f>& nearvirial);
+       vtkm::cont::ArrayHandle<Vec6f>& nearvirial,
+       vtkm::cont::ArrayHandle<Real>& energy_lj,
+       vtkm::cont::ArrayHandle<Real>& Energy_coul);
 
    void LJForceVerlet(const Real& cut_off,
                       const Vec3f& box,
@@ -115,7 +119,49 @@ namespace RunWorklet
                       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
                       const CoordOffsetType& coord_offset_j,
                       vtkm::cont::ArrayHandle<Vec3f>& LJforce,
-                      vtkm::cont::ArrayHandle<Vec6f>& LJvirial);
+                      vtkm::cont::ArrayHandle<Vec6f>& LJvirial,
+                      vtkm::cont::ArrayHandle<Real>& LJenergy);
+
+   void LJEnergyVerlet(const Real& cut_off,
+       const Vec3f& box,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+       const ContPointLocator& locator,
+       const ContTopology& topology,
+       const ContForceFunction& force_function,
+       const GroupVecType& Group_j,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+       const CoordOffsetType& coord_offset_j,
+       vtkm::cont::ArrayHandle<Real>& LJPE);
+
+   void SpecialLJCoulEnergyVerletWeightVirial(const Real& cut_off,
+       const Vec3f& box,
+       const Real& qqr2e,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+       const ContPointLocator& locator,
+       const ContTopology& topology,
+       const ContForceFunction& force_function,
+       const GroupVecType& Group_j,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+       const CoordOffsetType& coord_offset_j,
+       const GroupIdIdType& group_ids,
+       const GroupRealIdType& group_weights,
+       vtkm::cont::ArrayHandle<Vec6f>& nearvirial,
+       vtkm::cont::ArrayHandle<Real>& energy_lj,
+       vtkm::cont::ArrayHandle<Real>& Energy_coul);
+
+   void LJCoulEnergyVerletVirial(const Real& cut_off,
+       const Vec3f& box,
+       const Real& qqr2e,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+       const ContPointLocator& locator,
+       const ContTopology& topology,
+       const ContForceFunction& force_function,
+       const GroupVecType& Group_j,
+       const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
+       const CoordOffsetType& coord_offset_j,
+       vtkm::cont::ArrayHandle<Vec6f>& nearvirial,
+       vtkm::cont::ArrayHandle<Real>& energy_lj,
+       vtkm::cont::ArrayHandle<Real>& Energy_coul);
 
    void EAMfpVerlet(const Real& cut_off,
                     const Vec3f& box,
@@ -420,6 +466,9 @@ namespace RunWorklet
                                       const ContPointLocator& locator,
                                       vtkm::cont::ArrayHandle<vtkm::Vec3f>& eleFarNewforce,
                                       vtkm::cont::ArrayHandle<Vec6f>& KspaceVirial);
+
+    void ComputeSqCharge(const vtkm::cont::ArrayHandle<Real>& charge,
+        vtkm::cont::ArrayHandle<Real>& SelfEnergy);
 
     void ComputeLJVirial(const Real& cut_off,
         const Vec3f& box,

@@ -772,7 +772,7 @@ public:
     return 0.5 * ComptePE_ij;
   }
 
-  VTKM_EXEC Real ComputePotentialEn0(const Vec3f& r_ij,
+  VTKM_EXEC Real ComputePotentialEn_fix(const Vec3f& r_ij,
       const Real& eps_i,
       const Real& eps_j,
       const Real& sigma_i,
@@ -808,7 +808,7 @@ public:
     Real dis = vtkm::Magnitude(r_ij);
     if (dis < cut_off && dis > small_value)
     {
-      ComputePE_ij = charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(nearalpha) * dis)) / dis;
+      ComputePE_ij = charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(_alpha) * dis)) / dis;
     }
     return 0.5 * ComputePE_ij;
   }
@@ -816,8 +816,7 @@ public:
   VTKM_EXEC Real  ComputeNearEleEnergy_fix(const Vec3f& r_ij,
       const Real& charge_i,
       const Real& charge_j,
-      const Real& cut_off,
-      const Real& nearalpha) const
+      const Real& cut_off) const
   {
       const Real small_value = 0.0001;
       Real energy_coul = 0;
@@ -827,7 +826,7 @@ public:
       Real dis = vtkm::Sqrt(dis_2);
       if (dis_2 < cut_off_2 && dis_2 > small_value)
       {
-          energy_coul = 0.5 * charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(nearalpha) * dis)) / dis;
+          energy_coul = 0.5 * charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(_alpha) * dis)) / dis;
       }
       return energy_coul;
   }
