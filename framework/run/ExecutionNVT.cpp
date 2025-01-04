@@ -116,6 +116,7 @@ void ExecutionNVT::Solve()
 
         ComputeTempe();
         UpdateVelocityByTempConType();
+        Compute_Pressure_Scalar();
   }
   else if (temp_ctrl_type == "NOSE_HOOVER")
   {
@@ -809,17 +810,20 @@ void ExecutionNVT::InitParameters()
   {
     _RBE_P = _para.GetParameter<IdComponent>(PARA_COULOMB_SAMPLE_NUM);
     _alpha = _para.GetParameter<Real>(PARA_ALPHA);
-    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX); 
+    auto Kmax_vec = _para.GetParameter<std::vector<Id>>(PARA_KMAX);
+    _Kmax = { Kmax_vec[0],Kmax_vec[1], Kmax_vec[2] };
   }
-  _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0]; 
+  _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATUREE_VECTOR)[0]; 
   t_start = _kbT;
-  t_stop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[1];
-  _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2]; 
+  t_stop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATUREE_VECTOR)[1];
+  _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATUREE_VECTOR)[2]; 
   t_period = _Tdamp;
 
   _para.SetParameter(PARA_TEMPT_SUM, Real{ 0.0 });
   _para.SetParameter(PARA_TEMPT, Real{ 0.0 });
   _init_way = _para.GetParameter<std::string>(PARA_INIT_WAY);
+
+  _para.SetParameter(PARA_PRESSURE, Real{ 0.0 });
 }
 
 void ExecutionNVT::TimeIntegration() {}
@@ -1147,8 +1151,8 @@ void ExecutionNVT::FinalIntegrate()
 
     // compute new T,P after velocities rescaled by nh_v_press()
     // compute appropriately coupled elements of mvv_current
-    ComputeTempe(); //t_current
-    // update eta_dot
+    ComputeTempe(); //t_current     // update eta_dot
+    Compute_Pressure_Scalar();
 
     NHCTempIntegrate();
 }
@@ -1239,14 +1243,22 @@ void ExecutionNVT::NHCTempIntegrate()
     }
 }
 
-void ExecutionNVT::Computedof()
+void ExecutionNVT::Compute_Pressure_Scalar()
 {
-    auto n = _position.GetNumberOfValues();
-    auto extra_dof = 3; //dimension =3
-    tdof = 3 * n - extra_dof;
-    auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
-    if (shake == "true")
-    {
-        tdof = tdof - n;
-    }
+    //compute temperature
+    auto temperature = _para.GetParameter<Real>(PARA_TEMPT);
+
+    // compute  virial
+    auto range = _para.GetParameter<vtkm::Vec<vtkm::Range, 3>>(PARA_RANGE);
+    auto volume =
+        (range[0].Max - range[0].Min) * (range[1].Max - range[1].Min) * (range[2].Max - range[2].Min);
+    auto inv_volume = 1.0 / volume;
+
+    ComputeVirial();
+
+    //compute pressure_scalar
+    Real pressure_temp = (tdof * _unit_factor._boltz * temperature + virial[0] + virial[1] + virial[2]) /
+        3.0 * inv_volume * _unit_factor._nktv2p;
+
+    _para.SetParameter(PARA_PRESSURE, pressure_temp);
 }

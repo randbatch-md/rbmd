@@ -49,7 +49,7 @@ public:
                     const Real& volume,
                     const Real& vlength,
                     const Vec3f& box,
-                    const IdComponent& kmax,
+                    const Id3& kmax,
                     const IdComponent& rbeP,
                     const Real& rhomax,
                     const Id& nrho,
@@ -1140,7 +1140,7 @@ public:
   Real _Vlength;
   Vec3f _box;
   Real _sum_gauss;
-  IdComponent Kmax;
+  Id3 Kmax;
   IdComponent RBEP;
 
   Real _rhomax;

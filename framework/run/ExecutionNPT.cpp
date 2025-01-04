@@ -937,12 +937,13 @@ void ExecutionNPT::InitParameters()
     {
         _RBE_P = _para.GetParameter<IdComponent>(PARA_COULOMB_SAMPLE_NUM);
         _alpha = _para.GetParameter<Real>(PARA_ALPHA);
-        _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+        auto Kmax_vec = _para.GetParameter<std::vector<Id>>(PARA_KMAX);
+        _Kmax = { Kmax_vec[0],Kmax_vec[1], Kmax_vec[2] };
     }
-    _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[0];
+    _kbT = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATUREE_VECTOR)[0];
     t_start = _kbT;
-    t_stop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[1];
-    _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATURE)[2];
+    t_stop = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATUREE_VECTOR)[1];
+    _Tdamp = _para.GetParameter<std::vector<Real>>(PARA_TEMPERATUREE_VECTOR)[2];
     t_period = _Tdamp;
 
     _Pstart = _para.GetParameter<std::vector<Real>>(PARA_PRESSURE_VECTOR)[0];
@@ -1442,89 +1443,6 @@ void ExecutionNPT::Compute_Pressure_Scalar()
         3.0 * inv_volume * _unit_factor._nktv2p;
 
     _para.SetParameter(PARA_PRESSURE, _pressure_scalar);
-    std::cout << " pressure=" << _pressure_scalar << std::endl;
-}
-
-void ExecutionNPT::ComputeVirial()
-{
-    Vec6f spec_lj_virial, ewald_long_virial, spec_coul_virial, bond_virial, angle_virial, dihedral_virial;
-    Vec6f shake_virial;
-    Vec6f lj_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    spec_lj_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    ewald_long_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    spec_coul_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    bond_virial =  { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    angle_virial =  { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    dihedral_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    shake_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-
-    auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
-    if ("LJ/CUT" == force_field)
-    {
-        _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
-        if (_nearforce_type == "RBL")
-        {
-          ComputeVerletlistLJVirial(_lj_virial_atom);
-          lj_virial = vtkm::cont::Algorithm::Reduce(_lj_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-        }
-        else 
-        {
-          lj_virial = vtkm::cont::Algorithm::Reduce(_lj_virial_atom,
-              vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-        }
-        virial = lj_virial;
-    }
-    //
-    if ("LJ/CUT/COUL/LONG" == force_field)
-    {
-        auto lj_coul_virial = vtkm::cont::Algorithm::Reduce(_nearVirial_atom,
-            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-
-        ewald_long_virial = vtkm::cont::Algorithm::Reduce(
-            _ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) *
-            _unit_factor._qqr2e;
-
-        virial = lj_coul_virial + ewald_long_virial;
-    }
-
-    if ("CVFF" == force_field)
-    {
-        spec_lj_virial = vtkm::cont::Algorithm::Reduce(_nearVirial_atom,
-            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-
-        _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
-        if (_nearforce_type == "RBL") 
-        {
-            spec_coul_virial = vtkm::cont::Algorithm::Reduce(_spec_coul_virial_atom,
-                vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-        }
-
-        //ComputeEwaldLongVirial(_Kmax, _ewald_long_virial_atom);
-        ewald_long_virial = vtkm::cont::Algorithm::Reduce(
-            _ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) *
-            _unit_factor._qqr2e;
-
-        bond_virial = vtkm::cont::Algorithm::Reduce(_bond_virial_atom,
-            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-
-        angle_virial = vtkm::cont::Algorithm::Reduce(_angle_virial_atom,
-            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-
-        if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
-            _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
-        {
-            dihedral_virial = vtkm::cont::Algorithm::Reduce(
-                _dihedral_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-        }
-        if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
-        {
-            shake_virial = vtkm::cont::Algorithm::Reduce(
-                _shake_first_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
-        }
-
-        virial = spec_lj_virial + spec_coul_virial + ewald_long_virial + bond_virial + angle_virial +
-            dihedral_virial + shake_virial;
-    }
 }
 
 void ExecutionNPT::Couple()
@@ -1623,18 +1541,6 @@ void ExecutionNPT::NoseHooverChain()
 
 }
 
-void ExecutionNPT::Computedof()
-{
-    auto n = _position.GetNumberOfValues();
-    auto extra_dof = 3; //dimension =3
-    tdof = 3 * n - extra_dof;
-    auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
-    if (shake == "true")
-    {
-        tdof = tdof - n;
-    }
-}
-
 void ExecutionNPT::SetUp()
 {
     ComputeTempe();       //t_current
@@ -1650,13 +1556,6 @@ void ExecutionNPT::SetUp()
 
     // masses and initial forces on thermostat variables
     auto natoms = _position.GetNumberOfValues();
-    auto extra_dof = 3; //dimension =3
-    auto tdof = 3 * natoms - extra_dof;
-    auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
-    if (shake == "true")
-    {
-        tdof = tdof - natoms;
-    }
 
     eta_mass[0] = tdof * _unit_factor._boltz * t_target / (t_freq * t_freq);
     for (Id ich = 1; ich < mtchain; ich++)

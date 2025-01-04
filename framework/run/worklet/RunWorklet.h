@@ -457,7 +457,7 @@ namespace RunWorklet
                             vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                             vtkm::cont::ArrayHandle<vtkm::Id3>& position_flag);
 
-    void ComputeNewFarElectrostatics(const IdComponent& Kmax,
+    void ComputeNewFarElectrostatics(const Id3& Kmax,
                                      const Vec3f& box,
                                       const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                       const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
@@ -492,7 +492,7 @@ namespace RunWorklet
         const CoordOffsetType& coord_offset_j,
         vtkm::cont::ArrayHandle<Vec6f>& CoulVirial);
 
-    void ComputeEwaldVirial(const IdComponent& Kmax,
+    void ComputeEwaldVirial(const Id3& Kmax,
         const Real& unit_factor,
         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
         const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,

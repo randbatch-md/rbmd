@@ -2426,7 +2426,7 @@ namespace RunWorklet
     
     struct ComputeNewFarElectrostaticsWorklet : vtkm ::worklet::WorkletMapField
     {
-      ComputeNewFarElectrostaticsWorklet(const IdComponent& Kmax, const Vec3f& box)
+      ComputeNewFarElectrostaticsWorklet(const Id3& Kmax, const Vec3f& box)
         : _Kmax(Kmax),
           _box(box)
       {
@@ -2470,7 +2470,7 @@ namespace RunWorklet
          };
          locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
       }
-      IdComponent _Kmax;
+      Id3 _Kmax;
       Vec3f _box;
     };   
 
@@ -2606,7 +2606,7 @@ namespace RunWorklet
 
     struct ComputeEwaldVirialWorklet : vtkm::worklet::WorkletMapField
     {
-        ComputeEwaldVirialWorklet(const IdComponent& Kmax, const Real& unit_factor)
+        ComputeEwaldVirialWorklet(const Id3& Kmax, const Real& unit_factor)
             : _Kmax(Kmax)
             , _unit_factor(unit_factor)
         {
@@ -2640,7 +2640,7 @@ namespace RunWorklet
             locator.ExecuteOnKNeighbor(_Kmax, atoms_id, function);
             EwaldVirial = Ewald_v;
         }
-        IdComponent _Kmax;
+        Id3 _Kmax;
         Real _unit_factor;
     };
 
@@ -2955,7 +2955,7 @@ namespace RunWorklet
                 force_ij += fpair;
 
                 //virial_ij
-                virial_ij += force_function.ComputePairVirial_fix(r_ij, fpair);
+                virial_ij += force_function.ComputePairVirial(r_ij, fpair);
 
                 //energy
                 PE_lj += weight * energy_lj;
@@ -4078,7 +4078,7 @@ namespace RunWorklet
     }
     
 
-    void ComputeNewFarElectrostatics(const IdComponent& Kmax,
+    void ComputeNewFarElectrostatics(const Id3& Kmax,
                                       const Vec3f& box,
                                              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
                                              const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
@@ -4150,7 +4150,7 @@ namespace RunWorklet
     }
 
 
-    void ComputeEwaldVirial(const IdComponent& Kmax,
+    void ComputeEwaldVirial(const Id3& Kmax,
         const Real& unit_factor,
         const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
         const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,

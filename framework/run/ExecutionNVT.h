@@ -80,7 +80,7 @@ private:
   void InitStyle();
 
   //
-  void Computedof();
+  void Compute_Pressure_Scalar();
   void SetUp();
   void NoseHooverChain();
   void ComputeTempTarget();
@@ -113,7 +113,7 @@ private:
   ArrayHandle<Vec3f> _old_velocity;
   ArrayHandle<Vec3f> _old_position;
 
-  IdComponent _Kmax;
+  Id3 _Kmax;
   Real _cut_off;
   Real _nosehooverxi;
   Real _Vlength;
@@ -163,7 +163,6 @@ private:
     //temp
   Real t_start, t_stop, t_period, t_target, ke_target;
   Real t_freq;
-  Real tdof;
 
   std::vector<Real> eta, eta_dot; // chain thermostat for particles
   std::vector<Real> eta_dotdot;

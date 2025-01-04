@@ -37,12 +37,14 @@
 #include <vtkm/cont/Algorithm.h>
 
 const std::string HEADER_KBT_NAME = "KBT";
+const std::string HEADER_PRESSURE_NAME = "PRESSURE";
 
 TempOutput::TempOutput(const Configuration& cfg)
   : ConsoleOutput(cfg)
   , _file("temperature.rbmd")
   , _interval(Get<int>("interval", 1))
   , _temperature(0.0)
+  , _pressure(0.0)
 {
 }
 
@@ -55,11 +57,13 @@ void TempOutput::Init()
 {
   ConsoleOutput::Init();
   AddHeader(HEADER_KBT_NAME);
+  AddHeader(HEADER_PRESSURE_NAME);
 }
 
 void TempOutput::Execute()
 {
   _temperature = _para.GetParameter<Real>(PARA_TEMPT);
+  _pressure = _para.GetParameter<Real>(PARA_PRESSURE);
   WriteToFile();
 
 }
@@ -80,14 +84,14 @@ void TempOutput::WriteToFile()
   {
     _file << "Step"
           << " "
-          << "Temperature" << std::endl;
+          << "Temperature" << " "  <<"Pressure" <<std::endl;
   }
   if (ShouldOutput())
   {
     try
     {
       _file << _executioner->CurrentStep() << " "
-            << _temperature << std::endl;
+            << _temperature << " " << _pressure <<std::endl;
     }
     catch (const std::exception& e)
     {

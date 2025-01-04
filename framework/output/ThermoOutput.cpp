@@ -54,10 +54,7 @@ ThermoOutput::ThermoOutput(const Configuration& cfg)
   , _interval(Get<int>("interval", 1))
   //, _system_state("SystemState.csv")
   , _cut_off(0.0)
-  , _Vlength(0.0)
   , _volume(0.0)
-  , _Kmax(0)
-  , _alpha(0.0)
   , _bond_energy(0.0)
   , _angle_energy(0.0)
   , _dihedrals_energy(0.0)
@@ -94,14 +91,8 @@ void ThermoOutput::Init()
 
   _cut_off = _para.GetParameter<Real>(PARA_CUTOFF);
   _volume = _para.GetParameter<Real>(PARA_VOLUME);
-  _Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   _box = _para.GetParameter<Vec3f>(PARA_BOX);
   _rho = _para.GetParameter<Real>(PARA_RHO);
-  if (_para.GetParameter<bool>(PARA_FAR_FORCE))
-  {
-    _Kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
-    _alpha = _para.GetParameter<Real>(PARA_ALPHA);
-  }
 }
 
 void ThermoOutput::Execute()

@@ -82,8 +82,6 @@ private:
     void InitStyle();
 
     //
-    void ComputeVirial();
-    void ComputeVirial_r();
     void Compute_Pressure_Scalar();
 
     void Compute_Temp_Scalar();
@@ -96,7 +94,6 @@ private:
     void remap();
 
     //
-    void Computedof();
     void SetUp();
     void NoseHooverChain();
     void ComputeTempTarget();
@@ -151,7 +148,7 @@ private:
     ArrayHandle<Vec3f> _old_velocity;
     ArrayHandle<Vec3f> _old_position;
 
-    IdComponent _Kmax;
+    Id3 _Kmax;
     Real _cut_off;
     Real _nosehooverxi;
     Real _Vlength;
@@ -199,8 +196,8 @@ private:
     std::vector<Id> map; // mapping from atom types to elements
 
 
-    //
-    Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
+    ////
+    //Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
     Real _pressure_scalar; // computed global pressure scalar
 
     //pressure
@@ -225,7 +222,6 @@ private:
     //temp
     Real t_start, t_stop, t_period, t_target, ke_target;
     Real t_freq;
-    Real tdof;
 
     std::vector<Real> eta, eta_dot; // chain thermostat for particles
     std::vector<Real> eta_dotdot;

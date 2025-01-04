@@ -148,7 +148,7 @@ void ExecutionMD::SetParameters()
   _para.SetParameter(PARA_PRESS_CTRL_TYPE, Get<std::string>("press_ctrl_type"));
   _para.SetParameter(PARA_TIMESTEP, Get<Real>("timestep"));
   _para.SetParameter(PARA_NUM_STEPS, Get<Real>("num_steps"));
-  _para.SetParameter(PARA_TEMPERATURE, GetVectorValue<Real>("temperature"));
+  _para.SetParameter(PARA_TEMPERATUREE_VECTOR, GetVectorValue<Real>("temperature"));
   _para.SetParameter(PARA_PRESSURE_VECTOR, GetVectorValue<Real>("pressure"));
 }
 
@@ -360,18 +360,18 @@ void ExecutionMD::InitParameters()
 }
 
 std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
-                                                                  IdComponent& Kmax,
+                                                                  Id3& Kmax,
                                                                   Real&  alpha,
                                                                   Real& ewald_energy_total)
 {
   std::vector<Vec2f> rhok;
   ArrayHandle<Real> density_real;
   ArrayHandle<Real> density_image;
-  for (Id i = -Kmax; i <= Kmax; i++)
+  for (Id i = -Kmax[0]; i <= Kmax[0]; i++)
   {
-    for (Id j = -Kmax; j <= Kmax; j++)
+    for (Id j = -Kmax[1]; j <= Kmax[1]; j++)
     {
-      for (Id k = -Kmax; k <= Kmax; k++)
+      for (Id k = -Kmax[2]; k <= Kmax[2]; k++)
       {
         if (!(i == 0 && j == 0 && k == 0))
         {
@@ -394,7 +394,6 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
           ewald_energy_total +=
               vtkm::Exp(-Range_K * Range_K / (4 * alpha)) * Range_density2 / (Range_K * Range_K);
 
-          //std::cout << "Updated ewald_energy_total: " << ewald_energy_total << std::endl;
           rhok.push_back({ value_Re, value_Im });
         }
       }
@@ -404,18 +403,18 @@ std::vector<Vec2f> ExecutionMD::ComputeChargeStructureFactorEwald(Vec3f& box,
 }
 
 void  ExecutionMD::ComputeEwaldEnergy(Vec3f& box,
-    IdComponent& Kmax,
+    Id3& Kmax,
     Real& alpha,
     Real& ewald_energy_total)
 {
     std::vector<Vec2f> rhok;
     ArrayHandle<Real> density_real;
     ArrayHandle<Real> density_image;
-    for (Id i = -Kmax; i <= Kmax; i++)
+    for (Id i = -Kmax[0]; i <= Kmax[0]; i++)
     {
-        for (Id j = -Kmax; j <= Kmax; j++)
+        for (Id j = -Kmax[1]; j <= Kmax[1]; j++)
         {
-            for (Id k = -Kmax; k <= Kmax; k++)
+            for (Id k = -Kmax[2]; k <= Kmax[2]; k++)
             {
                 if (!(i == 0 && j == 0 && k == 0))
                 {
@@ -449,9 +448,6 @@ void ExecutionMD::ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                                   ArrayHandle<Vec3f>& RBE_ele_force,
                                   ArrayHandle<Vec6f>& ewald_long_virial_atom)
 {
- 
-
-  auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
 
   ArrayHandle<Vec2f> new_whole_rhok;
@@ -509,8 +505,10 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
   Real self_potential_energy_ave;
   ComputeSelfEnergy(self_potential_energy_ave);
 
+  auto Kmax_vec = _para.GetParameter<std::vector<Id>>(PARA_KMAX);
+  Id3 kmax = { Kmax_vec[0],Kmax_vec[1], Kmax_vec[2] };
   auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
-  auto kmax = _para.GetParameter<IdComponent>(PARA_KMAX);
+
   auto box = _para.GetParameter<Vec3f>(PARA_BOX);
   auto volume = box[0] * box[1] * box[2];
   Real ewald_energy_total = 0.0;
@@ -521,8 +519,8 @@ void ExecutionMD::ComputeNewChargeStructureFactorRBE(Vec3f& _box,
   _para.SetParameter(PARA_EWALD_LONG_ENERGY, ewald_energy_ave);
 }
 
-void ExecutionMD::ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom)
-{
+void ExecutionMD::ComputeEwaldEleForce(Id3& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom)
+{ 
   auto N = _position.GetNumberOfValues();
   auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
   auto Vlength = _para.GetParameter<Real>(PARA_VLENGTH);
@@ -1121,7 +1119,7 @@ void ExecutionMD::ComputeCoulVirial(ArrayHandle<Vec6f>& Coul_virial)
         Coul_virial);
 }
 
-void ExecutionMD::ComputeEwaldLongVirial(IdComponent& Kmax,
+void ExecutionMD::ComputeEwaldLongVirial(Id3& Kmax,
     ArrayHandle<Vec6f>& Ewald_long_virial)
 {
     auto alpha = _para.GetParameter<Real>(PARA_ALPHA);
@@ -1375,4 +1373,97 @@ void ExecutionMD::ApplyPbc()
                               { static_cast<Real>(range[1].Min), static_cast<Real>(range[1].Max) },
                               { static_cast<Real>(range[2].Min), static_cast<Real>(range[2].Max) } };
     RunWorklet::ApplyPbcFlag(box, data_range, _position, _locator, position_flag);
+}
+
+void ExecutionMD::Computedof()
+{
+    auto n = _position.GetNumberOfValues();
+    auto extra_dof = 3; //dimension =3
+    tdof = 3 * n - extra_dof;
+    auto shake = _para.GetParameter<std::string>(PARA_FIX_SHAKE);
+    if (shake == "true")
+    {
+        tdof = tdof - n;
+    }
+}
+
+void ExecutionMD::ComputeVirial()
+{
+    Vec6f spec_lj_virial, ewald_long_virial, spec_coul_virial, bond_virial, angle_virial, dihedral_virial;
+    Vec6f shake_virial;
+    Vec6f lj_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    spec_lj_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    ewald_long_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    spec_coul_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    bond_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    angle_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    dihedral_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    shake_virial = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+    auto force_field = _para.GetParameter<std::string>(PARA_FORCE_FIELD_TYPE);
+    auto nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
+    if ("LJ/CUT" == force_field)
+    {
+        if (nearforce_type == "RBL")
+        {
+            ComputeVerletlistLJVirial(_lj_virial_atom);
+            lj_virial = vtkm::cont::Algorithm::Reduce(_lj_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+        }
+        else
+        {
+            lj_virial = vtkm::cont::Algorithm::Reduce(_lj_virial_atom,
+                vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+        }
+        virial = lj_virial;
+    }
+    //
+    if ("LJ/CUT/COUL/LONG" == force_field)
+    {
+        auto lj_coul_virial = vtkm::cont::Algorithm::Reduce(_nearVirial_atom,
+            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+        ewald_long_virial = vtkm::cont::Algorithm::Reduce(
+            _ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) *
+            _unit_factor._qqr2e;
+
+        virial = lj_coul_virial + ewald_long_virial;
+    }
+
+    if ("CVFF" == force_field)
+    {
+        spec_lj_virial = vtkm::cont::Algorithm::Reduce(_nearVirial_atom,
+            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+        if (nearforce_type == "RBL")
+        {
+            spec_coul_virial = vtkm::cont::Algorithm::Reduce(_spec_coul_virial_atom,
+                vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+        }
+
+        //ComputeEwaldLongVirial(_Kmax, _ewald_long_virial_atom);
+        ewald_long_virial = vtkm::cont::Algorithm::Reduce(
+            _ewald_long_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization()) *
+            _unit_factor._qqr2e;
+
+        bond_virial = vtkm::cont::Algorithm::Reduce(_bond_virial_atom,
+            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+        angle_virial = vtkm::cont::Algorithm::Reduce(_angle_virial_atom,
+            vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+
+        if (_para.GetParameter<bool>(PARA_DIHEDRALS_FORCE) &&
+            _para.GetParameter<bool>(PARA_FILE_DIHEDRALS))
+        {
+            dihedral_virial = vtkm::cont::Algorithm::Reduce(
+                _dihedral_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+        }
+        if (_para.GetParameter<std::string>(PARA_FIX_SHAKE) == "true")
+        {
+            shake_virial = vtkm::cont::Algorithm::Reduce(
+                _shake_first_virial_atom, vtkm::TypeTraits<Vec6f>::ZeroInitialization());
+        }
+
+        virial = spec_lj_virial + spec_coul_virial + ewald_long_virial + bond_virial + angle_virial +
+            dihedral_virial + shake_virial;
+    }
 }

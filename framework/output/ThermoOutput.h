@@ -60,15 +60,14 @@ private:
 private:
   std::ofstream _file;
   std::ofstream _system_state;
-  IdComponent _Kmax;
 
   int _interval;
   Real _spec_far_ele_potential_energy_avr;
   Real _cut_off;
-  Real _Vlength;
+
   Vec3f _box;
   Real _volume;
-  Real _alpha;
+
   Real _bond_energy;
   Real _angle_energy;
   Real _rho;
