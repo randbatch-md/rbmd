@@ -781,11 +781,14 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::DihedralsForce()
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::ImproperForce()
 {
-    auto dihedral_type = _para.GetParameter<std::string>(PARA_DIHEDRAL_TYPE);
-    if ("Harmonic" == dihedral_type) 
+    vtkm::cont::ArrayHandle<Vec3f> reduce_force_improper;
+
+    auto improper_type = _para.GetParameter<std::string>(PARA_IMPROPER_TYPE);
+    if ("Harmonic" == improper_type)
     {
 
     }
+    return reduce_force_improper;
 }
 
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::SpecialCoulForce()
