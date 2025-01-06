@@ -1,10 +1,37 @@
-﻿#pragma once
+﻿//==================================================================================
+//  RBMD 2.2.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
+#pragma once
 
 #include <vtkm/worklet/WorkletMapField.h>
 #include <vtkm/worklet/WorkletMapTopology.h>
 #include <vtkm/worklet/WorkletReduceByKey.h>
 #include "locator/ExecPointLocator.h"
 #include "forceFunction/ExecForceFunction.h"
+#include <vtkm/exec/AtomicArrayExecutionObject.h>
 
 static constexpr Real SMALL = 0.001;
 
@@ -30,8 +57,10 @@ struct UnitRescaleWorklet : vtkm::worklet::WorkletMapField
 
 struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
 {
-  ComputeBondHarmonicWorklet(const Vec3f& box)
-    : _box(box)
+  ComputeBondHarmonicWorklet(const Id& n ,const Vec3f& box)
+    : _N(n),
+      _box(box)
+
   {
   }
   using ControlSignature = void(FieldIn bond_type,
@@ -41,14 +70,16 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 WholeArrayIn _position,
                                 FieldOut forcebond,
                                 FieldOut bondEnergy,
+                                FieldOut  bondVirial,
                                 ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
 
   template<typename BondType,
            typename BondListType,
            typename PositionType,
            typename ForceBondType,
-           typename BondEnergyType>
+           typename BondEnergyType,
+           typename BondVirialyType>
   VTKM_EXEC void operator()(const BondType& bond_type,
                             const BondListType& bondlist,
                             const Real& bond_coeffs_k,
@@ -56,6 +87,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                             const PositionType& _position,
                             ForceBondType& forcebond,
                             BondEnergyType& bondEnergy,
+                            BondVirialyType& bondVirial,
                             const ExecPointLocator& locator) const
   {
 
@@ -63,6 +95,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     vtkm::IdComponent bondj = bondlist[1];
     vtkm::IdComponent bondtype = bond_type;
     Vec3f forcebondij;
+    Vec6f virialbondij;
 
     ComputeijBondEnergyForce(bondi,
                              bondj,
@@ -72,13 +105,15 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                              _position,
                              forcebondij,
                              bondEnergy,
-                             locator);
+                             virialbondij,
+                              locator);
 
     //_forcebond.Get(bondi) = _forcebond.Get(bondi) + forcebondij;
     //_forcebond.Get(bondj) = _forcebond.Get(bondj) - forcebondij;
 
     forcebond[0] = forcebondij;
     forcebond[1] = -forcebondij;
+    bondVirial = virialbondij;
   }
   template<typename PositionType>
   VTKM_EXEC void ComputeijBondEnergyForce(const vtkm::IdComponent& bondi,
@@ -89,6 +124,7 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
                                           const PositionType& _position,
                                           Vec3f& forcebondij,
                                           Real& bondEnergy,
+                                          Vec6f& virialbondij,
                                           const ExecPointLocator& locator) const
   {
     Vec3f p_i = _position.Get(bondi);
@@ -110,8 +146,56 @@ struct ComputeBondHarmonicWorklet : vtkm::worklet::WorkletMapField
     forcebondij = r_ij * forcebondij;
 
     bondEnergy = rk * dr;
+
+   //newton_bond
+    bool newton_bond = true;
+    //Vec6f local_virial;
+    if (newton_bond)
+    {
+        virialbondij[0] = r_ij[0] * forcebondij[0];
+        virialbondij[1] = r_ij[1] * forcebondij[1];
+        virialbondij[2] = r_ij[2] * forcebondij[2];
+        virialbondij[3] = r_ij[0] * forcebondij[1];
+        virialbondij[4] = r_ij[0] * forcebondij[2];
+        virialbondij[5] = r_ij[1] * forcebondij[2];
+    }
+
+    //// Wrap bondVirial as AtomicArrayExecutionObject
+    //vtkm::exec::AtomicArrayExecutionObject<Real> atomicBondVirial(bondVirial);
+
+    //// Perform atomic updates
+    //atomicBondVirial.Add(0 * _N + bondi, local_virial[0]);
+    //atomicBondVirial.Add(1 * _N + bondi, local_virial[1]);
+    //atomicBondVirial.Add(2 * _N + bondi, local_virial[2]);
+    //atomicBondVirial.Add(3 * _N + bondi, local_virial[3]);
+    //atomicBondVirial.Add(4 * _N + bondi, local_virial[4]);
+    //atomicBondVirial.Add(5 * _N + bondi, local_virial[5]);
+
+    //atomicBondVirial.Add(0 * _N + bondj, local_virial[0]);
+    //atomicBondVirial.Add(1 * _N + bondj, local_virial[1]);
+    //atomicBondVirial.Add(2 * _N + bondj, local_virial[2]);
+    //atomicBondVirial.Add(3 * _N + bondj, local_virial[3]);
+    //atomicBondVirial.Add(4 * _N + bondj, local_virial[4]);
+    //atomicBondVirial.Add(5 * _N + bondj, local_virial[5]);
+
+
+    //portal.Set(0 * _N + bondi, local_virial[0]);
+    //portal.Set(1 * _N + bondi, local_virial[1]);
+    //portal.Set(2 * _N + bondi, local_virial[2]);
+    //portal.Set(3 * _N + bondi, local_virial[3]);
+    //portal.Set(4 * _N + bondi, local_virial[4]);
+    //portal.Set(5 * _N + bondi, local_virial[5]);
+
+    //portal.Set(0 * _N + bondj, local_virial[0]);
+    //portal.Set(1 * _N + bondj, local_virial[1]);
+    //portal.Set(2 * _N + bondj, local_virial[2]);
+    //portal.Set(3 * _N + bondj, local_virial[3]);
+    //portal.Set(4 * _N + bondj, local_virial[4]);
+    //portal.Set(5 * _N + bondj, local_virial[5]);
+
   }
-  Vec3f _box;
+  Vec3f _box; 
+  Id _N;
 };
 
 struct ReduceForceWorklet : vtkm::worklet::WorkletReduceByKey
@@ -147,8 +231,9 @@ struct AddForceWorklet : vtkm::worklet::WorkletMapField
 struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
 {
 
-  ComputeAngleHarmonicWorklet(const Vec3f& box)
-    : _box(box)
+  ComputeAngleHarmonicWorklet(const Id& n ,const Vec3f& box)
+    :  _N(n),
+      _box(box)
   {
   }
   using ControlSignature = void(FieldIn angle_type,
@@ -158,14 +243,16 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 const WholeArrayIn whole_pts,
                                 FieldOut forceangle,
                                 FieldOut angleEnergy,
+                                FieldOut angleVirial,
                                 ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
 
   template<typename AngleType,
            typename AngleListType,
            typename WholePtsType,
            typename ForceAngleType,
-           typename AngleEnergyType>
+           typename AngleEnergyType,
+             typename AngleVirialType>
   VTKM_EXEC void operator()(const AngleType& angle_type,
                             const AngleListType& anglelist,
                             const Real& angle_coeffs_k,
@@ -173,6 +260,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                             const WholePtsType& whole_pts,
                             ForceAngleType& forceangle,
                             AngleEnergyType& angleEnergy,
+                            AngleVirialType& angleVirial,
                             const ExecPointLocator& locator) const
   {
 
@@ -182,6 +270,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
     vtkm::IdComponent angletype = angle_type;
     Vec3f force_anglei;
     Vec3f force_anglek;
+    Vec6f angleVirial_pair;
 
     ComputeijAngleEnergyForce(anglei,
                               anglej,
@@ -193,10 +282,13 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                               force_anglei,
                               force_anglek,
                               angleEnergy,
+                              angleVirial_pair,
                               locator);
     forceangle[0] = force_anglei;
     forceangle[1] = -force_anglei - force_anglek;
     forceangle[2] = force_anglek;
+
+    angleVirial = angleVirial_pair;
   }
   template<typename WholePtsType>
   VTKM_EXEC void ComputeijAngleEnergyForce(const vtkm::IdComponent& anglei,
@@ -209,6 +301,7 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
                                            Vec3f& force_anglei,
                                            Vec3f& force_anglek,
                                            Real& angleEnergy,
+                                           Vec6f& angleVirial_pair,
                                            const ExecPointLocator& locator) const
   {
 
@@ -249,9 +342,56 @@ struct ComputeAngleHarmonicWorklet : vtkm::worklet::WorkletMapField
 
     force_anglei = a11 * r_ij + a12 * r_kj;
     force_anglek = a22 * r_kj + a12 * r_ij;
+    auto  force_anglej = -(force_anglei + force_anglek);
+
+    //newton_bond
+    bool newton_bond = true;
+    //Vec6f local_virial;
+    if (newton_bond)
+    {
+        angleVirial_pair[0] = (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+        angleVirial_pair[1] = (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+        angleVirial_pair[2] = (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+        angleVirial_pair[3] = (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+        angleVirial_pair[4] = (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+        angleVirial_pair[5] = (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
+    }
+    else
+    {
+        angleVirial_pair[0] = 0.3333333333 * (r_ij[0] * force_anglei[0] + r_kj[0] * force_anglek[0]);
+        angleVirial_pair[1] = 0.3333333333 * (r_ij[1] * force_anglei[1] + r_kj[1] * force_anglek[1]);
+        angleVirial_pair[2] = 0.3333333333 * (r_ij[2] * force_anglei[2] + r_kj[2] * force_anglek[2]);
+        angleVirial_pair[3] = 0.3333333333 * (r_ij[0] * force_anglei[1] + r_kj[0] * force_anglek[1]);
+        angleVirial_pair[4] = 0.3333333333 * (r_ij[0] * force_anglei[2] + r_kj[0] * force_anglek[2]);
+        angleVirial_pair[5] = 0.3333333333 * (r_ij[1] * force_anglei[2] + r_kj[1] * force_anglek[2]);
+    }
+
+
+    //auto portal = angleVirial;
+    //portal.Set(0 * _N + anglei, local_virial[0]);
+    //portal.Set(1 * _N + anglei, local_virial[1]);
+    //portal.Set(2 * _N + anglei, local_virial[2]);
+    //portal.Set(3 * _N + anglei, local_virial[3]);
+    //portal.Set(4 * _N + anglei, local_virial[4]);
+    //portal.Set(5 * _N + anglei, local_virial[5]);
+
+    //portal.Set(0 * _N + anglej, local_virial[0]);
+    //portal.Set(1 * _N + anglej, local_virial[1]);
+    //portal.Set(2 * _N + anglej, local_virial[2]);
+    //portal.Set(3 * _N + anglej, local_virial[3]);
+    //portal.Set(4 * _N + anglej, local_virial[4]);
+    //portal.Set(5 * _N + anglej, local_virial[5]);
+
+    //portal.Set(0 * _N + anglek, local_virial[0]);
+    //portal.Set(1 * _N + anglek, local_virial[1]);
+    //portal.Set(2 * _N + anglek, local_virial[2]);
+    //portal.Set(3 * _N + anglek, local_virial[3]);
+    //portal.Set(4 * _N + anglek, local_virial[4]);
+    //portal.Set(5 * _N + anglek, local_virial[5]);
   }
 
    Vec3f _box;
+   Id _N;
 };
 
 
@@ -541,14 +681,16 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
                                 WholeArrayIn whole_pts,
                                 FieldOut forcedihedral,
                                 FieldOut dihedralEnergy,
+                                FieldOut dihedralVirial,
                                 ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10);
 
   template<typename DihedralType,
            typename DihedralListType,
            typename WholePtsType,
            typename ForceDihedralType,
-           typename DihedralEnergyType>
+           typename DihedralEnergyType,
+           typename DihedralVirialType>
   VTKM_EXEC void operator()(const DihedralType& dihedral_type,
                             const DihedralListType& dihedrallist,
                             const Real& dihedral_coeffs_k,
@@ -557,6 +699,7 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
                             const WholePtsType& whole_pts,
                             ForceDihedralType& forcedihedral,
                             DihedralEnergyType& dihedralEnergy,
+                            DihedralVirialType& dihedralVirial,
                             const ExecPointLocator& locator) const
   {
 
@@ -581,6 +724,7 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f force_dihedralj;
     Vec3f force_dihedralk;
     Vec3f force_dihedralw;
+    Vec6f dihedralVirial_pair;
 
     ComputeijDihedralHarmonicEnergyForce(dihedrali,
                                          dihedralj,
@@ -597,11 +741,13 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
                                          force_dihedralk,
                                          force_dihedralw,
                                          dihedralEnergy,
+                                         dihedralVirial_pair,
                                          locator);
     forcedihedral[0] = force_dihedrali;
     forcedihedral[1] = force_dihedralj;
     forcedihedral[2] = force_dihedralk;
     forcedihedral[3] = force_dihedralw;
+    dihedralVirial = dihedralVirial_pair;
   }
   template<typename WholePtsType>
   VTKM_EXEC void ComputeijDihedralHarmonicEnergyForce(
@@ -620,6 +766,7 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     Vec3f& force_dihedralk,
     Vec3f& force_dihedralw,
     Real& dihedralEnergy,
+    Vec6f& dihedralVirial_pair,
     const ExecPointLocator& locator) const
   {
 
@@ -786,6 +933,43 @@ struct ComputeDihedralHarmonicWorklet : vtkm::worklet::WorkletMapField
     //f3[0] = -sx2 - f4[0];
     //f3[1] = -sy2 - f4[1];
     //f3[2] = -sz2 - f4[2];
+
+        //dihedralVirial
+    //dihedralVirial_pair[0] =  -0.25 * (vb1[0] * force_dihedrali[0] + vb2[0] * force_dihedralk[0] +
+    //  (vb3[0] + vb2[0]) * force_dihedralw[0]);
+
+    //dihedralVirial_pair[1] =  -0.25 * (vb1[1] * force_dihedrali[1] + vb2[1] * force_dihedralk[1] +
+    //   (vb3[1] + vb2[1]) * force_dihedralw[1]);
+
+    //dihedralVirial_pair[2] =  -0.25 * (vb1[2] * force_dihedrali[2] + vb2[2] * force_dihedralk[2] +
+    //  (vb3[2] + vb2[2]) * force_dihedralw[2]);
+
+    //dihedralVirial_pair[3] =  -0.25 * (vb1[0] * force_dihedrali[1] + vb2[0] * force_dihedralk[1] +
+    //  (vb3[0] + vb2[0]) * force_dihedralw[1]);
+
+    //dihedralVirial_pair[4] =  -0.25 * (vb1[0] * force_dihedrali[2] + vb2[0] * force_dihedralk[2] +
+    //  (vb3[0] + vb2[0]) * force_dihedralw[2]);
+
+    //dihedralVirial_pair[5] =  -0.25 * (vb1[1] * force_dihedrali[2] + vb2[1] * force_dihedralk[2] +
+    //  (vb3[1] + vb2[1]) * force_dihedralw[2]);
+
+    dihedralVirial_pair[0] = (vb1[0] * force_dihedrali[0] + vb2[0] * force_dihedralk[0] +
+        (vb3[0] + vb2[0]) * force_dihedralw[0]);
+
+    dihedralVirial_pair[1] = (vb1[1] * force_dihedrali[1] + vb2[1] * force_dihedralk[1] +
+        (vb3[1] + vb2[1]) * force_dihedralw[1]);
+
+    dihedralVirial_pair[2] = (vb1[2] * force_dihedrali[2] + vb2[2] * force_dihedralk[2] +
+        (vb3[2] + vb2[2]) * force_dihedralw[2]);
+
+    dihedralVirial_pair[3] = (vb1[0] * force_dihedrali[1] + vb2[0] * force_dihedralk[1] +
+        (vb3[0] + vb2[0]) * force_dihedralw[1]);
+
+    dihedralVirial_pair[4] = (vb1[0] * force_dihedrali[2] + vb2[0] * force_dihedralk[2] +
+        (vb3[0] + vb2[0]) * force_dihedralw[2]);
+
+    dihedralVirial_pair[5] = (vb1[1] * force_dihedrali[2] + vb2[1] * force_dihedralk[2] +
+        (vb3[1] + vb2[1]) * force_dihedralw[2]);
   }
 
    Vec3f _box;
@@ -2182,11 +2366,12 @@ struct ConstraintShakeForceStepWaterBondAngleWorklet : vtkm::worklet::WorkletMap
 
 struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
 {
-  NewConstraintAWaterBondAngleWorklet(const Vec3f& box,
+  NewConstraintAWaterBondAngleWorklet(const Id& N, const Vec3f& box,
                                       const Real& dt,
                                       const Real fmt2v,
                                       const Vec<Vec2f, 3>& range)
-    : _box(box)
+    : _N(N),
+      _box(box)
     , _dt(dt)
     , _fmt2v(fmt2v)
     , _range(range)
@@ -2196,11 +2381,11 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
                                 WholeArrayInOut whole_pts,
                                 WholeArrayInOut whole_velocity,
                                 const WholeArrayIn whole_all_force,
-
                                 const WholeArrayIn whole_mass , 
                                 WholeArrayInOut whole_pts_flag,
-                                ExecObject locator);
-  using ExecutionSignature = void(_1, _2, _3, _4, _5 ,_6,_7);
+                                ExecObject locator,
+                                FieldOut ShakeVirial);
+  using ExecutionSignature = void(_1, _2, _3, _4, _5 ,_6,_7,_8);
 
   template<typename AngleListType,
            typename PositionType,
@@ -2214,7 +2399,8 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
                             const AllForceType& whole_all_force,
                             const MassType& whole_mass,
                             PtsFlagType& whole_pts_flag,
-                            const ExecPointLocator& locator) const
+                            const ExecPointLocator& locator,
+                            Vec6f& ShakeVirial) const
   {
     IdComponent i0 = anglelist[0]; //H
     IdComponent i1 = anglelist[1]; //O
@@ -2433,12 +2619,29 @@ struct NewConstraintAWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
       whole_pts.Set(anglelist[i], whole_position_pbc[i]);
       whole_pts_flag.Set(anglelist[i], whole_pts_flag_pbc[i]);
     }
+
+    //ShakeVirial
+
+    Real dtfsq = 0.5 * _dt * _dt * _fmt2v;
+    lamda01 = lamda01 / dtfsq;
+    lamda20 = lamda20 / dtfsq;
+    lamda12 = lamda12 / dtfsq;
+    //
+    Real fraction = _N / 3.0;
+
+    ShakeVirial[0] = lamda01 * r01[0] * r01[0] + lamda20 * r20[0] * r20[0] + lamda12 * r12[0] * r12[0];
+    ShakeVirial[1] = lamda01 * r01[1] * r01[1] + lamda20 * r20[1] * r20[1] + lamda12 * r12[1] * r12[1];
+    ShakeVirial[2] = lamda01 * r01[2] * r01[2] + lamda20 * r20[2] * r20[2] + lamda12 * r12[2] * r12[2];
+    ShakeVirial[3] = lamda01 * r01[0] * r01[1] + lamda20 * r20[0] * r20[1] + lamda12 * r12[0] * r12[1];
+    ShakeVirial[4] = lamda01 * r01[0] * r01[2] + lamda20 * r20[0] * r20[2] + lamda12 * r12[0] * r12[2];
+    ShakeVirial[5] = lamda01 * r01[1] * r01[2] + lamda20 * r20[1] * r20[2] + lamda12 * r12[1] * r12[2];
   }
 
   Vec3f _box;
   Real _dt;
   Vec<Vec2f, 3> _range;
   Real _fmt2v;
+  Id _N;
 };
 
 struct NewConstraintBWaterBondAngleWorklet : vtkm::worklet::WorkletMapField
@@ -2640,6 +2843,408 @@ struct GetPositionByTypeWorklet : vtkm::worklet::WorkletMapField
   {
     pts_by_type = whole_pts.Get(atom_id);
   }
+};
+
+struct UnConstrainedUpdateWorklet : vtkm::worklet::WorkletMapField
+{
+    UnConstrainedUpdateWorklet(const Real& dt, const Real fmt2v)
+        : _dt(dt)
+        , _fmt2v(fmt2v)
+    {
+    }
+    using ControlSignature = void(FieldIn force,
+        FieldIn mass,
+        FieldIn  position,
+        FieldIn velocity,
+        FieldOut shakeposition);
+    using ExecutionSignature = void(_1, _2, _3, _4, _5);
+
+    VTKM_EXEC void operator()(Vec3f& force,
+        Real mass,
+        Vec3f& position,
+        Vec3f& velocity,
+        Vec3f& shakeposition) const
+    {
+        shakeposition = position + velocity * _dt + 0.5 * _dt * _dt * force / mass * _fmt2v;
+    }
+
+    Real _dt;
+    Real _fmt2v;
+};
+
+struct Shake3AngleWorklet : vtkm::worklet::WorkletMapField
+{
+    Shake3AngleWorklet(const Id& N,
+        const Vec3f& box,
+        const Real& dt,
+        const Real fmt2v)
+        : _N(N),
+        _box(box)
+        , _dt(dt)
+        , _fmt2v(fmt2v)
+    {
+    }
+    using ControlSignature = void(const FieldIn anglelist,
+        WholeArrayIn whole_pts,
+        WholeArrayIn whole_shake_position,
+        const WholeArrayIn whole_mass,
+        ExecObject locator,
+        WholeArrayOut whole_shake_force,
+        FieldOut ShakeVirial);
+    using ExecutionSignature = void(_1, _2, _3, _4, _5, _6, _7);
+
+    template<typename AngleListType,
+        typename PositionType,
+        typename ShakePositionType,
+        typename MassType,
+        typename AllForceType>
+    VTKM_EXEC void operator()(const AngleListType& anglelist,
+        PositionType& whole_pts,
+        ShakePositionType& whole_shake_position,
+        const MassType& whole_mass,
+        const ExecPointLocator& locator,
+        AllForceType& whole_shake_force,
+        Vec6f& ShakeVirial) const
+    {
+        IdComponent i0 = anglelist[0]; //H
+        IdComponent i1 = anglelist[1]; //O
+        IdComponent i2 = anglelist[2]; //H
+
+
+        Real bond1 = 1.0;
+        Real bond2 = 1.0;
+        Real bond12 = vtkm::Sqrt(bond1 * bond1 + bond2 * bond2 -
+            2.0 * bond1 * bond2 * vtkm::Cos((109.4700 / 180.0) * vtkm::Pif()));
+
+        // minimum image
+        Vec3f r01 = locator.MinDistanceVec(whole_pts.Get(i1), whole_pts.Get(i0), _box);
+        Vec3f r12 = locator.MinDistanceVec(whole_pts.Get(i2), whole_pts.Get(i1), _box);
+        Vec3f r20 = locator.MinDistanceVec(whole_pts.Get(i0), whole_pts.Get(i2), _box);
+
+        // s01,s02,s12 = distance vec after unconstrained update, with PBC
+
+        Vec3f s10 = locator.MinDistanceVec(whole_shake_position.Get(0), whole_shake_position.Get(1), _box);
+        Vec3f s21 = locator.MinDistanceVec(whole_shake_position.Get(1), whole_shake_position.Get(2), _box);
+        Vec3f s02 = locator.MinDistanceVec(whole_shake_position.Get(2), whole_shake_position.Get(0), _box);
+
+        // scalar distances between atoms
+
+        Real r01sq = vtkm::Dot(r01, r01);
+        Real r02sq = vtkm::Dot(r20, r20);
+        Real r12sq = vtkm::Dot(r12, r12);
+        Real s01sq = vtkm::Dot(s10, s10);
+        Real s02sq = vtkm::Dot(s02, s02);
+        Real s12sq = vtkm::Dot(s21, s21);
+
+        // matrix coeffs and rhs for lamda equations
+
+        Real invmass0 = 1.0 / whole_mass.Get(i0);
+        Real invmass1 = 1.0 / whole_mass.Get(i1);
+        Real invmass2 = 1.0 / whole_mass.Get(i2);
+        Real a11 = 2.0 * (invmass0 + invmass1) * vtkm::Dot(s10, r01);
+        Real a12 = -2.0 * invmass1 * vtkm::Dot(s10, r12);
+        Real a13 = -2.0 * invmass0 * vtkm::Dot(s10, r20);
+        Real a21 = -2.0 * invmass1 * vtkm::Dot(s21, r01);
+        Real a22 = 2.0 * (invmass1 + invmass2) * vtkm::Dot(s21, r12);
+        Real a23 = -2.0 * invmass2 * vtkm::Dot(s21, r20);
+        Real a31 = -2.0 * invmass0 * vtkm::Dot(s02, r01);
+        Real a32 = -2.0 * invmass2 * vtkm::Dot(s02, r12);
+        Real a33 = 2.0 * (invmass0 + invmass2) * (vtkm::Dot(s02, r20));
+
+        // inverse of matrix
+
+        Real determ = a11 * a22 * a33 + a12 * a23 * a31 + a13 * a21 * a32 - a11 * a23 * a32 -
+            a12 * a21 * a33 - a13 * a22 * a31;
+        if (vtkm::Abs(determ) < 0.0001)
+        {
+            printf("Shake determinant = 0.0");
+        }
+
+
+        Real determinv = 1.0 / determ;
+
+        Real a11inv = determinv * (a22 * a33 - a23 * a32);
+        Real a12inv = -determinv * (a12 * a33 - a13 * a32);
+        Real a13inv = determinv * (a12 * a23 - a13 * a22);
+        Real a21inv = -determinv * (a21 * a33 - a23 * a31);
+        Real a22inv = determinv * (a11 * a33 - a13 * a31);
+        Real a23inv = -determinv * (a11 * a23 - a13 * a21);
+        Real a31inv = determinv * (a21 * a32 - a22 * a31);
+        Real a32inv = -determinv * (a11 * a32 - a12 * a31);
+        Real a33inv = determinv * (a11 * a22 - a12 * a21);
+
+
+        Real r0120 = vtkm::Dot(r01, r20);
+        Real r0112 = vtkm::Dot(r01, r12);
+        Real r2012 = vtkm::Dot(r20, r12);
+
+        Real quad1_0101 = (invmass0 + invmass1) * (invmass0 + invmass1) * r01sq;
+        Real quad1_1212 = invmass1 * invmass1 * r12sq;
+        Real quad1_2020 = invmass0 * invmass0 * r02sq;
+        Real quad1_0120 = -2.0 * (invmass0 + invmass1) * invmass0 * r0120;
+        Real quad1_0112 = -2.0 * (invmass0 + invmass1) * invmass1 * r0112;
+        Real quad1_2012 = 2.0 * invmass0 * invmass1 * r2012;
+
+        Real quad2_0101 = invmass1 * invmass1 * r01sq;
+        Real quad2_1212 = (invmass1 + invmass2) * (invmass1 + invmass2) * r12sq;
+        Real quad2_2020 = invmass2 * invmass2 * r02sq;
+        Real quad2_0120 = 2.0 * invmass1 * invmass2 * r0120;
+        Real quad2_0112 = -2.0 * (invmass1 + invmass2) * invmass1 * r0112;
+        Real quad2_2012 = -2.0 * (invmass1 + invmass2) * invmass2 * r2012;
+
+        Real quad3_0101 = invmass0 * invmass0 * r01sq;
+        Real quad3_1212 = invmass2 * invmass2 * r12sq;
+        Real quad3_2020 = (invmass0 + invmass2) * (invmass0 + invmass2) * r02sq;
+        Real quad3_0120 = -2.0 * (invmass0 + invmass2) * invmass0 * r0120;
+        Real quad3_0112 = 2.0 * invmass0 * invmass2 * r0112;
+        Real quad3_2012 = -2.0 * (invmass0 + invmass2) * invmass2 * r2012;
+
+        // iterate until converged
+        Real tolerance = 0.00001;     // original 0.001
+        IdComponent max_iter = 5000; // original: 100
+
+        Real lamda01 = 0.0;
+        Real lamda20 = 0.0;
+        Real lamda12 = 0.0;
+        IdComponent niter = 0;
+        IdComponent done = 0;
+        IdComponent flag_overflow = 0;
+        Real quad1, quad2, quad3, b1, b2, b3, lamda01_new, lamda20_new, lamda12_new;
+
+        while (!done && niter < max_iter)
+        {
+
+            quad1 = quad1_0101 * lamda01 * lamda01 + quad1_2020 * lamda20 * lamda20 +
+                quad1_1212 * lamda12 * lamda12 + quad1_0120 * lamda01 * lamda20 +
+                quad1_0112 * lamda01 * lamda12 + quad1_2012 * lamda20 * lamda12;
+
+            quad2 = quad2_0101 * lamda01 * lamda01 + quad2_2020 * lamda20 * lamda20 +
+                quad2_1212 * lamda12 * lamda12 + quad2_0120 * lamda01 * lamda20 +
+                quad2_0112 * lamda01 * lamda12 + quad2_2012 * lamda20 * lamda12;
+
+            quad3 = quad3_0101 * lamda01 * lamda01 + quad3_2020 * lamda20 * lamda20 +
+                quad3_1212 * lamda12 * lamda12 + quad3_0120 * lamda01 * lamda20 +
+                quad3_0112 * lamda01 * lamda12 + quad3_2012 * lamda20 * lamda12;
+
+            b1 = bond1 * bond1 - s01sq - quad1;
+            b2 = bond2 * bond2 - s12sq - quad2;
+            b3 = bond12 * bond12 - s02sq - quad3;
+
+            lamda01_new = a11inv * b1 + a12inv * b2 + a13inv * b3;
+            lamda12_new = a21inv * b1 + a22inv * b2 + a23inv * b3;
+            lamda20_new = a31inv * b1 + a32inv * b2 + a33inv * b3;
+
+            done = 1;
+            if (vtkm::Abs(lamda01_new - lamda01) > tolerance)
+                done = 0;
+            if (vtkm::Abs(lamda20_new - lamda20) > tolerance)
+                done = 0;
+            if (vtkm::Abs(lamda12_new - lamda12) > tolerance)
+                done = 0;
+
+            lamda01 = lamda01_new;
+            lamda20 = lamda20_new;
+            lamda12 = lamda12_new;
+
+
+            if (vtkm::IsNan(lamda01) || vtkm::IsNan(lamda20) || vtkm::IsNan(lamda12) ||
+                vtkm::Abs(lamda01) > 1e20 || vtkm::Abs(lamda20) > 1e20 || vtkm::Abs(lamda12) > 1e20)
+            {
+                done = 1;
+                flag_overflow = 1;
+            }
+            niter++;
+        }
+
+        //update forces
+
+        Real dtfsq = 0.5 * _dt * _dt * _fmt2v;
+        lamda01 = lamda01 / dtfsq;
+        lamda20 = lamda20 / dtfsq;
+        lamda12 = lamda12 / dtfsq;
+
+        Vec3f fi0{ 0,0,0 };
+        Vec3f fi1{ 0,0,0 };
+        Vec3f fi2{ 0,0,0 };
+
+        if (i0 < _N)
+        {
+            fi0 += lamda01 * r01 + lamda20 * r20;
+        }
+
+        if (i1 < _N)
+        {
+            fi1 -= lamda01 * r01 - lamda12 * r12;
+        }
+        if (i2 < _N)
+        {
+            fi2 -= lamda20 * r20 + lamda12 * r12;
+        }
+
+        whole_shake_force.Set(i0, fi0);
+        whole_shake_force.Set(i1, fi1);
+        whole_shake_force.Set(i2, fi2);
+
+        //ShakeVirial
+
+        ShakeVirial[0] = lamda01 * r01[0] * r01[0] + lamda20 * r20[0] * r20[0] + lamda12 * r12[0] * r12[0];
+        ShakeVirial[1] = lamda01 * r01[1] * r01[1] + lamda20 * r20[1] * r20[1] + lamda12 * r12[1] * r12[1];
+        ShakeVirial[2] = lamda01 * r01[2] * r01[2] + lamda20 * r20[2] * r20[2] + lamda12 * r12[2] * r12[2];
+        ShakeVirial[3] = lamda01 * r01[0] * r01[1] + lamda20 * r20[0] * r20[1] + lamda12 * r12[0] * r12[1];
+        ShakeVirial[4] = lamda01 * r01[0] * r01[2] + lamda20 * r20[0] * r20[2] + lamda12 * r12[0] * r12[2];
+        ShakeVirial[5] = lamda01 * r01[1] * r01[2] + lamda20 * r20[1] * r20[2] + lamda12 * r12[1] * r12[2];
+
+    }
+
+    Id _N;
+    Vec3f _box;
+    Real _dt;
+    Real _fmt2v;
+};
+
+struct IntegratePostionWorklet : vtkm::worklet::WorkletMapField
+{
+    IntegratePostionWorklet(const Real& dt, const Real fmt2v)
+        : _dt(dt)
+        , _fmt2v(fmt2v)
+    {
+    }
+    using ControlSignature = void(FieldIn shakeforce, FieldIn mass, FieldInOut position);
+    using ExecutionSignature = void(_1, _2, _3);
+
+    VTKM_EXEC void operator()(Vec3f& shakeforce, Real mass, Vec3f& position) const
+    {
+        position = position + 0.5 * _dt * _dt * shakeforce / mass * _fmt2v;
+    }
+
+    Real _dt;
+    Real _fmt2v;
+};
+
+struct Velocity3angleWorklet : vtkm::worklet::WorkletMapField
+{
+    Velocity3angleWorklet(const Vec3f& box,
+        const Real& dt)
+        : _box(box)
+        , _dt(dt)
+    {
+    }
+    using ControlSignature = void(const FieldIn anglelist,
+        WholeArrayIn whole_pts,
+        WholeArrayIn whole_velocity_p,
+        const WholeArrayIn whole_mass,
+        ExecObject locator,
+        WholeArrayOut velocity);
+    using ExecutionSignature = void(_1, _2, _3, _4, _5, _6);
+
+    template<typename AngleListType,
+        typename PositionType,
+        typename VelocityPType,
+        typename MassType,
+        typename VelocityType>
+    VTKM_EXEC void operator()(const AngleListType& anglelist,
+        PositionType& whole_pts,
+        VelocityPType& whole_velocity_p,
+        const MassType& whole_mass,
+        const ExecPointLocator& locator,
+        VelocityType& whole_velocity) const
+    {
+        IdComponent i0 = anglelist[0]; //H
+        IdComponent i1 = anglelist[1]; //O
+        IdComponent i2 = anglelist[2]; //H
+
+        // minimum image
+
+        Vec3f r01 = locator.MinDistanceVec(whole_pts.Get(i1), whole_pts.Get(i0), _box);
+        Vec3f r12 = locator.MinDistanceVec(whole_pts.Get(i2), whole_pts.Get(i1), _box);
+        Vec3f r20 = locator.MinDistanceVec(whole_pts.Get(i0), whole_pts.Get(i2), _box);
+
+        // sv01,sv02,sv12 = velocity differences
+
+        Vec3f sv10;
+        sv10 = whole_velocity_p.Get(i0) - whole_velocity_p.Get(i1);
+        Vec3f sv21;
+        sv21 = whole_velocity_p.Get(i1) - whole_velocity_p.Get(i2);
+        Vec3f sv02;
+        sv02 = whole_velocity_p.Get(i2) - whole_velocity_p.Get(i0);
+
+
+        Real invmass0 = 1.0 / whole_mass.Get(i0);
+        Real invmass1 = 1.0 / whole_mass.Get(i1);
+        Real invmass2 = 1.0 / whole_mass.Get(i2);
+
+        Vec3f c, l;
+        Vec<Vec3f, 3> a;
+        //Vec<Vec3f> a[3][3];
+
+        // setup matrix
+
+        a[0][0] = (invmass1 + invmass0) * vtkm::Dot(r01, r01);
+        a[0][1] = -invmass1 * vtkm::Dot(r01, r12);
+        a[0][2] = (-invmass0) * vtkm::Dot(r01, r20);
+        a[1][0] = a[0][1];
+        a[1][1] = (invmass1 + invmass2) * vtkm::Dot(r12, r12);
+        a[1][2] = -(invmass2)*vtkm::Dot(r20, r12);
+        a[2][0] = a[0][2];
+        a[2][1] = a[1][2];
+        a[2][2] = (invmass0 + invmass2) * vtkm::Dot(r20, r20);
+
+        // sestup RHS
+
+        c[0] = -vtkm::Dot(sv10, r01);
+        c[1] = -vtkm::Dot(sv21, r12);
+        c[2] = -vtkm::Dot(sv02, r20);
+
+        Vec<Vec3f, 3> ai;
+        //Vec<Vec3f> ai[3][3];
+
+        Real determ, determinv = 0.0;
+        // calculate the determinant of the matrix
+
+        determ = a[0][0] * a[1][1] * a[2][2] + a[0][1] * a[1][2] * a[2][0] +
+            a[0][2] * a[1][0] * a[2][1] - a[0][0] * a[1][2] * a[2][1] - a[0][1] * a[1][0] * a[2][2] -
+            a[0][2] * a[1][1] * a[2][0];
+
+        // check if matrix is actually invertible
+
+        if (vtkm::Abs(determ) < 0.0001)
+            printf(" Error: Rattle determinant = 0.0 ");
+
+        // calculate the inverse 3x3 matrix: A^(-1) = (ai_jk)
+
+        determinv = 1.0 / determ;
+        ai[0][0] = determinv * (a[1][1] * a[2][2] - a[1][2] * a[2][1]);
+        ai[0][1] = -determinv * (a[0][1] * a[2][2] - a[0][2] * a[2][1]);
+        ai[0][2] = determinv * (a[0][1] * a[1][2] - a[0][2] * a[1][1]);
+        ai[1][0] = -determinv * (a[1][0] * a[2][2] - a[1][2] * a[2][0]);
+        ai[1][1] = determinv * (a[0][0] * a[2][2] - a[0][2] * a[2][0]);
+        ai[1][2] = -determinv * (a[0][0] * a[1][2] - a[0][2] * a[1][0]);
+        ai[2][0] = determinv * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+        ai[2][1] = -determinv * (a[0][0] * a[2][1] - a[0][1] * a[2][0]);
+        ai[2][2] = determinv * (a[0][0] * a[1][1] - a[0][1] * a[1][0]);
+
+        // calculate the solution:  (l01, l02, l12)^T = A^(-1) * c
+
+        for (int i = 0; i < 3; i++)
+        {
+            l[i] = 0;
+            for (int j = 0; j < 3; j++)
+                l[i] += ai[i][j] * c[j];
+        }
+
+        // [l01,l02,l12]^T = [lamda12,lamda23,lamda31]^T
+
+        Vec3f velocity_constraint_i0 = l[0] * r01 * invmass0 - l[2] * r20 * invmass0;
+        Vec3f velocity_constraint_i1 = l[1] * r12 * invmass1 - l[0] * r01 * invmass1;
+        Vec3f velocity_constraint_i2 = l[2] * r20 * invmass2 - l[1] * r12 * invmass2;
+
+        whole_velocity.Set(i0, velocity_constraint_i0);
+        whole_velocity.Set(i1, velocity_constraint_i1);
+        whole_velocity.Set(i2, velocity_constraint_i2);
+    }
+
+    Vec3f _box;
+    Real _dt;
 };
 
 }

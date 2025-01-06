@@ -1,4 +1,30 @@
-﻿#include "Executioner.h"
+﻿//==================================================================================
+//  RBMD 2.2.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
+#include "Executioner.h"
 #include "Application.h"
 #include "Logging.h"
 #include "Output.h"
@@ -20,6 +46,7 @@ Executioner::Executioner(const Configuration& cfg)
   _current_step = 0;
   _end_time = _dt * _num_steps;
   _timer.Start();
+  _time_count.Start();
 }
 
 void Executioner::Init() 
@@ -50,9 +77,9 @@ void Executioner::Execute()
 
 void Executioner::PostExecute()
 {
-  console::Success("运行完成.  运行时间: ", _timer.GetElapsedTime());
-  console::Info("当前步: ", _current_step-1, "总步数: ", _num_steps);
-  console::Info("当前时间: ", _current_time-_dt, "结束时间: ",  _end_time);
+  console::Success("Running successfully.  Total time: ", _time_count.GetElapsedTime(), "s");
+  //console::Info("当前步: ", _current_step-1, "总步数: ", _num_steps);
+  console::Info("Time step: ", _dt,"fs      ", "Total simulation time: ",  _end_time,"fs");
   std::ofstream log_file("rbmd.log",std::ios::app);
   try
   {

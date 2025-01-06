@@ -1,4 +1,30 @@
-﻿#pragma once
+﻿//==================================================================================
+//  RBMD 2.2.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
+#pragma once
 #include <string>
 
 namespace field
@@ -61,6 +87,7 @@ const std::string PARA_NEIGHBOR_SAMPLE_NUM = "neighbor_sample_num";
 const std::string PARA_COULOMB_SAMPLE_NUM = "coulomb_sample_num";
 const std::string PARA_VLENGTH = "vLength";
 const std::string PARA_BOX = "box";
+const std::string PARA_POINTT = "fixedpoint";
 const std::string PARA_VOLUME = "volume";
 const std::string PARA_BIN_NUMBER = "bin_number";
 const std::string PARA_RANGE = "range";
@@ -70,10 +97,15 @@ const std::string PARA_RHO = "rho";
 const std::string PARA_RDF_RHO = "rdf_rho";
 const std::string PARA_ALPHA = "alpha";
 const std::string PARA_KMAX = "kmax";
+const std::string PARA_LJ_ENERGY = "lj_energy";
+const std::string PARA_COUL_ENERGY = "coul_energy";
+const std::string PARA_SELF_ENERGY = "self_energy";
+const std::string PARA_EWALD_LONG_ENERGY = "ewald_long_energy";
 const std::string PARA_BOND_ENERGY = "bond_energy";
 const std::string PARA_ANGLE_ENERGY = "angle_energy";
 const std::string PARA_TEMPT_SUM = "tempt_sum";
 const std::string PARA_TEMPT = "temp_t";
+const std::string PARA_PRESSURE = "pressure";
 const std::string PARA_RBE_P = "rbeP";
 const std::string PARA_CENTER_TYPE = "center_type";
 const std::string PARA_TARGET_TYPE = "target_type";
@@ -95,11 +127,15 @@ const std::string PARA_ATOM_MAP = "atom_map";
 const std::string PARA_FORCE_FIELD_TYPE = "force_field_type";
 const std::string PARA_POTENTIAL_FILE = "potential_file";
 const std::string PARA_NEIGHBOR_TYPE = "neighbor_type";
+const std::string PARA_BOND_TYPE = "bond_type";
+const std::string PARA_ANGLE_TYPE = "angle_type";
+const std::string PARA_DIHEDRAL_TYPE = "dihedral_type";
+const std::string PARA_IMPROPER_TYPE = "improper_type";
 const std::string PARA_FIX_SHAKE = "fix_shake";
 const std::string PARA_COULOMB_TYPE = "coulomb_type";
 const std::string PARA_ENSEMBLE = "ensemble";
-const std::string PARA_TEMPERATURE = "temperature";
-const std::string PARA_PRESSURE = "pressure";
+const std::string PARA_TEMPERATUREE_VECTOR = "temperature_vector";
+const std::string PARA_PRESSURE_VECTOR = "pressure_vector";
 const std::string PARA_TEMP_CTRL_TYPE = "temp_ctrl_type";
 const std::string PARA_PRESS_CTRL_TYPE = "press_ctrl_type";
 const std::string PARA_TIMESTEP = "timestep";

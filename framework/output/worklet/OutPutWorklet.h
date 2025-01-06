@@ -1,4 +1,30 @@
-﻿#pragma once
+﻿//==================================================================================
+//  RBMD 2.2.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
+#pragma once
 #include "locator/ContPointLocator.h"
 #include "forceFunction/ContForceFunction.h"
 #include "topology/ContTopology.h"
@@ -12,6 +38,14 @@ using GroupRealIdType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::Arra
 
 namespace OutPut
 {
+    void ComputeNeighbours(const Real& cut_off,
+        const Vec3f& box,
+        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
+        const ContPointLocator& locator,
+        GroupVecType& id_verletlist_group,
+        vtkm::cont::ArrayHandle<vtkm::Id>& num_verletlist,
+        CoordOffsetType& offset_verletlist_group);
+
 void EAM_rho(const Real& eam_cut_off,
              const Vec3f& box,
              const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -46,25 +80,6 @@ void ComputePotentialEnergy(const Real& cutoff,
                             const ContForceFunction& force_function,
                             vtkm::cont::ArrayHandle<Real>& potential_energy);
 
-void ComputeSpecialBondsLJPotential(const Real& cutoff,
-                                    const Vec3f& box,
-                                    const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                                    const ContPointLocator& locator,
-                                    const ContTopology& topology,
-                                    const ContForceFunction& force_function,
-                                    const GroupIdIdType& group_ids,
-                                    const GroupRealIdType& group_weights,
-                                    vtkm::cont::ArrayHandle<Real>& potential_energy);
-
-void ComputeNearElePotential(const Real& cutoff,
-                             const Real& alpha,
-                             const Vec3f& box,
-                             const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-                             const ContPointLocator& locator,
-                             const ContTopology& topology,
-                             const ContForceFunction& force_function,
-                             vtkm::cont::ArrayHandle<Real>& near_potential_energy);
-
 void ComputeDensity(const vtkm::Vec3f& K,
                     const vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,
                     const vtkm::cont::ArrayHandle<Real>& charge,
@@ -73,25 +88,6 @@ void ComputeDensity(const vtkm::Vec3f& K,
     
 void ComputeSqCharge(const vtkm::cont::ArrayHandle<Real>& charge,
                      vtkm::cont::ArrayHandle<Real>& SelfEnergy);
-
-using GroupVecType = vtkm::cont::ArrayHandleGroupVecVariable<vtkm::cont::ArrayHandle<vtkm::Id>,
-                                                             vtkm::cont::ArrayHandle<vtkm::Id>>;
-void ComputeSpecialFarCoul(const Vec3f& box,
-                           const vtkm::cont::ArrayHandle<Id>& atoms_id,
-                           const GroupVecType& group_vec,
-                           const ContPointLocator& locator,
-                           const ContTopology& topology,
-                           const ContForceFunction& force_function,
-                           vtkm::cont::ArrayHandle<Real>& SpecFarEnergy);
-void ComputeSpecialBondsCoul(const Vec3f& box,
-                             const vtkm::cont::ArrayHandle<Id>& atoms_id,
-                             const GroupVecType& group_vec,
-                             const ContPointLocator& locator,
-                             const ContTopology& topology,
-                             const ContForceFunction& force_function,
-                             const GroupIdIdType& group_ids,
-                             const GroupRealIdType& group_weights,
-                             vtkm::cont::ArrayHandle<Real>& SpecFarEnergy);
 
  void ComputeRDF(const Id& num_center_pos,
                 const Real& _rho,

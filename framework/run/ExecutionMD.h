@@ -1,4 +1,30 @@
-﻿#pragma once
+﻿//==================================================================================
+//  RBMD 2.2.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
+#pragma once
 #include "Execution.h"
 #include "locator/ContPointLocator.h"
 #include "forceFunction/ContForceFunction.h"
@@ -22,18 +48,27 @@ public:
   virtual void InitParameters();
 
 protected:
-  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Vec3f& _box, IdComponent& Kmax);
+  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Vec3f& _box, Id3& Kmax, Real& alpha,Real& ewald_energy_total);
   std::vector<Vec2f> ComputeChargeStructureFactorRBE(Real& _Vlength, ArrayHandle<Vec3f>& _psample);
   void ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                           IdComponent& RBE_P,
-                          ArrayHandle<Vec3f>& RBE_ele_force);
-  void ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force);
+                          ArrayHandle<Vec3f>& RBE_ele_force,
+                          ArrayHandle<Vec6f>& ewald_long_virial_atom);
+  void ComputeEwaldEleForce(Id3& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom);
+  void ComputeLJCoulEnergy();
 
-  void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
-  void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce);
-  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce);
-  void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce);
+  void ComputeLJEnergy();
+
+  void ComputeSelfEnergy(Real& self_potential_energy_avr);
+  void ComputeEwaldEnergy(Vec3f& _box, Id3& Kmax, Real& alpha, Real& ewald_energy_total);
+
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
+  void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce, ArrayHandle<Vec6f>& lj_rbl_virial_atom);
+  void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHandle<Vec6f>& lj_virial_atom);
+
+  void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& lj_coul_rbl_virial_atom);
+  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& lj_coul_virial_atom);
+
   void ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeRBLEAMForce(ArrayHandle<Vec3f>& force);
   void ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force);
@@ -42,7 +77,7 @@ protected:
 
   void UpdateVerletList();
 
-  void ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+  void ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force, vtkm::cont::ArrayHandle<Vec6f>& corr_virial);
   virtual void InitialCondition();
   virtual void SetForceFunction();
   virtual void SetTopology();
@@ -54,6 +89,11 @@ protected:
                                           ArrayHandle<Vec2f>& new_rhok);
   void InitPointLocator();
 
+
+  void Computedof();
+  void ComputeVirial();
+
+  void ApplyPbc();
 protected:
   ArrayHandle<Id> _molecule_id;
   ArrayHandle<Id> _atoms_id;
@@ -80,4 +120,26 @@ protected:
 
   ContStaticTable _static_table;
   std::string _init_way;
+
+  //
+  Real tdof;
+  Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
+  //Real _pressure_scalar; // computed global pressure scalar
+
+  ArrayHandle<Vec6f> _lj_virial_atom;
+  ArrayHandle<Vec6f> _lj_rbl_virial_atom;
+
+  ArrayHandle<Vec6f> _lj_coul_virial_atom;
+  ArrayHandle<Vec6f> _lj_coul_rbl_virial_atom;
+
+  ArrayHandle<Vec6f> _spec_coul_virial_atom;
+
+  ArrayHandle<Vec6f> _ewald_long_virial_atom;
+
+  ArrayHandle<Vec6f> _bond_virial_atom;
+  ArrayHandle<Vec6f> _angle_virial_atom;
+  ArrayHandle<Vec6f> _dihedral_virial_atom;
+  ArrayHandle<Vec6f> _shake_first_virial_atom;
+
+  ArrayHandle<Real> _energy_lj, _energy_coul;
 };
