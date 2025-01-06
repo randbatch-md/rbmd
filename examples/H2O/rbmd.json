@@ -39,7 +39,7 @@
       "type": "EWALD", //  RBE,EWALD
       "coulomb_sample_num": 100,
       "alpha": 0.0361,
-      "kmax": 3
+      "kmax": [3,3,3]
     },
 
     "extend": {
