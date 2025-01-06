@@ -49,7 +49,7 @@ public:
                     const Real& volume,
                     const Real& vlength,
                     const Vec3f& box,
-                    const IdComponent& kmax,
+                    const Id3& kmax,
                     const IdComponent& rbeP,
                     const Real& rhomax,
                     const Id& nrho,
@@ -535,6 +535,49 @@ public:
     return force;
   }
 
+  VTKM_EXEC void  ComputeNearEnergyForceRs_fix(
+      const Vec3f& r_ij,
+      const Real& charge_pi,
+      const Real& charge_pj,
+      const Real& rs,
+      Vec3f& force_coul_factor,
+      Vec3f& force_coul) const
+  {
+      const Real small_value = 0.0001;
+      const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+      const Real dis = vtkm::Sqrt(dis_2);
+      const Real dis_3 = dis * dis * dis;
+      auto rs_2 = rs * rs;
+      if (dis_2 < rs_2 && dis_2 > small_value)
+      //if (dis_2 < rs_2)
+      {
+          force_coul_factor = -charge_pi * charge_pj * r_ij / dis_3;//+
+          force_coul = -charge_pi * charge_pj * Gnear(_alpha, dis) * r_ij / dis;
+      }
+  }
+
+  VTKM_EXEC void  ComputeNearEnergyForceRcs_fix(
+      const Vec3f& r_ij,
+      const Real& charge_pi,
+      const Real& charge_pj,
+      const Real& rc,
+      const Real& rs,
+      Vec3f& force_coul_factor,
+      Vec3f& force_coul) const
+  {
+      const Real small_value = 0.0001;
+      const Real dis_2 = r_ij[0] * r_ij[0] + r_ij[1] * r_ij[1] + r_ij[2] * r_ij[2];
+      const Real dis = vtkm::Sqrt(dis_2);
+      const Real dis_3 = dis * dis * dis;
+      auto rs_2 = rs * rs;
+      auto rc_2 = rc * rc;
+      if (dis_2 < rc_2 && dis_2 > rs_2)
+      {
+          force_coul_factor = -charge_pi * charge_pj * r_ij / dis_3;//+
+          force_coul = -charge_pi * charge_pj * Gnear(_alpha, dis) * r_ij / dis;
+      }
+  }
+
   VTKM_EXEC Vec3f ComputeNearEnergyForceERF(const Vec3f& r_ij,
                                          const Real& charge_pi,
                                          const Real& charge_pj,
@@ -772,7 +815,7 @@ public:
     return 0.5 * ComptePE_ij;
   }
 
-  VTKM_EXEC Real ComputePotentialEn0(const Vec3f& r_ij,
+  VTKM_EXEC Real ComputePotentialEn_fix(const Vec3f& r_ij,
       const Real& eps_i,
       const Real& eps_j,
       const Real& sigma_i,
@@ -808,7 +851,7 @@ public:
     Real dis = vtkm::Magnitude(r_ij);
     if (dis < cut_off && dis > small_value)
     {
-      ComputePE_ij = charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(nearalpha) * dis)) / dis;
+      ComputePE_ij = charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(_alpha) * dis)) / dis;
     }
     return 0.5 * ComputePE_ij;
   }
@@ -816,8 +859,7 @@ public:
   VTKM_EXEC Real  ComputeNearEleEnergy_fix(const Vec3f& r_ij,
       const Real& charge_i,
       const Real& charge_j,
-      const Real& cut_off,
-      const Real& nearalpha) const
+      const Real& cut_off) const
   {
       const Real small_value = 0.0001;
       Real energy_coul = 0;
@@ -827,7 +869,7 @@ public:
       Real dis = vtkm::Sqrt(dis_2);
       if (dis_2 < cut_off_2 && dis_2 > small_value)
       {
-          energy_coul = 0.5 * charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(nearalpha) * dis)) / dis;
+          energy_coul = 0.5 * charge_i * charge_j * (1.0 - vtkm::ERF(vtkm::Sqrt(_alpha) * dis)) / dis;
       }
       return energy_coul;
   }
@@ -1141,7 +1183,7 @@ public:
   Real _Vlength;
   Vec3f _box;
   Real _sum_gauss;
-  IdComponent Kmax;
+  Id3 Kmax;
   IdComponent RBEP;
 
   Real _rhomax;

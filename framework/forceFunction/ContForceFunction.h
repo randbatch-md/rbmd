@@ -39,7 +39,7 @@ public:
                      const Real& volume,
                      const Real& vlength,
                      const Vec3f& box,
-                     const IdComponent& kmax)
+                     const Id3& kmax)
   {
     this->_cut_Off = cut_off;
     this->_alpha = alpha;
@@ -72,7 +72,7 @@ public:
   Real _volume;
   Real _Vlength;
   Vec3f _box;
-  IdComponent Kmax;
+  Id3 Kmax;
   IdComponent RBEP;
 
   Real _rhomax;

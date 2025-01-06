@@ -48,19 +48,27 @@ public:
   virtual void InitParameters();
 
 protected:
-  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Vec3f& _box, IdComponent& Kmax);
+  std::vector<Vec2f> ComputeChargeStructureFactorEwald(Vec3f& _box, Id3& Kmax, Real& alpha,Real& ewald_energy_total);
   std::vector<Vec2f> ComputeChargeStructureFactorRBE(Real& _Vlength, ArrayHandle<Vec3f>& _psample);
   void ComputeRBEEleForce(ArrayHandle<Vec3f>& psample,
                           IdComponent& RBE_P,
                           ArrayHandle<Vec3f>& RBE_ele_force,
                           ArrayHandle<Vec6f>& ewald_long_virial_atom);
-  void ComputeEwaldEleForce(IdComponent& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom);
+  void ComputeEwaldEleForce(Id3& Kmax, ArrayHandle<Vec3f>& Ewald_ele_force, ArrayHandle<Vec6f>& ewald_long_virial_atom);
+  void ComputeLJCoulEnergy();
 
-  void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce);
-  void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce);
-  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& nearVirial_atom);
-  void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHandle<Vec6f>& nearVirial_atom);
+  void ComputeLJEnergy();
+
+  void ComputeSelfEnergy(Real& self_potential_energy_avr);
+  void ComputeEwaldEnergy(Vec3f& _box, Id3& Kmax, Real& alpha, Real& ewald_energy_total);
+
   void ComputeOriginalLJForce(ArrayHandle<Vec3f>& ljforce);
+  void ComputeRBLLJForce(ArrayHandle<Vec3f>& LJforce, ArrayHandle<Vec6f>& lj_rbl_virial_atom);
+  void ComputeVerletlistLJForce(ArrayHandle<Vec3f>& ljforce, ArrayHandle<Vec6f>& lj_virial_atom);
+
+  void ComputeRBLNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& lj_coul_rbl_virial_atom);
+  void ComputeVerletlistNearForce(ArrayHandle<Vec3f>& nearforce, ArrayHandle<Vec6f>& lj_coul_virial_atom);
+
   void ComputeSpecialBondsLJForce(ArrayHandle<Vec3f>& ljforce);
   void ComputeRBLEAMForce(ArrayHandle<Vec3f>& force);
   void ComputeVerletlistEAMForce(ArrayHandle<Vec3f>& force);
@@ -69,7 +77,7 @@ protected:
 
   void UpdateVerletList();
 
-  void ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+  void ComputeCorrForce(vtkm::cont::ArrayHandle<Vec3f>& corr_force, vtkm::cont::ArrayHandle<Vec6f>& corr_virial);
   virtual void InitialCondition();
   virtual void SetForceFunction();
   virtual void SetTopology();
@@ -82,10 +90,8 @@ protected:
   void InitPointLocator();
 
 
-  //
-  void ComputeVerletlistLJVirial(ArrayHandle<Vec6f>& lj_virial);
-  void ComputeCoulVirial(ArrayHandle<Vec6f>& Coul_virial);
-  void ComputeEwaldLongVirial(IdComponent& Kmax, ArrayHandle<Vec6f>& Ewald_long_virial);
+  void Computedof();
+  void ComputeVirial();
 
   void ApplyPbc();
 protected:
@@ -115,17 +121,25 @@ protected:
   ContStaticTable _static_table;
   std::string _init_way;
 
-  ArrayHandle<Vec6f> _nearVirial_atom;
+  //
+  Real tdof;
+  Vec6f virial;          // accumulated virial: xx,yy,zz,xy,xz,yz
+  //Real _pressure_scalar; // computed global pressure scalar
+
   ArrayHandle<Vec6f> _lj_virial_atom;
-  ArrayHandle<Vec6f> _coul_virial_atom;
-  ArrayHandle<Vec6f> _ewald_long_virial_atom;
-  ArrayHandle<Vec6f> _ewald_long_virial_atom_1;
-  ArrayHandle<Vec6f> _bond_virial_atom;
-  ArrayHandle<Real> _bond_virial_atom_1;
-  ArrayHandle<Vec6f> _angle_virial_atom;
-  ArrayHandle<Real> _angle_virial_atom_1;
-  ArrayHandle<Vec6f> _dihedral_virial_atom;
+  ArrayHandle<Vec6f> _lj_rbl_virial_atom;
+
+  ArrayHandle<Vec6f> _lj_coul_virial_atom;
+  ArrayHandle<Vec6f> _lj_coul_rbl_virial_atom;
+
   ArrayHandle<Vec6f> _spec_coul_virial_atom;
 
+  ArrayHandle<Vec6f> _ewald_long_virial_atom;
+
+  ArrayHandle<Vec6f> _bond_virial_atom;
+  ArrayHandle<Vec6f> _angle_virial_atom;
+  ArrayHandle<Vec6f> _dihedral_virial_atom;
   ArrayHandle<Vec6f> _shake_first_virial_atom;
+
+  ArrayHandle<Real> _energy_lj, _energy_coul;
 };
