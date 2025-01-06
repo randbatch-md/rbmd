@@ -52,6 +52,7 @@ private:
   vtkm::cont::ArrayHandle<Vec3f> BondForce();
   vtkm::cont::ArrayHandle<Vec3f> AngleForce();
   vtkm::cont::ArrayHandle<Vec3f> DihedralsForce();
+  vtkm::cont::ArrayHandle<Vec3f> ImproperForce();
   vtkm::cont::ArrayHandle<Vec3f> SpecialCoulForce();
   vtkm::cont::ArrayHandle<Vec3f> EleNewForce();
   void TempConTypeForce();

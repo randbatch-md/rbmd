@@ -403,11 +403,11 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::LJForce()
     _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
     if (_nearforce_type == "RBL")
     {
-        ComputeRBLLJForce(_LJforce, _nearVirial_atom);
+        ComputeRBLLJForce(_LJforce, _lj_rbl_virial_atom);
     }
     if (_nearforce_type == "VERLETLIST")
     {
-        ComputeVerletlistLJForce(_LJforce, _nearVirial_atom);
+        ComputeVerletlistLJForce(_LJforce, _lj_virial_atom);
     }
     return _LJforce;
 }
@@ -434,11 +434,11 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::NearForce()
 
     if (_nearforce_type == "RBL")
     {
-        ComputeRBLNearForce(_nearforce, _nearVirial_atom);
+        ComputeRBLNearForce(_nearforce, _lj_coul_rbl_virial_atom);
     }
     else if (_nearforce_type == "VERLETLIST")
     {
-        ComputeVerletlistNearForce(_nearforce, _nearVirial_atom);
+        ComputeVerletlistNearForce(_nearforce, _lj_coul_virial_atom);
     }
     return _nearforce;
 }
@@ -448,11 +448,11 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::NearForceLJ()
     _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
     if (_nearforce_type == "RBL")
     {
-        ComputeRBLLJForce(_all_force, _nearVirial_atom);
+        ComputeRBLLJForce(_all_force, _lj_rbl_virial_atom);
     }
     else if (_nearforce_type == "VERLETLIST")
     {
-        ComputeVerletlistLJForce(_all_force, _nearVirial_atom);
+        ComputeVerletlistLJForce(_all_force, _lj_virial_atom);
     }
     return _all_force;
 }
@@ -779,6 +779,15 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::DihedralsForce()
     }
 }
 
+vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::ImproperForce()
+{
+    auto dihedral_type = _para.GetParameter<std::string>(PARA_DIHEDRAL_TYPE);
+    if ("Harmonic" == dihedral_type) 
+    {
+
+    }
+}
+
 vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::SpecialCoulForce()
 {
     auto vLength = _para.GetParameter<Real>(PARA_VLENGTH);
@@ -828,17 +837,6 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNPT::EleNewForce()
     return _ele_new_force;
 }
 
-vtkm::cont::ArrayHandle<Vec6f> ExecutionNPT::LJVirial()
-{
-    ComputeVerletlistLJVirial(_lj_virial_atom);
-    return _lj_virial_atom;
-}
-
-vtkm::cont::ArrayHandle<Vec6f> ExecutionNPT::EwaldVirial()
-{
-    ComputeEwaldLongVirial(_Kmax, _ewald_long_virial_atom);
-    return _ewald_long_virial_atom;
-}
 void ExecutionNPT::TempConTypeForce()
 {
     vtkm::cont::ArrayHandle<Real> mass;

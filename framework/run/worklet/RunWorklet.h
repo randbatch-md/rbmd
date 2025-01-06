@@ -145,7 +145,6 @@ namespace RunWorklet
        const CoordOffsetType& coord_offset_j,
        const GroupIdIdType& group_ids,
        const GroupRealIdType& group_weights,
-       vtkm::cont::ArrayHandle<Vec6f>& nearvirial,
        vtkm::cont::ArrayHandle<Real>& energy_lj,
        vtkm::cont::ArrayHandle<Real>& Energy_coul);
 
@@ -159,7 +158,6 @@ namespace RunWorklet
        const GroupVecType& Group_j,
        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
        const CoordOffsetType& coord_offset_j,
-       vtkm::cont::ArrayHandle<Vec6f>& nearvirial,
        vtkm::cont::ArrayHandle<Real>& energy_lj,
        vtkm::cont::ArrayHandle<Real>& Energy_coul);
 
@@ -228,7 +226,8 @@ namespace RunWorklet
                         const GroupVecType& id_verletlist_group,
                         const GroupNumType& num_verletlist,
                         const CoordOffsetType& offset_verletlist_group,
-                        vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+                        vtkm::cont::ArrayHandle<Vec3f>& corr_force,
+                         vtkm::cont::ArrayHandle<Vec6f>& corr_virial);
 
     void NearForceRBLERFSpecialBonds(const Id& rs_num,
                                       const Id& pice_num,
@@ -244,7 +243,8 @@ namespace RunWorklet
                                       const CoordOffsetType& offset_verletlist_group,
                                       const GroupIdIdType& group_ids,
                                       const GroupRealIdType& group_weights,
-                                      vtkm::cont::ArrayHandle<Vec3f>& corr_force);
+                                      vtkm::cont::ArrayHandle<Vec3f>& corr_force,
+                                     vtkm::cont::ArrayHandle<Vec6f>& corr_virial);
 
     void NearForceRBLERFSpecialBonds_fix(const Id& rs_num,
         const Id& pice_num,
@@ -284,7 +284,8 @@ namespace RunWorklet
                     const GroupVecType& id_verletlist_group,
                     const GroupNumType& num_verletlist,
                     const CoordOffsetType& offset_verletlist_group,
-                    vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce);
+                    vtkm::cont::ArrayHandle<Vec3f>& corr_ljforce,
+                    vtkm::cont::ArrayHandle<Vec6f>& corr_ljvirial);
 
     void EAMfp(const Real& rc,
                const Vec3f& box,
@@ -320,6 +321,10 @@ namespace RunWorklet
     void SumRBLCorrForce(const vtkm::Vec3f corr_value,
                          const vtkm::cont::ArrayHandle<vtkm::Vec3f>& corr_force,
                          vtkm::cont::ArrayHandle<vtkm::Vec3f>& LJforce);
+
+    void SumRBLCorrVirial(const Vec6f corr_value,
+        const vtkm::cont::ArrayHandle<Vec6f>& corr_virial,
+        vtkm::cont::ArrayHandle<Vec6f>& LJvirial);
 
     void LJForceWithPeriodicBC(const Real& cut_off,
                                const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
@@ -469,37 +474,6 @@ namespace RunWorklet
 
     void ComputeSqCharge(const vtkm::cont::ArrayHandle<Real>& charge,
         vtkm::cont::ArrayHandle<Real>& SelfEnergy);
-
-    void ComputeLJVirial(const Real& cut_off,
-        const Vec3f& box,
-        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-        const ContPointLocator& locator,
-        const ContTopology& topology,
-        const ContForceFunction& force_function,
-        const GroupVecType& Group_j,
-        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-        const CoordOffsetType& coord_offset_j,
-        vtkm::cont::ArrayHandle<Vec6f>& LJVirial);
-
-    void ComputeCoulVirial(const Real& cut_off,
-        const Vec3f& box,
-        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-        const ContPointLocator& locator,
-        const ContTopology& topology,
-        const ContForceFunction& force_function,
-        const GroupVecType& Group_j,
-        const vtkm::cont::ArrayHandle<vtkm::Id>& num_j,
-        const CoordOffsetType& coord_offset_j,
-        vtkm::cont::ArrayHandle<Vec6f>& CoulVirial);
-
-    void ComputeEwaldVirial(const Id3& Kmax,
-        const Real& unit_factor,
-        const vtkm::cont::ArrayHandle<vtkm::Id>& atoms_id,
-        const vtkm::cont::ArrayHandle<vtkm::Vec2f>& whole_rhok,
-        const ContForceFunction& force_function,
-        const ContTopology& topology,
-        const ContPointLocator& locator,
-        vtkm::cont::ArrayHandle<Vec6f>& EwaldVirial);
 
     void fix_press_berendsen(const Real& scale_factor,
         vtkm::cont::ArrayHandle<vtkm::Vec3f>& position,

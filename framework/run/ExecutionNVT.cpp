@@ -358,11 +358,11 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::LJForce()
   _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
   if (_nearforce_type == "RBL")
   {
-    ComputeRBLLJForce(_LJforce, _nearVirial_atom);
+    ComputeRBLLJForce(_LJforce, _lj_rbl_virial_atom);
   }
   if (_nearforce_type == "VERLETLIST")
   {
-    ComputeVerletlistLJForce(_LJforce, _nearVirial_atom);
+    ComputeVerletlistLJForce(_LJforce, _lj_virial_atom);
   }
   return _LJforce;
 }
@@ -389,11 +389,11 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForce()
 
   if (_nearforce_type == "RBL")
   {
-    ComputeRBLNearForce(_nearforce,_nearVirial_atom);
+    ComputeRBLNearForce(_nearforce, _lj_coul_rbl_virial_atom);
   }
   else if (_nearforce_type == "VERLETLIST")
   {
-    ComputeVerletlistNearForce(_nearforce, _nearVirial_atom);
+    ComputeVerletlistNearForce(_nearforce, _lj_coul_virial_atom);
   }
   return _nearforce;
 }
@@ -403,11 +403,11 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::NearForceLJ()
   _nearforce_type = _para.GetParameter<std::string>(PARA_NEIGHBOR_TYPE);
   if (_nearforce_type == "RBL")
   {
-    ComputeRBLLJForce(_all_force, _nearVirial_atom);
+    ComputeRBLLJForce(_all_force, _lj_rbl_virial_atom);
   }
   else if (_nearforce_type == "VERLETLIST")
   {
-    ComputeVerletlistLJForce(_all_force,_nearVirial_atom);
+    ComputeVerletlistLJForce(_all_force, _lj_virial_atom);
   }
   return _all_force;
 }
@@ -655,6 +655,15 @@ vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::DihedralsForce()
             reduce_force_dihedrals);
 
         return reduce_force_dihedrals;
+    }
+}
+
+vtkm::cont::ArrayHandle<Vec3f> ExecutionNVT::ImproperForce()
+{
+    auto dihedral_type = _para.GetParameter<std::string>(PARA_DIHEDRAL_TYPE);
+    if ("Harmonic" == dihedral_type)
+    {
+
     }
 }
 
