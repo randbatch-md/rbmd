@@ -1,0 +1,90 @@
+﻿{
+  "init_configuration": {
+
+    "read_data": {
+      "file": "CH4_5k_1W_v.data",
+      "unit": "REAL", //LJ ,REAL
+      "atom_style": "full", //支持atomic，charge,full
+      "velocity_type": "GAUSS"
+    }
+
+    //"inbuild": {
+    //  "dims": [ 10, 10, 10 ],
+    //  "x_range": [ 0.0, 10 ],
+    //  "y_range": [ 0.0, 10 ],
+    //  "z_range": [ 0.0, 10 ],
+    //  "velocity_type": "GAUSS",
+    //  "unit": "LJ"
+    //}
+  },
+
+  "hyper_parameters": {
+    "force_field": {
+      "type": "CVFF", // OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file)
+      //"potential_file": "/path/to/"
+	  "bond_type" :"Harmonic",
+	  "angle_type":"Harmonic"
+    },
+
+    "neighbor": {
+      "type": "VERLETLIST", //RBL,VERLET-LIST
+      "cut_off": 10,
+      "r_core": 5,
+      "neighbor_sample_num": 50
+    },
+
+    "coulomb": {
+      "type": "RBE", //  RBE,EWALD
+      "coulomb_sample_num": 100,
+      "alpha": 0.01,
+      "kmax": [2,2,2]
+    },
+
+    "extend": {
+      //"fix_shake": true,
+      "special_bonds": [ 0, 0, 0 ]
+    }
+  },
+
+  "execution": {
+    "ensemble": "NPT", // "NVE","NVT" ,"NPT"
+    "temperature":[ 298.0, 298.0, 50],  // 5= 10*dt;
+	"pressure" :[1.0,1.0,500,100],
+    "temp_ctrl_type": "NOSE_HOOVER", //BERENDSEN ，NOSE_HOOVER                                      
+    "press_ctrl_type": "NOSE_HOOVER", //Berendsen ,stochastic cell rescaling ,Parrinello-Rahman    
+    "timestep": 0.5,
+    "num_steps": 10000 //run 
+  },
+
+  "outputs": {
+
+    "thermo_out": { 
+      "interval": 1
+    },
+
+    "rdf_out": {
+      "interval": 10,
+      "radius": 10,
+      "dr": 0.1,
+      "statistics_rdf_steps": 10,
+      "atoms_pair": [[ 0, 0 ]]
+    },
+    
+    "msd_out": {
+      "interval": 1000,
+      "start_step": 0,
+      "end_step": 10000
+    },
+    
+    "vacf_out": {
+      "interval": 1000,
+      "start_step": 0,
+      "end_step": 10000
+    },
+    
+    "trajectory_out": {
+      "interval": 100
+    }
+
+  }
+}
