@@ -1,4 +1,30 @@
-﻿#pragma once
+﻿//==================================================================================
+//  RBMD 2.2.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
+#pragma once
 #include <vtkm/cont/CoordinateSystem.h>
 #include <vtkm/Deprecated.h>
 #include <vtkm/Pair.h>
@@ -98,14 +124,14 @@ public:
   }
 
   template<typename Func>
-  VTKM_EXEC void ExecuteOnKNeighbor(const IdComponent& k_maxconst, const vtkm::Id& atoms_id,Func& function) const
+  VTKM_EXEC void ExecuteOnKNeighbor(const Id3& k_maxconst, const vtkm::Id& atoms_id,Func& function) const
   {
     vtkm::Id indexEwald = 0;
-    for (vtkm::Id i = -k_maxconst; i <= k_maxconst; i++)
+    for (vtkm::Id i = -k_maxconst[0]; i <= k_maxconst[0]; i++)
     {
-      for (vtkm::Id j = -k_maxconst; j <= k_maxconst; j++)
+      for (vtkm::Id j = -k_maxconst[1]; j <= k_maxconst[1]; j++)
       {
-        for (vtkm::Id k = -k_maxconst; k <= k_maxconst; k++)
+        for (vtkm::Id k = -k_maxconst[2]; k <= k_maxconst[2]; k++)
         {
           if (i != 0 || j != 0 || k != 0)
           {

@@ -1,4 +1,30 @@
-﻿#pragma once
+﻿//==================================================================================
+//  RBMD 2.2.0 is developed for random batch molecular dynamics calculation.
+//
+//  Copyright(C) 2024 SHANGHAI JIAOTONG UNIVERSITY CHONGQING RESEARCH INSTITUTE
+//
+//  This program is free software : you can redistribute it and /or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.If not, see < https://www.gnu.org/licenses/>.
+//
+//  The post-processing data produced by VASPKIT may be used in any publications 
+//  provided that its use is explicitly acknowledged. A suitable reference for VASPKIT is:
+//  [1] Gao W, Zhao T, Guo Y, et al.RBMD: A molecular dynamics package enabling to simulate 
+//  10 million all - atom particles in a single graphics processing unit[J].arXiv preprint arXiv : 2407.09315, 2024.
+// 
+//  Contact Email : [support_wz@sciai.com.cn]
+//==================================================================================
+
+#pragma once
 #include "Executioner.h"
 #include "ExecutionMD.h"
 #include <vtkm/cont/ArrayHandleGroupVecVariable.h>
@@ -26,6 +52,7 @@ private:
   vtkm::cont::ArrayHandle<Vec3f> BondForce();
   vtkm::cont::ArrayHandle<Vec3f> AngleForce();
   vtkm::cont::ArrayHandle<Vec3f> DihedralsForce();
+  vtkm::cont::ArrayHandle<Vec3f> ImproperForce();
   vtkm::cont::ArrayHandle<Vec3f> SpecialCoulForce();
   vtkm::cont::ArrayHandle<Vec3f> EleNewForce();
   void TempConTypeForce();
@@ -53,6 +80,18 @@ private:
   void SetEAM();
   void InitStyle();
 
+  //
+  void Compute_Pressure_Scalar();
+  void SetUp();
+  void NoseHooverChain();
+  void ComputeTempTarget();
+  void InitialIntegrate();
+  void FinalIntegrate();
+
+  void NHCTempIntegrate();
+  void NVE_v();
+  void NVE_x();
+
 private:
   ArrayHandle<Vec3f> _nearforce;
   ArrayHandle<Vec3f> _LJforce;
@@ -75,7 +114,7 @@ private:
   ArrayHandle<Vec3f> _old_velocity;
   ArrayHandle<Vec3f> _old_position;
 
-  IdComponent _Kmax;
+  Id3 _Kmax;
   Real _cut_off;
   Real _nosehooverxi;
   Real _Vlength;
@@ -121,4 +160,22 @@ private:
   std::vector<Id> numforce;
 
   std::vector<Id> map; // mapping from atom types to elements
+
+    //temp
+  Real t_start, t_stop, t_period, t_target, ke_target;
+  Real t_freq;
+
+  std::vector<Real> eta, eta_dot; // chain thermostat for particles
+  std::vector<Real> eta_dotdot;
+  std::vector<Real> eta_mass;
+  Id mtchain;              // length of chain
+  Id mtchain_default_flag; // 1 = mtchain is default
+
+  Real dtv, dtf, dthalf, dt4, dt8, dto;
+  Id eta_mass_flag;
+  Real drag, tdrag_factor; // drag factor on particle thermostat
+
+  Id nc_tchain;
+  Real factor_eta;
+
 };

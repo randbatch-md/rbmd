@@ -2,7 +2,7 @@
   "init_configuration": {
 
     "read_data": {
-      "file": "H2O_212121_v.data",
+      "file": "CH4_5k_1W_v.data",
       "unit": "REAL", //LJ ,REAL
       "atom_style": "full", //支持atomic，charge,full
       "velocity_type": "GAUSS"
@@ -23,23 +23,21 @@
       "type": "CVFF", // OPLS-AA(fix_erf),CVFF(fix_erf)，EAM(potential_file)
       //"potential_file": "/path/to/"
 	  "bond_type" :"Harmonic",
-	  "angle_type":"Harmonic",
-	  //"dihedral_type":" Harmonic",
-	  //"improper_type":" Harmonic"
+	  "angle_type":"Harmonic"
     },
 
     "neighbor": {
-      "type": "VERLETLIST", //RBL,VERLETLIST
+      "type": "VERLETLIST", //RBL,VERLET-LIST
       "cut_off": 10,
       "r_core": 5,
-      "neighbor_sample_num": 100
+      "neighbor_sample_num": 50
     },
 
     "coulomb": {
-      "type": "EWALD", //  RBE,EWALD
+      "type": "RBE", //  RBE,EWALD
       "coulomb_sample_num": 100,
-      "alpha": 0.0361,
-      "kmax": [3,3,3]
+      "alpha": 0.01,
+      "kmax": [2,2,2]
     },
 
     "extend": {
@@ -49,11 +47,11 @@
   },
 
   "execution": {
-    "ensemble": "NVT", // "NVE","NVT" ,"NPT"
-    "temperature":[ 298.0, 298.0, 50],  // 5= 20*dt;
+    "ensemble": "NPT", // "NVE","NVT" ,"NPT"
+    "temperature":[ 298.0, 298.0, 50],  // 5= 10*dt;
 	"pressure" :[1.0,1.0,500,100],
     "temp_ctrl_type": "NOSE_HOOVER", //BERENDSEN ，NOSE_HOOVER                                      
-    "press_ctrl_type": "Berendsen", //Berendsen ,stochastic cell rescaling ,Parrinello-Rahman    
+    "press_ctrl_type": "NOSE_HOOVER", //Berendsen ,stochastic cell rescaling ,Parrinello-Rahman    
     "timestep": 0.5,
     "num_steps": 10000 //run 
   },
@@ -68,18 +66,18 @@
       "interval": 10,
       "radius": 10,
       "dr": 0.1,
-      "statistics_rdf_steps": 100,
+      "statistics_rdf_steps": 10,
       "atoms_pair": [[ 0, 0 ]]
     },
     
     "msd_out": {
-      "interval": 100,
+      "interval": 1000,
       "start_step": 0,
       "end_step": 10000
     },
     
     "vacf_out": {
-      "interval": 100,
+      "interval": 1000,
       "start_step": 0,
       "end_step": 10000
     },
