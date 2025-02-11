@@ -28,7 +28,7 @@ cmake_minimum_required(VERSION 3.12...3.15 FATAL_ERROR)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(project_name rbmd)
+set(project_name rbmd1)
 project(${project_name} CXX)
 
 set(_this ${project_name})
